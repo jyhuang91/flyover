@@ -208,6 +208,10 @@ Network * Network::New(const Configuration & config, const string & name)
   if ( n && ( config.GetInt( "link_failures" ) > 0 ) ) {
     n->InsertRandomFaults( config );
   }
+
+  // Jiayi, Core parking
+  _off_routers = config.GetIntArray("off_cores");
+
   return n;
 }
 
@@ -222,6 +226,10 @@ void Network::_Alloc( )
 
   // Jiayi, Core parking
   _router_states.resize(_size, true);	// Jiayi
+  for ( int i = 0; i < _off_routers.size(); ++i) {
+    int r_id = _off_routers[i];
+    _router_states[r_id] = false;
+  }
   for ( int r = 0; r < _size; ++r) {
 	  switch (_off_percentile) {
 		case 10:

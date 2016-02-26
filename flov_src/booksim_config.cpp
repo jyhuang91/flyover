@@ -357,6 +357,7 @@ BookSimConfig::BookSimConfig( )
 
   //===============Off core Parameter==================
   _int_map["off_percentile"] = 0; // Jiayi
+  AddStrField("off_cores", "");
 
   //==================Network file===========================
   AddStrField("network_file","");

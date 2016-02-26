@@ -114,6 +114,7 @@ protected:
   vector<CreditChannel *> _chan_cred;
 
   vector<bool> _router_states;	// Jiayi
+  vector<int> _off_routers;
   int _off_percentile;
 #ifdef HANDSHAKE	// Jiayi
   vector<HandshakeChannel *> _chan_handshake;
