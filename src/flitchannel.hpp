@@ -98,9 +98,15 @@ private:
   //
   ////////////////////////////////////////
 
-  Router const * _routerSource;
+  /* ==== Power Gate - Begin ==== */
+  //Router const * _routerSource;
+  Router * _routerSource;
+  /* ==== Power Gate - End ==== */
   int _routerSourcePort;
-  Router const * _routerSink;
+  /* ==== Power Gate - Begin ==== */
+  //Router const * _routerSink;
+  Router * _routerSink;
+  /* ==== Power Gate - End ==== */
   int _routerSinkPort;
 
   // Statistics for Activity Factors

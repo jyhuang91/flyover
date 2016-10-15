@@ -37,7 +37,9 @@ public:
   virtual ~TimedModule() {}
   
   virtual void ReadInputs() = 0;
-  virtual void PowerStateEvaluate() {} // Jiayi
+  /* ==== Power Gate - Begin ==== */
+  virtual void PowerStateEvaluate() {}
+  /* ==== Power Gate - End ==== */
   virtual void Evaluate() = 0;
   virtual void WriteOutputs() = 0;
 };

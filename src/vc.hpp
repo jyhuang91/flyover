@@ -126,6 +126,12 @@ public:
   {
     return (int)_buffer.size();
   }
+  /* ==== Power Gate - Begin ==== */
+  inline void ClearRouteSet()
+  {
+    _route_set->Clear();
+  }
+  /* ==== Power Gate - End ==== */
 
   // ==== Debug functions ====
 

@@ -59,6 +59,10 @@ void BufferState::BufferPolicy::SendingFlit(Flit const * const f) {
 void BufferState::BufferPolicy::FreeSlotFor(int vc) {
 }
 
+/* ==== Power Gate - Begin ==== */
+void BufferState::BufferPolicy::ReturnBuffer(int vc) {
+}
+/* ==== Power Gate - End ==== */
 BufferState::BufferPolicy * BufferState::BufferPolicy::New(Configuration const & config, BufferState * parent, const string & name)
 {
   BufferPolicy * sp = NULL;
@@ -307,6 +311,17 @@ int BufferState::LimitedSharedBufferPolicy::LimitFor(int vc) const
   return min(SharedBufferPolicy::LimitFor(vc), _max_held_slots);
 }
 
+/* ==== Power Gate - Begin ==== */
+/* ==== Power Gate - End ==== */
+void BufferState::LimitedSharedBufferPolicy::ReturnBuffer(int vc)
+{
+  --_active_vcs;
+  if (_active_vcs < 0){
+    Error("Number of active VCs fell below zero.");
+  }
+}
+/* ==== Power Gate - End ==== */
+
 BufferState::DynamicLimitedSharedBufferPolicy::DynamicLimitedSharedBufferPolicy(Configuration const & config, BufferState * parent, const string & name)
   : LimitedSharedBufferPolicy(config, parent, name)
 {
@@ -329,6 +344,17 @@ void BufferState::DynamicLimitedSharedBufferPolicy::SendingFlit(Flit const * con
   }
   assert(_max_held_slots > 0);
 }
+
+/* ==== Power Gate - Begin ==== */
+void BufferState::DynamicLimitedSharedBufferPolicy::ReturnBuffer(int vc)
+{
+  LimitedSharedBufferPolicy::ReturnBuffer(vc);
+  if (_active_vcs > 0) {
+    _max_held_slots = _buf_size / _active_vcs;
+  }
+  assert(_max_held_slots > 0);
+}
+/* ==== Power Gate - End ==== */
 
 BufferState::ShiftingDynamicLimitedSharedBufferPolicy::ShiftingDynamicLimitedSharedBufferPolicy(Configuration const & config, BufferState * parent, const string & name)
   : DynamicLimitedSharedBufferPolicy(config, parent, name)
@@ -362,6 +388,22 @@ void BufferState::ShiftingDynamicLimitedSharedBufferPolicy::SendingFlit(Flit con
   }
   assert(_max_held_slots > 0);
 }
+
+/* ==== Power Gate - Begin ==== */
+void BufferState::ShiftingDynamicLimitedSharedBufferPolicy::ReturnBuffer(int vc)
+{
+  LimitedSharedBufferPolicy::ReturnBuffer(vc);
+  if (_active_vcs) {
+    int i = _active_vcs - 1;
+    _max_held_slots = _buf_size;
+    while (i) {
+      _max_held_slots >>= 1;
+      i >>= 1;
+    }
+  }
+  assert(_max_held_slots > 0);
+}
+/* ==== Power Gate - End ==== */
 
 BufferState::FeedbackSharedBufferPolicy::FeedbackSharedBufferPolicy(Configuration const & config, BufferState * parent, const string & name)
   : SharedBufferPolicy(config, parent, name)
@@ -662,6 +704,42 @@ void BufferState::TakeBuffer( int vc, int tag )
   _tail_sent[vc] = false;
   _buffer_policy->TakeBuffer(vc);
 }
+
+/* ==== Power Gate - Begin ==== */
+void BufferState::ReturnBuffer( int vc)
+{
+  assert( ( vc >= 0 ) && ( vc < _vcs ) );
+
+  if (_in_use_by[vc] < 0) {
+    ostringstream err;
+    err << "Buffer return while VC " << vc << " is not used";
+    Error( err.str() );
+  }
+  _in_use_by[vc] = -1;
+  _tail_sent[vc] = false;  // ??
+  _buffer_policy->ReturnBuffer(vc);
+}
+
+void BufferState::ClearCredits()
+{
+	_occupancy = _size;
+	for (int vc = 0; vc < _vcs; ++vc) {
+		_vc_occupancy[vc] = _size / _vcs;
+		_in_use_by[vc] = -1;
+		_tail_sent[vc] = false;
+	}
+}
+
+void BufferState::FullCredits()
+{
+	_occupancy = 0;
+	for (int vc = 0; vc < _vcs; ++vc) {
+		_vc_occupancy[vc] = 0;
+		_in_use_by[vc] = -1;
+		_tail_sent[vc] = false;
+	}
+}
+/* ==== Power Gate - End ==== */
 
 void BufferState::Display( ostream & os ) const
 {
