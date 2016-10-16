@@ -47,6 +47,9 @@
 #include "iq_router.hpp"
 #include "event_router.hpp"
 #include "chaos_router.hpp"
+/* ==== Power Gate - Begin ==== */
+#include "flov_router.hpp"
+/* ==== Power Gate - End ==== */
 ///////////////////////////////////////////////////////
 
 /* ==== Power Gate - Begin ==== */
@@ -193,6 +196,10 @@ Router *Router::NewRouter( const Configuration& config,
     r = new EventRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "chaos" ) {
     r = new ChaosRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "flov" ) {
+    /* ==== Power Gate - Begin ==== */
+    r = new FLOVRouter( config, parent, name, id, inputs, outputs );
+    /* ==== Power Gate - End ==== */
   } else {
     cerr << "Unknown router type: " << type << endl;
   }

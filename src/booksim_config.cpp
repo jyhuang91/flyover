@@ -312,6 +312,15 @@ BookSimConfig::BookSimConfig( )
   _int_map["channel_width"] = 128;
   _int_map["channel_sweep"] = 0;
 
+  /* ==== Power Gate - Begin ==== */
+  AddStrField("off_cores", "");
+  
+  _int_map["idle_threshold"] = 5;
+  _int_map["drain_threshold"] = 100;
+  _int_map["bet_threshold"] = 10;
+  _int_map["wakeup_threshold"] = 3;
+  /* ==== Power Gate - End ==== */
+
   //==================Network file===========================
   AddStrField("network_file","");
 }
