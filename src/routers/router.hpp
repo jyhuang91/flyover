@@ -30,17 +30,33 @@
 
 #include <string>
 #include <vector>
+/* ==== Power Gate - Begin ==== */
+#include <deque>
+/* ==== Power Gate - End ==== */
 
 #include "timed_module.hpp"
 #include "flit.hpp"
 #include "credit.hpp"
+/* ==== Power Gate - Begin ==== */
+#include "handshake.hpp"
+/* ==== Power Gate - End ==== */
 #include "flitchannel.hpp"
 #include "channel.hpp"
 #include "config_utils.hpp"
 
 typedef Channel<Credit> CreditChannel;
+/* ==== Power Gate - Begin ==== */
+typedef Channel<Handshake> HandshakeChannel;
+/* ==== Power Gate - End ==== */
 
 class Router : public TimedModule {
+
+/* ==== Power Gate - Begin ==== */
+public:
+  enum ePowerState { state_min = 0, power_off = state_min,
+    power_on, draining, wakeup, state_max = wakeup };
+  static const char * const POWERSTATE[];
+/* ==== Power Gate - End ==== */
 
 protected:
 
@@ -71,6 +87,10 @@ protected:
   vector<FlitChannel *>   _output_channels;
   vector<CreditChannel *> _output_credits;
   vector<bool>            _channel_faults;
+  /* ==== Power Gate - Begin ==== */
+  vector<HandshakeChannel *> _input_handshakes;
+  vector<HandshakeChannel *> _output_handshakes;
+  /* ==== Power Gate - End ==== */
 
 #ifdef TRACK_FLOWS
   vector<vector<int> > _received_flits;
@@ -90,6 +110,34 @@ protected:
 
   virtual void _InternalStep() = 0;
 
+  /* ==== Power Gate - Begin ==== */
+  ePowerState _power_state;
+  uint64_t _power_off_cycles; // number of power-off cycles for current kernel? needed?
+  uint64_t _total_power_off_cycles; // accumulated
+  uint64_t _total_run_time; // in cycles
+  int _idle_threshold;
+  int _drain_threshold;
+  int _bet_threshold;
+  int _wakeup_threshold;
+  int _idle_timer;
+  int _drain_timer;
+  int _off_timer; // consecutive off cycles
+  int _wakeup_timer;
+  bool _wakeup_signal;
+  double _off_counter;
+  double _drain_counter;
+  double _drain_timeout_counter;
+  deque<int> _drain_time_q;
+  int _max_drain_time;
+  int _min_drain_time;
+  vector<ePowerState> _neighbor_states;
+  vector<ePowerState> _downstream_states;
+  double _outstanding_requests;
+  vector<bool> _drain_done_sent;
+  vector<bool> _drain_tags;
+  bool _router_state; // set by trafficmanager, on is true, off is false
+  /* ==== Power Gate - End ==== */
+
 public:
   Router( const Configuration& config,
 	  Module *parent, const string & name, int id,
@@ -101,7 +149,11 @@ public:
 
   virtual void AddInputChannel( FlitChannel *channel, CreditChannel *backchannel );
   virtual void AddOutputChannel( FlitChannel *channel, CreditChannel *backchannel );
- 
+  /* ==== Power Gate - Begin ==== */
+  virtual void AddInputHandshake(HandshakeChannel *channel);
+  virtual void AddOutputHandshake(HandshakeChannel *channel);
+  /* ==== Power Gate - End ==== */
+
   inline FlitChannel * GetInputChannel( int input ) const {
     assert((input >= 0) && (input < _inputs));
     return _input_channels[input];
@@ -112,6 +164,9 @@ public:
   }
 
   virtual void ReadInputs( ) = 0;
+  /* ==== Power Gate - Begin ==== */
+  //virtual void PowerStateEvaluate( ) {};
+  /* ==== Power Gate - Begin ==== */
   virtual void Evaluate( );
   virtual void WriteOutputs( ) = 0;
 
@@ -197,6 +252,29 @@ public:
 
   inline int NumInputs() const {return _inputs;}
   inline int NumOutputs() const {return _outputs;}
+  /* ==== Power Gate - Begin ==== */
+  inline void PowerOn() {_power_state = power_on;}
+  inline void PowerOff() {_power_state = power_off;}
+  inline void SetPowerState( ePowerState s ) {_power_state = s;}
+  inline Router::ePowerState GetPowerState() const {return _power_state;}
+  inline uint64_t GetPowerOffCycles() const {return _power_off_cycles;}
+  inline void ResetPowerOffCycles() {_power_off_cycles = 0;}  // _power_off_cycles is reset when each kernel is finished (GPGPU)
+  inline uint64_t GetTotalPowerOffCycles() const {return _total_power_off_cycles;}
+  inline uint64_t GetTotalRunTime() const {return _total_run_time;}
+  inline void AddRunTime(double kernel_run_time) {_total_run_time += kernel_run_time;}
+  inline double GetDrainCounter() const {return _drain_counter;}
+  inline double GetDrainTimeoutCounter() const {return _drain_timeout_counter;}
+  inline int GetMaxDrainTime() const {return _max_drain_time;}
+  inline int GetMinDrainTime() const {return _min_drain_time;}
+  inline deque<int> GetDrainTime() const {return _drain_time_q;}
+  inline void WakeUp() {_wakeup_signal = true;}
+  Router::ePowerState GetNeighborPowerState(int out_port) const;
+  void IdleDetected();
+  inline double GetPowerGateOverheadCycles() const {return _off_counter*_bet_threshold;}
+  inline void SetDrainTag(int input) {_drain_tags[input] = true;}
+  inline void SetRouterState(bool state) {_router_state = state;}
+  /* ==== Power Gate - End ==== */
+
 };
 
 #endif

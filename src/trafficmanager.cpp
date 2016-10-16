@@ -36,6 +36,9 @@
 #include "booksim_config.hpp"
 #include "trafficmanager.hpp"
 #include "batchtrafficmanager.hpp"
+/* ==== Power Gate - Begin ==== */
+#include "flovtrafficmanager.hpp"
+/* ==== Power Gate - End ==== */
 #include "random_utils.hpp" 
 #include "vc.hpp"
 #include "packet_reply_info.hpp"
@@ -49,7 +52,9 @@ TrafficManager * TrafficManager::New(Configuration const & config,
         result = new TrafficManager(config, net);
     } else if(sim_type == "batch") {
         result = new BatchTrafficManager(config, net);
-    } else {
+    } else if (sim_type == "flov") {
+        result = new FLOVTrafficManager(config, net);
+    }else {
         cerr << "Unknown simulation type: " << sim_type << endl;
     } 
     return result;

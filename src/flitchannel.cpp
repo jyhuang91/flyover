@@ -51,15 +51,27 @@ FlitChannel::FlitChannel(Module * parent, string const & name, int classes)
   _active.resize(classes, 0);
 }
 
-void FlitChannel::SetSource(Router const * const router, int port) {
-  _routerSource = router;
-  _routerSourcePort = port;
+/* ==== Power Gate - Begin ==== */
+//void FlitChannel::SetSource(Router const * const router, int port) {
+//  _routerSource = router;
+//  _routerSourcePort = port;
+//}
+//
+//void FlitChannel::SetSink(Router const * const router, int port) {
+//  _routerSink = router;
+//  _routerSinkPort = port;
+//}
+
+void FlitChannel::SetSource(Router * router, int port) {
+    _routerSource = router;
+    _routerSourcePort = port;
 }
 
-void FlitChannel::SetSink(Router const * const router, int port) {
-  _routerSink = router;
-  _routerSinkPort = port;
+void FlitChannel::SetSink(Router * router, int port) {
+    _routerSink = router;
+    _routerSinkPort = port;
 }
+/* ==== Power Gate - End ==== */
 
 void FlitChannel::Send(Flit * f) {
   if(f) {
@@ -78,6 +90,13 @@ void FlitChannel::ReadInputs() {
 	       << " with delay " << _delay
 	       << "." << endl;
   }
+
+  /* ==== Power Gate - Begin ==== */
+  if (f && _routerSink) {
+    if (f->src == _routerSink->GetID())
+      _routerSink->WakeUp();
+  }
+  /* ==== Power Gate - Begin ==== */
   Channel<Flit>::ReadInputs();
 }
 

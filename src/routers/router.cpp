@@ -49,6 +49,10 @@
 #include "chaos_router.hpp"
 ///////////////////////////////////////////////////////
 
+/* ==== Power Gate - Begin ==== */
+const char * const Router::POWERSTATE[] = {"power_off",
+  "power_on", "draining", "wakeup", "invalid"};
+
 int const Router::STALL_BUFFER_BUSY = -2;
 int const Router::STALL_BUFFER_CONFLICT = -3;
 int const Router::STALL_BUFFER_FULL = -4;
@@ -85,6 +89,45 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   _crossbar_conflict_stalls.resize(_classes, 0);
 #endif
 
+  /* ==== Power Gate - Begin ==== */
+  _power_state = power_on;
+  _power_off_cycles = 0;
+  _total_power_off_cycles = 0;
+  _total_run_time = 0;
+  _idle_threshold = config.GetInt( "idle_threshold" );
+  _drain_threshold = config.GetInt( "drain_threshold" );
+  _bet_threshold = config.GetInt( "bet_threshold" );
+  _wakeup_threshold = config.GetInt( "wakeup_threshold" );
+  _idle_timer = 0;
+  _drain_timer = 0;
+  _off_timer = 0;
+  _wakeup_timer = 0;
+  _wakeup_signal = false;
+  _off_counter = 0;
+  _drain_counter = 0;
+  _drain_timeout_counter = 0;
+  _max_drain_time = 0;
+  _min_drain_time = -1;
+  // FIXME: only support mesh now
+  _neighbor_states.resize(4, power_on);
+  _downstream_states.resize(4, power_on);
+  // for edge routers
+  if (_id / gK == 0) {
+    _neighbor_states[3] = power_off;
+    _downstream_states[3] = power_off;
+  } else if (_id / gK == 7) {
+    _neighbor_states[2] = power_off;
+    _downstream_states[2] = power_off;
+  } else if (_id % gK == 0) {
+    _neighbor_states[1] = power_off;
+    _downstream_states[1] = power_off;
+  } else if (_id % gK == 7) {
+    _neighbor_states[0] = power_off;
+    _downstream_states[0] = power_off;
+  }
+  _outstanding_requests = 0;
+  _router_state = true;
+  /* ==== Power Gate - End ==== */
 }
 
 void Router::AddInputChannel( FlitChannel *channel, CreditChannel *backchannel )
@@ -101,6 +144,18 @@ void Router::AddOutputChannel( FlitChannel *channel, CreditChannel *backchannel 
   _channel_faults.push_back( false );
   channel->SetSource( this, _output_channels.size() - 1 ) ;
 }
+
+/* ==== Power Gate - Begin ==== */
+void Router::AddInputHandshake( HandshakeChannel *channel )
+{
+  _input_handshakes.push_back(channel);
+}
+
+void Router::AddOutputHandshake( HandshakeChannel *channel )
+{
+  _output_handshakes.push_back(channel);
+}
+/* ==== Power Gate - End ==== */
 
 void Router::Evaluate( )
 {
@@ -149,7 +204,22 @@ Router *Router::NewRouter( const Configuration& config,
   return r;
 }
 
+/* ==== Power Gate - Begin ==== */
+Router::ePowerState Router::GetNeighborPowerState( int out_port ) const
+{
+  assert(out_port >= 0);
+  return _neighbor_states[out_port];
+}
 
-
+void Router::IdleDetected()
+{
+  if (_power_state == power_on)
+    ++_idle_timer;
+  else if (_power_state == draining || _power_state == wakeup)
+    ++_drain_timer;
+  else if (_power_state == power_off)
+    ++_off_timer;
+}
+/* ==== Power Gate - End ==== */
 
 

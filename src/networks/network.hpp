@@ -34,6 +34,9 @@
 #include "module.hpp"
 #include "flit.hpp"
 #include "credit.hpp"
+/* ==== Power Gate - Begin ==== */
+#include "handshake.hpp"
+/* ==== Power Gate - End ==== */
 #include "router.hpp"
 #include "module.hpp"
 #include "timed_module.hpp"
@@ -43,7 +46,9 @@
 #include "globals.hpp"
 
 typedef Channel<Credit> CreditChannel;
-
+/* ==== Power Gate - Begin ==== */
+typedef Channel<Handshake> HandshakeChannel;
+/* ==== Power Gate - End ==== */
 
 class Network : public TimedModule {
 protected:
@@ -63,6 +68,12 @@ protected:
 
   vector<FlitChannel *> _chan;
   vector<CreditChannel *> _chan_cred;
+
+  /* ==== Power Gate - Begin ==== */
+  vector<bool> _router_states;
+  vector<int> _off_routers;
+  vector<HandshakeChannel *> _chan_handshake;
+  /* ==== Power Gate - End ==== */
 
   deque<TimedModule *> _timed_modules;
 
@@ -91,6 +102,9 @@ public:
   virtual double Capacity( ) const;
 
   virtual void ReadInputs( );
+  /* ==== Power Gate - Begin ==== */
+  virtual void PowerStateEvaluate( );
+  /* ==== Power Gate - End ==== */
   virtual void Evaluate( );
   virtual void WriteOutputs( );
 
@@ -109,9 +123,14 @@ public:
   CreditChannel * GetEjectCred(int index) {return _eject_cred[index];}
   const vector<FlitChannel *> & GetChannels(){return _chan;}
   const vector<CreditChannel *> & GetChannelsCred(){return _chan_cred;}
+  /* ==== Power Gate - Begin ==== */
+  const vector<HandshakeChannel *> & GetChannelHandshake(){return _chan_handshake;}
+  /* ==== Power Gate - End ==== */
   const vector<Router *> & GetRouters(){return _routers;}
   Router * GetRouter(int index) {return _routers[index];}
   int NumRouters() const {return _size;}
+  /* ==== Power Gate - Begin ==== */
+  vector<bool> & GetRouterStates(){return _router_states;}
 };
 
 #endif 

@@ -56,6 +56,9 @@ Network::Network( const Configuration &config, const string & name ) :
   _nodes    = -1; 
   _channels = -1;
   _classes  = config.GetInt("classes");
+  /* ==== Power Gate - Begin ==== */
+  _off_routers = config.GetIntArray("off_cores");
+  /* ==== Power Gate - End ==== */
 }
 
 Network::~Network( )
@@ -74,6 +77,9 @@ Network::~Network( )
   for ( int c = 0; c < _channels; ++c ) {
     if ( _chan[c] ) delete _chan[c];
     if ( _chan_cred[c] ) delete _chan_cred[c];
+    /* ==== Power Gate - Begin ==== */
+    if ( _chan_handshake[c] ) delete _chan_handshake[c];
+    /* ==== Power Gate - End ==== */
   }
 }
 
@@ -133,6 +139,15 @@ void Network::_Alloc( )
   _routers.resize(_size);
   gNodes = _nodes;
 
+  /* ==== Power Gate - Begin ==== */
+  // Core parking
+  _router_states.resize(_size, true);
+  for (int i = 0; i < _off_routers.size(); ++i) {
+    int r_id = _off_routers[i];
+    _router_states[r_id] = false;
+  }
+  /* ==== Power Gate - End ==== */
+
   /*booksim used arrays of flits as the channels which makes have capacity of
    *one. To simulate channel latency, flitchannel class has been added
    *which are fifos with depth = channel latency and each cycle the channel
@@ -167,6 +182,9 @@ void Network::_Alloc( )
   }
   _chan.resize(_channels);
   _chan_cred.resize(_channels);
+  /* ==== Power Gate - Begin ==== */
+  _chan_handshake.resize(_channels);
+  /* ==== Power Gate - End ==== */
   for ( int c = 0; c < _channels; ++c ) {
     ostringstream name;
     name << Name() << "_fchan_" << c;
@@ -176,6 +194,12 @@ void Network::_Alloc( )
     name << Name() << "_cchan_" << c;
     _chan_cred[c] = new CreditChannel(this, name.str());
     _timed_modules.push_back(_chan_cred[c]);
+    /* ==== Power Gate - Begin ==== */
+    name.str("");
+    name << Name() << "_hchan_" << c;
+    _chan_handshake[c] = new HandshakeChannel(this, name.str());
+    _timed_modules.push_back(_chan_handshake[c]);
+    /* ==== Power Gate - End ==== */
   }
 }
 
@@ -187,6 +211,17 @@ void Network::ReadInputs( )
     (*iter)->ReadInputs( );
   }
 }
+
+/* ==== Power Gate - Begin ==== */
+void Network::PowerStateEvaluate( )
+{
+  for(deque<TimedModule *>::const_iterator iter = _timed_modules.begin();
+      iter != _timed_modules.end();
+      ++iter) {
+    (*iter)->PowerStateEvaluate( );
+  }
+}
+/* ==== Power Gate - End ==== */
 
 void Network::Evaluate( )
 {

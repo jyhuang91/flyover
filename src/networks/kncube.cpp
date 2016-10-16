@@ -98,6 +98,11 @@ void KNCube::_BuildNet( const Configuration &config )
 					node, 2*_n + 1, 2*_n + 1 );
     _timed_modules.push_back(_routers[node]);
 
+    /* ==== Power Gate - Begin ==== */
+    if (_router_states[node] == false)
+      _routers[node]->SetRouterState(false);
+    /* ==== Power Gate - End ==== */
+
     router_name.str("");
 
     for ( int dim = 0; dim < _n; ++dim ) {
@@ -125,6 +130,10 @@ void KNCube::_BuildNet( const Configuration &config )
       //add the input channel
       _routers[node]->AddInputChannel( _chan[right_input], _chan_cred[right_input] );
       _routers[node]->AddInputChannel( _chan[left_input], _chan_cred[left_input] );
+      /* ==== Power Gate - Begin ==== */
+      _routers[node]->AddInputHandshake(_chan_handshake[right_input]);
+      _routers[node]->AddInputHandshake(_chan_handshake[left_input]);
+      /* ==== Power Gate - End ==== */
 
       //set input channel latency
       if(use_noc_latency){
@@ -132,11 +141,19 @@ void KNCube::_BuildNet( const Configuration &config )
 	_chan[left_input]->SetLatency( latency );
 	_chan_cred[right_input]->SetLatency( latency );
 	_chan_cred[left_input]->SetLatency( latency );
+        /* ==== Power Gate - Begin ==== */
+        _chan_handshake[right_input]->SetLatency( latency );
+        _chan_handshake[left_input]->SetLatency( latency );
+        /* ==== Power Gate - End ==== */
       } else {
 	_chan[left_input]->SetLatency( 1 );
 	_chan_cred[right_input]->SetLatency( 1 );
 	_chan_cred[left_input]->SetLatency( 1 );
 	_chan[right_input]->SetLatency( 1 );
+        /* ==== Power Gate - Begin ==== */
+        _chan_handshake[right_input]->SetLatency(1);
+        _chan_handshake[left_input]->SetLatency(1);
+        /* ==== Power Gate - End ==== */
       }
       //get the output channel number
       right_output = _RightChannel( node, dim );
@@ -145,6 +162,10 @@ void KNCube::_BuildNet( const Configuration &config )
       //add the output channel
       _routers[node]->AddOutputChannel( _chan[right_output], _chan_cred[right_output] );
       _routers[node]->AddOutputChannel( _chan[left_output], _chan_cred[left_output] );
+      /* ==== Power Gate - Begin ==== */
+      _routers[node]->AddOutputHandshake(_chan_handshake[right_output]);
+      _routers[node]->AddOutputHandshake(_chan_handshake[left_output]);
+      /* ==== Power Gate - End ==== */
 
       //set output channel latency
       if(use_noc_latency){
@@ -152,11 +173,19 @@ void KNCube::_BuildNet( const Configuration &config )
 	_chan[left_output]->SetLatency( latency );
 	_chan_cred[right_output]->SetLatency( latency );
 	_chan_cred[left_output]->SetLatency( latency );
+        /* ==== Power Gate - Begin ==== */
+        _chan_handshake[right_output]->SetLatency(latency);
+        _chan_handshake[left_output]->SetLatency(latency);
+        /* ==== Power Gate - End ==== */
       } else {
 	_chan[right_output]->SetLatency( 1 );
 	_chan[left_output]->SetLatency( 1 );
 	_chan_cred[right_output]->SetLatency( 1 );
 	_chan_cred[left_output]->SetLatency( 1 );
+        /* ==== Power Gate - Begin ==== */
+        _chan_handshake[right_output]->SetLatency(1);
+        _chan_handshake[left_output]->SetLatency(1);
+        /* ==== Power Gate - End ==== */
 
       }
     }
