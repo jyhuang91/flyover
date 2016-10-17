@@ -49,135 +49,137 @@
 
 IQRouter::IQRouter(Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs) :
-  Router(config, parent, name, id, inputs, outputs), _active(false) {
-    _vcs = config.GetInt("num_vcs");
+  Router(config, parent, name, id, inputs, outputs), _active(false) 
+{
+  _vcs = config.GetInt("num_vcs");
 
-    _vc_busy_when_full = (config.GetInt("vc_busy_when_full") > 0);
-    _vc_prioritize_empty = (config.GetInt("vc_prioritize_empty") > 0);
-    _vc_shuffle_requests = (config.GetInt("vc_shuffle_requests") > 0);
+  _vc_busy_when_full = (config.GetInt("vc_busy_when_full") > 0);
+  _vc_prioritize_empty = (config.GetInt("vc_prioritize_empty") > 0);
+  _vc_shuffle_requests = (config.GetInt("vc_shuffle_requests") > 0);
 
-    _speculative = (config.GetInt("speculative") > 0);
-    _spec_check_elig = (config.GetInt("spec_check_elig") > 0);
-    _spec_check_cred = (config.GetInt("spec_check_cred") > 0);
-    _spec_mask_by_reqs = (config.GetInt("spec_mask_by_reqs") > 0);
+  _speculative = (config.GetInt("speculative") > 0);
+  _spec_check_elig = (config.GetInt("spec_check_elig") > 0);
+  _spec_check_cred = (config.GetInt("spec_check_cred") > 0);
+  _spec_mask_by_reqs = (config.GetInt("spec_mask_by_reqs") > 0);
 
-    _routing_delay = config.GetInt("routing_delay");
-    _vc_alloc_delay = config.GetInt("vc_alloc_delay");
-    if (!_vc_alloc_delay) {
-      Error("VC allocator cannot have zero delay.");
-    }
-    _sw_alloc_delay = config.GetInt("sw_alloc_delay");
-    if (!_sw_alloc_delay) {
-      Error("Switch allocator cannot have zero delay.");
-    }
-
-    // Routing
-    string const rf = config.GetStr("routing_function") + "_"
-      + config.GetStr("topology");
-    map<string, tRoutingFunction>::const_iterator rf_iter =
-      gRoutingFunctionMap.find(rf);
-    if (rf_iter == gRoutingFunctionMap.end()) {
-      Error("Invalid routing function: " + rf);
-    }
-    _rf = rf_iter->second;
-
-    // Alloc VC's
-    _buf.resize(_inputs);
-    for (int i = 0; i < _inputs; ++i) {
-      ostringstream module_name;
-      module_name << "buf_" << i;
-      _buf[i] = new Buffer(config, _outputs, this, module_name.str());
-      module_name.str("");
-    }
-
-    // Alloc next VCs' buffer state
-    _next_buf.resize(_outputs);
-    for (int j = 0; j < _outputs; ++j) {
-      ostringstream module_name;
-      module_name << "next_vc_o" << j;
-      _next_buf[j] = new BufferState(config, this, module_name.str());
-      module_name.str("");
-    }
-
-    // Alloc allocators
-    string vc_alloc_type = config.GetStr("vc_allocator");
-    if (vc_alloc_type == "piggyback") {
-      if (!_speculative) {
-        Error(
-            "Piggyback VC allocation requires speculative switch allocation to be enabled.");
-      }
-      _vc_allocator = NULL;
-      _vc_rr_offset.resize(_outputs * _classes, -1);
-    } else {
-      _vc_allocator = Allocator::NewAllocator(this, "vc_allocator", vc_alloc_type,
-          _vcs * _inputs, _vcs * _outputs);
-
-      if (!_vc_allocator) {
-        Error("Unknown vc_allocator type: " + vc_alloc_type);
-      }
-    }
-
-    string sw_alloc_type = config.GetStr("sw_allocator");
-    _sw_allocator = Allocator::NewAllocator(this, "sw_allocator", sw_alloc_type,
-        _inputs * _input_speedup, _outputs * _output_speedup);
-
-    if (!_sw_allocator) {
-      Error("Unknown sw_allocator type: " + sw_alloc_type);
-    }
-
-    string spec_sw_alloc_type = config.GetStr("spec_sw_allocator");
-    if (_speculative && (spec_sw_alloc_type != "prio")) {
-      _spec_sw_allocator = Allocator::NewAllocator(this, "spec_sw_allocator",
-          spec_sw_alloc_type, _inputs * _input_speedup,
-          _outputs * _output_speedup);
-      if (!_spec_sw_allocator) {
-        Error("Unknown spec_sw_allocator type: " + spec_sw_alloc_type);
-      }
-    } else {
-      _spec_sw_allocator = NULL;
-    }
-
-    _sw_rr_offset.resize(_inputs * _input_speedup);
-    for (int i = 0; i < _inputs * _input_speedup; ++i)
-      _sw_rr_offset[i] = i % _input_speedup;
-
-    _noq = config.GetInt("noq") > 0;
-    if (_noq) {
-      if (_routing_delay) {
-        Error("NOQ requires lookahead routing to be enabled.");
-      }
-      if (_vcs < _outputs) {
-        Error("NOQ requires at least as many VCs as router outputs.");
-      }
-    }
-    _noq_next_output_port.resize(_inputs, vector<int>(_vcs, -1));
-    _noq_next_vc_start.resize(_inputs, vector<int>(_vcs, -1));
-    _noq_next_vc_end.resize(_inputs, vector<int>(_vcs, -1));
-
-    // Output queues
-    _output_buffer_size = config.GetInt("output_buffer_size");
-    _output_buffer.resize(_outputs);
-    _credit_buffer.resize(_inputs);
-
-    // Switch configuration (when held for multiple cycles)
-    _hold_switch_for_packet = (config.GetInt("hold_switch_for_packet") > 0);
-    _switch_hold_in.resize(_inputs * _input_speedup, -1);
-    _switch_hold_out.resize(_outputs * _output_speedup, -1);
-    _switch_hold_vc.resize(_inputs * _input_speedup, -1);
-
-    _bufferMonitor = new BufferMonitor(inputs, _classes);
-    _switchMonitor = new SwitchMonitor(inputs, outputs, _classes);
-
-#ifdef TRACK_FLOWS
-    for(int c = 0; c < _classes; ++c) {
-      _stored_flits[c].resize(_inputs, 0);
-      _active_packets[c].resize(_inputs, 0);
-    }
-    _outstanding_classes.resize(_outputs, vector<queue<int> >(_vcs));
-#endif
+  _routing_delay = config.GetInt("routing_delay");
+  _vc_alloc_delay = config.GetInt("vc_alloc_delay");
+  if (!_vc_alloc_delay) {
+    Error("VC allocator cannot have zero delay.");
+  }
+  _sw_alloc_delay = config.GetInt("sw_alloc_delay");
+  if (!_sw_alloc_delay) {
+    Error("Switch allocator cannot have zero delay.");
   }
 
-IQRouter::~IQRouter() {
+  // Routing
+  string const rf = config.GetStr("routing_function") + "_"
+    + config.GetStr("topology");
+  map<string, tRoutingFunction>::const_iterator rf_iter =
+    gRoutingFunctionMap.find(rf);
+  if (rf_iter == gRoutingFunctionMap.end()) {
+    Error("Invalid routing function: " + rf);
+  }
+  _rf = rf_iter->second;
+
+  // Alloc VC's
+  _buf.resize(_inputs);
+  for (int i = 0; i < _inputs; ++i) {
+    ostringstream module_name;
+    module_name << "buf_" << i;
+    _buf[i] = new Buffer(config, _outputs, this, module_name.str());
+    module_name.str("");
+  }
+
+  // Alloc next VCs' buffer state
+  _next_buf.resize(_outputs);
+  for (int j = 0; j < _outputs; ++j) {
+    ostringstream module_name;
+    module_name << "next_vc_o" << j;
+    _next_buf[j] = new BufferState(config, this, module_name.str());
+    module_name.str("");
+  }
+
+  // Alloc allocators
+  string vc_alloc_type = config.GetStr("vc_allocator");
+  if (vc_alloc_type == "piggyback") {
+    if (!_speculative) {
+      Error(
+          "Piggyback VC allocation requires speculative switch allocation to be enabled.");
+    }
+    _vc_allocator = NULL;
+    _vc_rr_offset.resize(_outputs * _classes, -1);
+  } else {
+    _vc_allocator = Allocator::NewAllocator(this, "vc_allocator", vc_alloc_type,
+        _vcs * _inputs, _vcs * _outputs);
+
+    if (!_vc_allocator) {
+      Error("Unknown vc_allocator type: " + vc_alloc_type);
+    }
+  }
+
+  string sw_alloc_type = config.GetStr("sw_allocator");
+  _sw_allocator = Allocator::NewAllocator(this, "sw_allocator", sw_alloc_type,
+      _inputs * _input_speedup, _outputs * _output_speedup);
+
+  if (!_sw_allocator) {
+    Error("Unknown sw_allocator type: " + sw_alloc_type);
+  }
+
+  string spec_sw_alloc_type = config.GetStr("spec_sw_allocator");
+  if (_speculative && (spec_sw_alloc_type != "prio")) {
+    _spec_sw_allocator = Allocator::NewAllocator(this, "spec_sw_allocator",
+        spec_sw_alloc_type, _inputs * _input_speedup,
+        _outputs * _output_speedup);
+    if (!_spec_sw_allocator) {
+      Error("Unknown spec_sw_allocator type: " + spec_sw_alloc_type);
+    }
+  } else {
+    _spec_sw_allocator = NULL;
+  }
+
+  _sw_rr_offset.resize(_inputs * _input_speedup);
+  for (int i = 0; i < _inputs * _input_speedup; ++i)
+    _sw_rr_offset[i] = i % _input_speedup;
+
+  _noq = config.GetInt("noq") > 0;
+  if (_noq) {
+    if (_routing_delay) {
+      Error("NOQ requires lookahead routing to be enabled.");
+    }
+    if (_vcs < _outputs) {
+      Error("NOQ requires at least as many VCs as router outputs.");
+    }
+  }
+  _noq_next_output_port.resize(_inputs, vector<int>(_vcs, -1));
+  _noq_next_vc_start.resize(_inputs, vector<int>(_vcs, -1));
+  _noq_next_vc_end.resize(_inputs, vector<int>(_vcs, -1));
+
+  // Output queues
+  _output_buffer_size = config.GetInt("output_buffer_size");
+  _output_buffer.resize(_outputs);
+  _credit_buffer.resize(_inputs);
+
+  // Switch configuration (when held for multiple cycles)
+  _hold_switch_for_packet = (config.GetInt("hold_switch_for_packet") > 0);
+  _switch_hold_in.resize(_inputs * _input_speedup, -1);
+  _switch_hold_out.resize(_outputs * _output_speedup, -1);
+  _switch_hold_vc.resize(_inputs * _input_speedup, -1);
+
+  _bufferMonitor = new BufferMonitor(inputs, _classes);
+  _switchMonitor = new SwitchMonitor(inputs, outputs, _classes);
+
+#ifdef TRACK_FLOWS
+  for(int c = 0; c < _classes; ++c) {
+    _stored_flits[c].resize(_inputs, 0);
+    _active_packets[c].resize(_inputs, 0);
+  }
+  _outstanding_classes.resize(_outputs, vector<queue<int> >(_vcs));
+#endif
+}
+
+IQRouter::~IQRouter() 
+{
 
   if (gPrintActivity) {
     cout << Name() << ".bufferMonitor:" << endl;
@@ -205,7 +207,8 @@ IQRouter::~IQRouter() {
 }
 
 void IQRouter::AddOutputChannel(FlitChannel * channel,
-    CreditChannel * backchannel) {
+    CreditChannel * backchannel) 
+{
   int alloc_delay =
     _speculative ?
     max(_vc_alloc_delay, _sw_alloc_delay) :
@@ -216,13 +219,15 @@ void IQRouter::AddOutputChannel(FlitChannel * channel,
   Router::AddOutputChannel(channel, backchannel);
 }
 
-void IQRouter::ReadInputs() {
+void IQRouter::ReadInputs() 
+{
   bool have_flits = _ReceiveFlits();
   bool have_credits = _ReceiveCredits();
   _active = _active || have_flits || have_credits;
 }
 
-void IQRouter::_InternalStep() {
+void IQRouter::_InternalStep() 
+{
   if (!_active) {
     return;
   }
@@ -280,7 +285,8 @@ void IQRouter::_InternalStep() {
   _switchMonitor->cycle();
 }
 
-void IQRouter::WriteOutputs() {
+void IQRouter::WriteOutputs() 
+{
   _SendFlits();
   _SendCredits();
 }
@@ -289,7 +295,8 @@ void IQRouter::WriteOutputs() {
 // read inputs
 //------------------------------------------------------------------------------
 
-bool IQRouter::_ReceiveFlits() {
+bool IQRouter::_ReceiveFlits() 
+{
   bool activity = false;
   for (int input = 0; input < _inputs; ++input) {
     Flit * const f = _input_channels[input]->Receive();
@@ -311,7 +318,8 @@ bool IQRouter::_ReceiveFlits() {
   return activity;
 }
 
-bool IQRouter::_ReceiveCredits() {
+bool IQRouter::_ReceiveCredits() 
+{
   bool activity = false;
   for (int output = 0; output < _outputs; ++output) {
     Credit * const c = _output_credits[output]->Receive();
@@ -328,7 +336,8 @@ bool IQRouter::_ReceiveCredits() {
 // input queuing
 //------------------------------------------------------------------------------
 
-void IQRouter::_InputQueuing() {
+void IQRouter::_InputQueuing() 
+{
   for (map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
       iter != _in_queue_flits.end(); ++iter) {
 
@@ -458,7 +467,8 @@ void IQRouter::_InputQueuing() {
 // routing
 //------------------------------------------------------------------------------
 
-void IQRouter::_RouteEvaluate() {
+void IQRouter::_RouteEvaluate() 
+{
   assert(_routing_delay);
 
   for (deque<pair<int, pair<int, int> > >::iterator iter = _route_vcs.begin();
@@ -492,7 +502,8 @@ void IQRouter::_RouteEvaluate() {
   }
 }
 
-void IQRouter::_RouteUpdate() {
+void IQRouter::_RouteUpdate() 
+{
   assert(_routing_delay);
 
   while (!_route_vcs.empty()) {
@@ -543,7 +554,8 @@ void IQRouter::_RouteUpdate() {
 // VC allocation
 //------------------------------------------------------------------------------
 
-void IQRouter::_VCAllocEvaluate() {
+void IQRouter::_VCAllocEvaluate() 
+{
   assert(_vc_allocator);
 
   bool watched = false;
@@ -813,7 +825,8 @@ void IQRouter::_VCAllocEvaluate() {
   }
 }
 
-void IQRouter::_VCAllocUpdate() {
+void IQRouter::_VCAllocUpdate() 
+{
   assert(_vc_allocator);
 
   while (!_vc_alloc_vcs.empty()) {
@@ -918,7 +931,8 @@ void IQRouter::_VCAllocUpdate() {
 // switch holding
 //------------------------------------------------------------------------------
 
-void IQRouter::_SWHoldEvaluate() {
+void IQRouter::_SWHoldEvaluate() 
+{
   assert(_hold_switch_for_packet);
 
   for (deque<pair<int, pair<pair<int, int>, int> > >::iterator iter =
@@ -987,7 +1001,8 @@ void IQRouter::_SWHoldEvaluate() {
   }
 }
 
-void IQRouter::_SWHoldUpdate() {
+void IQRouter::_SWHoldUpdate() 
+{
   assert(_hold_switch_for_packet);
 
   while (!_sw_hold_vcs.empty()) {
@@ -1207,7 +1222,8 @@ void IQRouter::_SWHoldUpdate() {
 // switch allocation
 //------------------------------------------------------------------------------
 
-bool IQRouter::_SWAllocAddReq(int input, int vc, int output) {
+bool IQRouter::_SWAllocAddReq(int input, int vc, int output) 
+{
   assert(input >= 0 && input < _inputs);
   assert(vc >= 0 && vc < _vcs);
   assert(output >= 0 && output < _outputs);
@@ -1302,7 +1318,8 @@ bool IQRouter::_SWAllocAddReq(int input, int vc, int output) {
   return false;
 }
 
-void IQRouter::_SWAllocEvaluate() {
+void IQRouter::_SWAllocEvaluate() 
+{
   bool watched = false;
 
   for (deque<pair<int, pair<pair<int, int>, int> > >::iterator iter =
@@ -1806,7 +1823,8 @@ void IQRouter::_SWAllocEvaluate() {
   }
 }
 
-void IQRouter::_SWAllocUpdate() {
+void IQRouter::_SWAllocUpdate() 
+{
   while (!_sw_alloc_vcs.empty()) {
 
     pair<int, pair<pair<int, int>, int> > const & item = _sw_alloc_vcs.front();
@@ -2140,7 +2158,8 @@ void IQRouter::_SWAllocUpdate() {
 // switch traversal
 //------------------------------------------------------------------------------
 
-void IQRouter::_SwitchEvaluate() {
+void IQRouter::_SwitchEvaluate() 
+{
   for (deque<pair<int, pair<Flit *, pair<int, int> > > >::iterator iter =
       _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
 
@@ -2167,7 +2186,8 @@ void IQRouter::_SwitchEvaluate() {
   }
 }
 
-void IQRouter::_SwitchUpdate() {
+void IQRouter::_SwitchUpdate() 
+{
   while (!_crossbar_flits.empty()) {
 
     pair<int, pair<Flit *, pair<int, int> > > const & item =
@@ -2218,7 +2238,8 @@ void IQRouter::_SwitchUpdate() {
 // output queuing
 //------------------------------------------------------------------------------
 
-void IQRouter::_OutputQueuing() {
+void IQRouter::_OutputQueuing() 
+{
   for (map<int, Credit *>::const_iterator iter = _out_queue_credits.begin();
       iter != _out_queue_credits.end(); ++iter) {
 
@@ -2238,7 +2259,8 @@ void IQRouter::_OutputQueuing() {
 // write outputs
 //------------------------------------------------------------------------------
 
-void IQRouter::_SendFlits() {
+void IQRouter::_SendFlits() 
+{
   for (int output = 0; output < _outputs; ++output) {
     if (!_output_buffer[output].empty()) {
       Flit * const f = _output_buffer[output].front();
@@ -2261,7 +2283,8 @@ void IQRouter::_SendFlits() {
   }
 }
 
-void IQRouter::_SendCredits() {
+void IQRouter::_SendCredits() 
+{
   for (int input = 0; input < _inputs; ++input) {
     if (!_credit_buffer[input].empty()) {
       Credit * const c = _credit_buffer[input].front();
@@ -2276,19 +2299,22 @@ void IQRouter::_SendCredits() {
 // misc.
 //------------------------------------------------------------------------------
 
-void IQRouter::Display(ostream & os) const {
+void IQRouter::Display(ostream & os) const 
+{
   for (int input = 0; input < _inputs; ++input) {
     _buf[input]->Display(os);
   }
 }
 
-int IQRouter::GetUsedCredit(int o) const {
+int IQRouter::GetUsedCredit(int o) const 
+{
   assert((o >= 0) && (o < _outputs));
   BufferState const * const dest_buf = _next_buf[o];
   return dest_buf->Occupancy();
 }
 
-int IQRouter::GetBufferOccupancy(int i) const {
+int IQRouter::GetBufferOccupancy(int i) const 
+{
   assert(i >= 0 && i < _inputs);
   return _buf[i]->GetOccupancy();
 }
@@ -2318,7 +2344,8 @@ vector<int> IQRouter::UsedCredits() const {
   return result;
 }
 
-vector<int> IQRouter::FreeCredits() const {
+vector<int> IQRouter::FreeCredits() const 
+{
   vector<int> result(_outputs * _vcs);
   for (int o = 0; o < _outputs; ++o) {
     for (int v = 0; v < _vcs; ++v) {
@@ -2328,7 +2355,8 @@ vector<int> IQRouter::FreeCredits() const {
   return result;
 }
 
-vector<int> IQRouter::MaxCredits() const {
+vector<int> IQRouter::MaxCredits() const 
+{
   vector<int> result(_outputs * _vcs);
   for (int o = 0; o < _outputs; ++o) {
     for (int v = 0; v < _vcs; ++v) {
@@ -2338,7 +2366,8 @@ vector<int> IQRouter::MaxCredits() const {
   return result;
 }
 
-void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) {
+void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) 
+{
   assert(!_routing_delay);
   assert(f);
   assert(f->vc == vc);
