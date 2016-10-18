@@ -84,6 +84,7 @@ void RouteTbl::_CalDist()
   while (count < _num_nodes) {
 
     closest = _ClosestUnvisited();
+    assert(closest >= 0);
     _visited[closest] = true;
 
     for (int i = 0; i < _num_nodes; i++) {
