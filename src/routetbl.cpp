@@ -65,7 +65,7 @@ int RouteTbl::_ClosestUnvisited()
   int min_dist = INFINITY;
   int closest = -1;
   for (int i = 0; i < _num_nodes; i++) {
-    if (!_visited[i] && (min_dist > _dist[i])) {
+    if (!_visited[i] && (min_dist >= _dist[i])) {
       min_dist = _dist[i];
       closest = i;
     }
