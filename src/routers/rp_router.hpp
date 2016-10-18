@@ -48,7 +48,7 @@ class Allocator;
 class SwitchMonitor;
 class BufferMonitor;
 
-class RPRouter : public IQRouter {
+class RPRouter : public Router {
 
   int _vcs;
 
