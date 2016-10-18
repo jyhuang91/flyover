@@ -56,7 +56,7 @@ TrafficManager * TrafficManager::New(Configuration const & config,
       /* ==== Power Gate - Begin ==== */
     } else if (sim_type == "flov") {
         result = new FLOVTrafficManager(config, net);
-    } else if (sim_type = "rp") {
+    } else if (sim_type == "rp") {
         result = new RPTrafficManager(config, net);
       /* ==== Power Gate - End ==== */
     } else {
