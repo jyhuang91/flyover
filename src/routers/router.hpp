@@ -136,6 +136,9 @@ protected:
   vector<bool> _drain_done_sent;
   vector<bool> _drain_tags;
   bool _router_state; // set by trafficmanager, on is true, off is false
+  // routing tables
+  vector<int> _rt_tbl;
+  vector<int> _esc_rt_tbl;
   /* ==== Power Gate - End ==== */
 
 public:
@@ -164,9 +167,6 @@ public:
   }
 
   virtual void ReadInputs( ) = 0;
-  /* ==== Power Gate - Begin ==== */
-  //virtual void PowerStateEvaluate( ) {};
-  /* ==== Power Gate - Begin ==== */
   virtual void Evaluate( );
   virtual void WriteOutputs( ) = 0;
 
@@ -252,11 +252,15 @@ public:
 
   inline int NumInputs() const {return _inputs;}
   inline int NumOutputs() const {return _outputs;}
+
   /* ==== Power Gate - Begin ==== */
   inline void PowerOn() {_power_state = power_on;}
   inline void PowerOff() {_power_state = power_off;}
+  inline void WakeUp() {_wakeup_signal = true;}
   inline void SetPowerState( ePowerState s ) {_power_state = s;}
   inline Router::ePowerState GetPowerState() const {return _power_state;}
+  inline void SetRouterState(bool state) {_router_state = state;}
+  
   inline uint64_t GetPowerOffCycles() const {return _power_off_cycles;}
   inline void ResetPowerOffCycles() {_power_off_cycles = 0;}  // _power_off_cycles is reset when each kernel is finished (GPGPU)
   inline uint64_t GetTotalPowerOffCycles() const {return _total_power_off_cycles;}
@@ -267,12 +271,16 @@ public:
   inline int GetMaxDrainTime() const {return _max_drain_time;}
   inline int GetMinDrainTime() const {return _min_drain_time;}
   inline deque<int> GetDrainTime() const {return _drain_time_q;}
-  inline void WakeUp() {_wakeup_signal = true;}
-  Router::ePowerState GetNeighborPowerState(int out_port) const;
-  void IdleDetected();
   inline double GetPowerGateOverheadCycles() const {return _off_counter*_bet_threshold;}
   inline void SetDrainTag(int input) {_drain_tags[input] = true;}
-  inline void SetRouterState(bool state) {_router_state = state;}
+
+  inline void SetRouteTable(vector<int> rt_tbl) {_rt_tbl = rt_tbl;}
+  inline void SetEscRouteTable(vector<int> esc_rt_tbl) {_esc_rt_tbl = esc_rt_tbl;}
+  inline const vector<int> & GetRouteTable() const {return _rt_tbl;}
+  inline const vector<int> & GetEscRouteTable() const {return _esc_rt_tbl;}
+
+  void IdleDetected();
+  Router::ePowerState GetNeighborPowerState(int out_port) const;
   /* ==== Power Gate - End ==== */
 
 };
