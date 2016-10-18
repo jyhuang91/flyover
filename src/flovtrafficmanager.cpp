@@ -506,7 +506,7 @@ void FLOVTrafficManager::_Step( )
         for (int n = 0; n < _nodes; ++n)
             routers[n]->Display(cout);
         cout << endl << endl;
-        /* ==== Power Gate Debug - Begin ==== */
+        /* ==== Power Gate Debug - End ==== */
     }
 
     /* ==== Power Gate - Begin ==== */
