@@ -43,10 +43,10 @@ private:
   // ============ Internal methods ============ 
 protected:
 
-  void _Inject();
-  void _Step( );
+  virtual void _Inject();
+  virtual void _Step( );
 
-  void _GeneratePacket( int source, int size, int cl, int time );
+  virtual void _GeneratePacket( int source, int size, int cl, int time );
 
 public:
 

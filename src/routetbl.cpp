@@ -1,10 +1,11 @@
 #include <deque>
+#include <limits>
 
 #include "globals.hpp"
 #include "misc_utils.hpp"
 #include "routetbl.hpp"
 
-#define DEBUG
+//#define DEBUG
 
 RouteTbl::RouteTbl()
 {
@@ -54,16 +55,16 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
     }
   }
 #ifdef DEBUG
-//  cout << "Adjacent Matrix: " << endl;
-//  for (int i = 0; i < _num_nodes; i++) {
-//    cout << i << ": ";
-//    for (int j = 0; j < _num_nodes; j++) {
-//      //cout << _adj_mtx[i][j] << " ";
-//      if (_adj_mtx[i][j] > 0)
-//        cout << j << " ";
-//    }
-//    cout << endl;
-//  }
+  cout << "Adjacent Matrix: " << endl;
+  for (int i = 0; i < _num_nodes; i++) {
+    cout << i << ": ";
+    for (int j = 0; j < _num_nodes; j++) {
+      //cout << _adj_mtx[i][j] << " ";
+      if (_adj_mtx[i][j] > 0)
+        cout << j << " ";
+    }
+    cout << endl;
+  }
 #endif
 }
 
@@ -74,7 +75,8 @@ void RouteTbl::_Init()
   _dist.clear();
   _visited.resize(_num_nodes, false);
   _pred.resize(_num_nodes, -1);
-  _dist.resize(_num_nodes, INFINITY);
+  _dist.resize(_num_nodes, numeric_limits<int>::max());
+  //_dist.resize(_num_nodes, INFINITY);
   _dist[_src] = 0;
   _rt_tbl.resize(_num_nodes, INVALID);
   _esc_rt_tbl.resize(_num_nodes, INVALID);
@@ -82,7 +84,7 @@ void RouteTbl::_Init()
 
 int RouteTbl::_ClosestUnvisited()
 {
-  int min_dist = INFINITY;
+  int min_dist = numeric_limits<int>::max();//INFINITY;
   int closest = -1;
   for (int i = 0; i < _num_nodes; i++) {
     if (!_visited[i] && (min_dist >= _dist[i])) {

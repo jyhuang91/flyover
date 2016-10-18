@@ -6,7 +6,7 @@
 
 #include "booksim.hpp"
 
-#define INFINITY (__builtin_inff())
+//#define INFINITY (__builtin_inff())
 
 enum { INVALID = -1, EAST, WEST, 
   SOUTH, NORTH, ARRIVED
