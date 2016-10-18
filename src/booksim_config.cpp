@@ -314,6 +314,7 @@ BookSimConfig::BookSimConfig( )
 
   /* ==== Power Gate - Begin ==== */
   AddStrField("off_cores", "");
+  AddStrField("off_routers", "");
   
   _int_map["idle_threshold"] = 5;
   _int_map["drain_threshold"] = 100;

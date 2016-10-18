@@ -112,8 +112,8 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
     assert(stype!=0);
 
     /* ==== Power Gate - Begin ==== */
-    vector<bool> & router_states = _net[0]->GetRouterStates();
-    assert(router_states[source] == true);
+    vector<bool> & core_states = _net[0]->GetCoreStates();
+    assert(core_states[source] == true);
     /* ==== Power Gate - End ==== */
 
     Flit::FlitType packet_type = Flit::ANY_TYPE;
@@ -125,14 +125,14 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
     if (_traffic[cl] == "tornado") {
         for (int i = 1; i < _nodes; ++i) {
             packet_destination = _traffic_pattern[cl]->dest((source+i)%_nodes);
-            if (router_states[packet_destination] == true)
+            if (core_states[packet_destination] == true)
                 break;
         }
     } else {
-        while (router_states[packet_destination] != true)
+        while (core_states[packet_destination] != true)
             packet_destination = _traffic_pattern[cl]->dest(source);
     }
-    assert(router_states[packet_destination] == true);
+    assert(core_states[packet_destination] == true);
     /* ==== Power Gate - End ==== */
     bool record = false;
     bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0);
@@ -264,12 +264,12 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
 void RPTrafficManager::_Inject()
 {
     /* ==== Power Gate - Begin ==== */
-    vector<bool> & router_states = _net[0]->GetRouterStates();
+    vector<bool> & core_states = _net[0]->GetCoreStates();
     /* ==== Power Gate - End ==== */
 
     for ( int input = 0; input < _nodes; ++input ) {
         /* ==== Power Gate - Begin ==== */
-        if (router_states[input] == false)
+        if (core_states[input] == false)
             continue;
         /* ==== Power Gate - End ==== */
         for ( int c = 0; c < _classes; ++c ) {
@@ -286,7 +286,7 @@ void RPTrafficManager::_Inject()
                         if (_traffic[c] == "tornado") {
                             for (i = 0; i < _nodes; ++i) {
                                 int pkt_dest = _traffic_pattern[c]->dest((input+i)%_nodes);
-                                if (router_states[pkt_dest] == true)
+                                if (core_states[pkt_dest] == true)
                                     break;
                             }
                         }

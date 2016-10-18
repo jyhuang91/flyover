@@ -70,7 +70,9 @@ protected:
   vector<CreditChannel *> _chan_cred;
 
   /* ==== Power Gate - Begin ==== */
+  vector<bool> _core_states;
   vector<bool> _router_states;
+  vector<int> _off_cores;
   vector<int> _off_routers;
   vector<HandshakeChannel *> _chan_handshake;
   /* ==== Power Gate - End ==== */
@@ -130,7 +132,9 @@ public:
   Router * GetRouter(int index) {return _routers[index];}
   int NumRouters() const {return _size;}
   /* ==== Power Gate - Begin ==== */
+  vector<bool> & GetCoreStates(){return _core_states;}
   vector<bool> & GetRouterStates(){return _router_states;}
+  /* ==== Power Gate - End ==== */
 };
 
 #endif 
