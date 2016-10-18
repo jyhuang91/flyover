@@ -19,6 +19,14 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
 {
   _Init();
 
+#ifdef DEBUG
+  cout << "Power-on routers: ";
+  for (int i = 0; i < _num_nodes; i++) {
+    if (_router_states[i])
+      cout << i << " ";
+  }
+  cout << endl;
+#endif
   assert(_num_nodes == powi(gK, gN));
   assert(gN == 2);
 
@@ -45,6 +53,18 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
       }
     }
   }
+#ifdef DEBUG
+//  cout << "Adjacent Matrix: " << endl;
+//  for (int i = 0; i < _num_nodes; i++) {
+//    cout << i << ": ";
+//    for (int j = 0; j < _num_nodes; j++) {
+//      //cout << _adj_mtx[i][j] << " ";
+//      if (_adj_mtx[i][j] > 0)
+//        cout << j << " ";
+//    }
+//    cout << endl;
+//  }
+#endif
 }
 
 void RouteTbl::_Init()
@@ -84,7 +104,13 @@ void RouteTbl::_CalDist()
   while (count < _num_nodes) {
 
     closest = _ClosestUnvisited();
-    assert(closest >= 0);
+    //cout << "closest: " << closest << endl;
+    if (closest < 0) {
+      //cout << "count: " << count << endl;
+      //assert(0);
+      break;
+    }
+
     _visited[closest] = true;
 
     for (int i = 0; i < _num_nodes; i++) {
@@ -158,6 +184,7 @@ void RouteTbl::BuildRoute()
   }
 
 #ifdef DEBUG
+  cout << endl;
   cout << "Regular routes:" << endl;
   _PrintAllPath();
 #endif
@@ -237,8 +264,10 @@ void RouteTbl::_PrintPath(int node) {
   if (node == _src) {
     cout << node << "->";
   } else if (_pred[node] == -1) {
-    cout << "No path from " << _src
-      << " to " << node << endl;
+    //cout << "No path from " << _src
+    //  << " to " << node
+    //  << " (dist: " << _dist[node]
+    //  << ")" << endl;
   } else {
     _PrintPath(_pred[node]);
     cout << node << "->";
@@ -253,6 +282,7 @@ void RouteTbl::_PrintAllPath()
     } else {
       _PrintPath(i);
     }
-    cout << " (" << _dist[i] << ")." << endl;
+    if (_dist[i] < _num_nodes)
+      cout << " (" << _dist[i] << ")." << endl;
   }
 }
