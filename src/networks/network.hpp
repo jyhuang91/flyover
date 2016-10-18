@@ -70,6 +70,7 @@ protected:
   vector<CreditChannel *> _chan_cred;
 
   /* ==== Power Gate - Begin ==== */
+  int _fabric_manager;  // RP
   vector<bool> _core_states;
   vector<bool> _router_states;
   vector<int> _off_cores;

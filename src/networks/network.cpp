@@ -57,6 +57,9 @@ Network::Network( const Configuration &config, const string & name ) :
   _channels = -1;
   _classes  = config.GetInt("classes");
   /* ==== Power Gate - Begin ==== */
+  _fabric_manager = config.GetInt("fabric_manager");
+  string type = config.GetStr("sim_type");
+  assert((_fabric_manager >= 0 && type == "rp") || _fabric_manager < 0);
   _off_cores = config.GetIntArray("off_cores");
   _off_routers = config.GetIntArray("off_routers");
   /* ==== Power Gate - End ==== */

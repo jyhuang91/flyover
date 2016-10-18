@@ -40,6 +40,9 @@
 #include "random_utils.hpp"
 #include "misc_utils.hpp"
  //#include "iq_router.hpp"
+/* ==== Power Gate - Begin ==== */
+#include "routetbl.hpp"
+/* ==== Power Gate - End ==== */
 
 
 KNCube::KNCube( const Configuration &config, const string & name, bool mesh ) :
@@ -99,8 +102,17 @@ void KNCube::_BuildNet( const Configuration &config )
     _timed_modules.push_back(_routers[node]);
 
     /* ==== Power Gate - Begin ==== */
-    if (_router_states[node] == false)
+    string type = config.GetStr("router");
+    bool is_rp = (type == "rp");
+    if (_router_states[node] == false) {
       _routers[node]->SetRouterState(false);
+    } else if (is_rp) {
+      RouteTbl rt = RouteTbl(node, _size, _router_states);
+      rt.BuildRoute();
+      rt.BuildEscRoute(_fabric_manager);
+      _routers[node]->SetRouteTable(rt.GetRouteTbl());
+      _routers[node]->SetEscRouteTable(rt.GetEscRouteTbl());
+    }
     /* ==== Power Gate - End ==== */
 
     router_name.str("");
