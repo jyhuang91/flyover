@@ -49,6 +49,7 @@
 #include "chaos_router.hpp"
 /* ==== Power Gate - Begin ==== */
 #include "flov_router.hpp"
+#include "rp_router.hpp"
 /* ==== Power Gate - End ==== */
 ///////////////////////////////////////////////////////
 
@@ -199,6 +200,8 @@ Router *Router::NewRouter( const Configuration& config,
   } else if ( type == "flov" ) {
     /* ==== Power Gate - Begin ==== */
     r = new FLOVRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "rp" ) {
+    r = new RPRouter( config, parent, name, id, inputs, outputs );
     /* ==== Power Gate - End ==== */
   } else {
     cerr << "Unknown router type: " << type << endl;

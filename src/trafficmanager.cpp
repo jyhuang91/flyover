@@ -38,6 +38,7 @@
 #include "batchtrafficmanager.hpp"
 /* ==== Power Gate - Begin ==== */
 #include "flovtrafficmanager.hpp"
+#include "rptrafficmanager.hpp"
 /* ==== Power Gate - End ==== */
 #include "random_utils.hpp" 
 #include "vc.hpp"
@@ -52,9 +53,13 @@ TrafficManager * TrafficManager::New(Configuration const & config,
         result = new TrafficManager(config, net);
     } else if(sim_type == "batch") {
         result = new BatchTrafficManager(config, net);
+      /* ==== Power Gate - Begin ==== */
     } else if (sim_type == "flov") {
         result = new FLOVTrafficManager(config, net);
-    }else {
+    } else if (sim_type == "rp") {
+        result = new RPTrafficManager(config, net);
+      /* ==== Power Gate - End ==== */
+    } else {
         cerr << "Unknown simulation type: " << sim_type << endl;
     } 
     return result;

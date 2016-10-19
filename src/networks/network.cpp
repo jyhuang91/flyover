@@ -57,7 +57,11 @@ Network::Network( const Configuration &config, const string & name ) :
   _channels = -1;
   _classes  = config.GetInt("classes");
   /* ==== Power Gate - Begin ==== */
-  _off_routers = config.GetIntArray("off_cores");
+  _fabric_manager = config.GetInt("fabric_manager");
+  string type = config.GetStr("sim_type");
+  assert((_fabric_manager >= 0 && type == "rp") || _fabric_manager < 0);
+  _off_cores = config.GetIntArray("off_cores");
+  _off_routers = config.GetIntArray("off_routers");
   /* ==== Power Gate - End ==== */
 }
 
@@ -141,8 +145,13 @@ void Network::_Alloc( )
 
   /* ==== Power Gate - Begin ==== */
   // Core parking
+  _core_states.resize(_size, true);
   _router_states.resize(_size, true);
-  for (int i = 0; i < _off_routers.size(); ++i) {
+  for (unsigned i = 0; i < _off_cores.size(); ++i) {
+    int c_id = _off_cores[i];
+    _core_states[c_id] = false;
+  }
+  for (unsigned i = 0; i < _off_routers.size(); ++i) {
     int r_id = _off_routers[i];
     _router_states[r_id] = false;
   }

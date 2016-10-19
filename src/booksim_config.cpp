@@ -313,7 +313,9 @@ BookSimConfig::BookSimConfig( )
   _int_map["channel_sweep"] = 0;
 
   /* ==== Power Gate - Begin ==== */
+  _int_map["fabric_manager"] = -1;  // Router Parking: fabric manager
   AddStrField("off_cores", "");
+  AddStrField("off_routers", "");
   
   _int_map["idle_threshold"] = 5;
   _int_map["drain_threshold"] = 100;

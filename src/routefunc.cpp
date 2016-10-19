@@ -1965,10 +1965,6 @@ void flov_mesh( const Router *r, const Flit *f, int in_channel,
   int dest = f->dest;
 
   int out_port = dor_next_mesh(r->GetID(), f->dest);
-  //	if (f->id == 76384) {
-  //		cout << GetSimTime() << " | original computed out port is " << out_port << endl
-  //				<< "\trouter state of out port is " << Router::POWERSTATE[r->GetNeighborPowerState(out_port)] << endl;
-  //	}
 
   if(r->GetNeighborPowerState(out_port) != Router::power_on)
     out_port = dor_next_mesh(r->GetID(), f->dest, true);
@@ -2000,9 +1996,77 @@ void flov_mesh( const Router *r, const Flit *f, int in_channel,
   assert(out_port >= 0);
   assert(!inject);
 
-  //  if (f->id == 76384) {
-  //  	cout << GetSimTime() << " | computed out port is " << out_port << endl;
-  //  }
+  outputs->AddRange(out_port, vcBegin, vcEnd);
+}
+
+void rp_mesh( const Router *r, const Flit *f, int in_channel,
+    OutputSet *outputs, bool inject )
+{
+  int vcBegin = 0, vcEnd = gNumVCs - 1;
+  if (f->type == Flit::READ_REQUEST) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if (f->type == Flit::WRITE_REQUEST) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if (f->type == Flit::READ_REPLY) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if (f->type == Flit::WRITE_REPLY) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  outputs->Clear();
+
+  if (inject) {
+    // injection can use all VCs
+    outputs->AddRange(-1, vcBegin, vcEnd);
+    return;
+  } else if (r->GetID() == f->dest) {
+    // ejection can also use all VCs
+    outputs->AddRange(2*gN, vcBegin, vcEnd);
+    return;
+  }
+
+  assert(!inject && r->GetID() != f->dest);
+
+  int in_vc;
+
+  if (in_channel == 2*gN) {
+    in_vc = vcEnd; // ignore the injection VC
+  } else {
+    in_vc = f->vc;
+  }
+
+  bool escape = false;
+  if (in_vc == vcBegin)
+    escape = true;
+  if (GetSimTime() - f->rtime >= 300) {
+    escape = true;
+  }
+
+  int out_port;
+
+  if (!escape) {
+    const vector<int> & routing_table = r->GetRouteTable();
+    out_port = routing_table[f->dest];
+    ++vcBegin;
+  } else {
+    const vector<int> & escape_routing_table = r->GetEscRouteTable();
+    out_port = escape_routing_table[f->dest];
+    vcEnd = vcBegin;
+  }
+  assert(out_port >= 0 && out_port <= 4);
+
+  if (f->watch) {
+    *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+      << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+      << " at output port " << out_port << " for flit " << f->id
+      << " (input port " << in_channel << ", destination " << f->dest << ")"
+      << "." << endl;
+  }
 
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
@@ -2095,5 +2159,6 @@ void InitializeRoutingMap( const Configuration & config )
   
   /* ==== Power Gate - Begin ==== */
   gRoutingFunctionMap["flov_mesh"] = &flov_mesh;
+  gRoutingFunctionMap["rp_mesh"] = &rp_mesh;
   /* ==== Power Gate - End ==== */
 }

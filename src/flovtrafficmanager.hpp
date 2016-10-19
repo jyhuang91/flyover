@@ -50,9 +50,9 @@ private:
   /* ==== Power Gate - End ==== */
 
   /* ==== Power Gate - Begin ==== */
-  vector<vector<uint64_t> > _idle_cycles;
-  vector<uint64_t> _router_idle_periods;
-  vector<vector<uint64_t> > _overall_idle_cycles;
+  vector<vector<int> > _idle_cycles;
+  vector<int> _router_idle_periods;
+  vector<vector<int> > _overall_idle_cycles;
   vector<bool> _wakeup_handshake_latency;
   /* ==== Power Gate - End ==== */
   // ============ Internal methods ============ 
@@ -60,13 +60,10 @@ protected:
 
   virtual void _RetireFlit( Flit *f, int dest );
 
-  void _Inject();
-  void _Step( );
+  virtual void _Inject();
+  virtual void _Step( );
 
-//  bool _PacketsOutstanding( ) const;
-  
-//  virtual int  _IssuePacket( int source, int cl );
-  void _GeneratePacket( int source, int size, int cl, int time );
+  virtual void _GeneratePacket( int source, int size, int cl, int time );
 
   virtual void _ClearStats( );
 

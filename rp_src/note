@@ -1,0 +1,3 @@
+flits are waiting in the queue and the wait time accumulated,
+so they are all tempting to timeout and will recompute routing,
+then all waiting for VC0 (escape), which is very congested.
