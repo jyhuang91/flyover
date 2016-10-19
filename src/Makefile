@@ -30,8 +30,15 @@ DEFINE =
 INCPATH = -I. -Iarbiters -Iallocators -Irouters -Inetworks -Ipower
 CPPFLAGS += -Wall $(INCPATH) $(DEFINE)
 CPPFLAGS += -O3
-CPPFLAGS += -g -std=c++11
+CPPFLAGS += -g
 LFLAGS +=
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+  CPPFLAGS +=
+else
+  CPPFLAGS += -std=c++11
+endif
 
 OBJDIR := obj
 PROG := booksim
