@@ -28,154 +28,48 @@
 #ifndef _FLOV_ROUTER_HPP_
 #define _FLOV_ROUTER_HPP_
 
-#include <string>
-#include <deque>
-#include <queue>
-#include <set>
-#include <map>
+#include "iq_router.hpp"
 
-#include "router.hpp"
-#include "routefunc.hpp"
-
-using namespace std;
-
-class VC;
-class Flit;
-class Credit;
-class Buffer;
-class BufferState;
-class Allocator;
-class SwitchMonitor;
-class BufferMonitor;
 /* ==== Power Gate - Begin ==== */
 class Handshake;
 /* ==== Power Gate - End ==== */
 
-class FLOVRouter : public Router {
+class FLOVRouter : public IQRouter {
 
-  int _vcs;
+protected:
 
-  bool _vc_busy_when_full;
-  bool _vc_prioritize_empty;
-  bool _vc_shuffle_requests;
-
-  bool _speculative;
-  bool _spec_check_elig;
-  bool _spec_check_cred;
-  bool _spec_mask_by_reqs;
-  
-  bool _active;
-
-  int _routing_delay;
-  int _vc_alloc_delay;
-  int _sw_alloc_delay;
-  
-  map<int, Flit *> _in_queue_flits;
-
-  deque<pair<int, pair<Credit *, int> > > _proc_credits;
   /* ==== Power Gate - Begin ==== */
   deque<pair<int, Handshake *> > _proc_handshakes;
-  /* ==== Power Gate - End ==== */
 
-  deque<pair<int, pair<int, int> > > _route_vcs;
-  deque<pair<int, pair<pair<int, int>, int> > > _vc_alloc_vcs;  
-  deque<pair<int, pair<pair<int, int>, int> > > _sw_hold_vcs;
-  deque<pair<int, pair<pair<int, int>, int> > > _sw_alloc_vcs;
-
-  deque<pair<int, pair<Flit *, pair<int, int> > > > _crossbar_flits;
-
-  map<int, Credit *> _out_queue_credits;
-  /* ==== Power Gate - Begin ==== */
   map<int, Handshake *> _out_queue_handshakes;
-  /* ==== Power Gate - End ==== */
 
-  vector<Buffer *> _buf;
-  vector<BufferState *> _next_buf;
-  /* ==== Power Gate - Begin ==== */
   vector<vector<int> > _credit_counter;
   vector<bool> _clear_credits;
-  /* ==== Power Gate - End ==== */
 
-  Allocator *_vc_allocator;
-  Allocator *_sw_allocator;
-  Allocator *_spec_sw_allocator;
-  
-  vector<int> _vc_rr_offset;
-  vector<int> _sw_rr_offset;
-
-  tRoutingFunction   _rf;
-
-  int _output_buffer_size;
-  vector<queue<Flit *> > _output_buffer;
-
-  vector<queue<Credit *> > _credit_buffer;
-
-  /* ==== Power Gate - Begin ==== */
   vector<queue<Handshake *> > _handshake_buffer;
-  /* ==== Power Gate - End ==== */
+ 
 
-  bool _hold_switch_for_packet;
-  vector<int> _switch_hold_in;
-  vector<int> _switch_hold_out;
-  vector<int> _switch_hold_vc;
-
-  bool _noq;
-  vector<vector<int> > _noq_next_output_port;
-  vector<vector<int> > _noq_next_vc_start;
-  vector<vector<int> > _noq_next_vc_end;
-
-#ifdef TRACK_FLOWS
-  vector<vector<queue<int> > > _outstanding_classes;
-#endif
-
-  bool _ReceiveFlits( );
-  bool _ReceiveCredits( );
-  /* ==== Power Gate - Begin ==== */
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */
 
   virtual void _InternalStep( );
 
-  bool _SWAllocAddReq(int input, int vc, int output);
+  virtual void _InputQueuing( );
 
-  void _InputQueuing( );
+  virtual void _RouteUpdate( );
+  virtual void _VCAllocUpdate( );
+  virtual void _SWHoldUpdate( );
+  virtual void _SWAllocUpdate( );
 
-  void _RouteEvaluate( );
-  void _VCAllocEvaluate( );
-  void _SWHoldEvaluate( );
-  void _SWAllocEvaluate( );
-  void _SwitchEvaluate( );
+  virtual void _OutputQueuing( );
 
-  void _RouteUpdate( );
-  void _VCAllocUpdate( );
-  void _SWHoldUpdate( );
-  void _SWAllocUpdate( );
-  void _SwitchUpdate( );
-
-  void _OutputQueuing( );
-
-  void _SendFlits( );
-  void _SendCredits( );
   /* ==== Power Gate - Begin ==== */
   void _SendHandshakes( );
-  /* ==== Power Gate - End ==== */
   
-  void _UpdateNOQ(int input, int vc, Flit const * f);
-
-  /* ==== Power Gate - Begin ==== */
   void _FlovStep( );  // fly-over operations
   void _HandshakeEvaluate();
   void _HandshakeResponse();
   /* ==== Power Gate - End ==== */
-
-  // ----------------------------------------
-  //
-  //   Router Power Modellingyes
-  //
-  // ----------------------------------------
-
-  SwitchMonitor * _switchMonitor ;
-  BufferMonitor * _bufferMonitor ;
   
 public:
 
@@ -185,31 +79,13 @@ public:
   
   virtual ~FLOVRouter( );
   
-  virtual void AddOutputChannel(FlitChannel * channel, CreditChannel * backchannel);
-
   /* ==== Power Gate - Begin ==== */
   virtual void PowerStateEvaluate( );
   /* ==== Power Gate - End ==== */
+  
   virtual void ReadInputs( );
   virtual void WriteOutputs( );
   
-  void Display( ostream & os = cout ) const;
-
-  virtual int GetUsedCredit(int o) const;
-  virtual int GetBufferOccupancy(int i) const;
-
-#ifdef TRACK_BUFFERS
-  virtual int GetUsedCreditForClass(int output, int cl) const;
-  virtual int GetBufferOccupancyForClass(int input, int cl) const;
-#endif
-
-  virtual vector<int> UsedCredits() const;
-  virtual vector<int> FreeCredits() const;
-  virtual vector<int> MaxCredits() const;
-
-  SwitchMonitor const * const GetSwitchMonitor() const {return _switchMonitor;}
-  BufferMonitor const * const GetBufferMonitor() const {return _bufferMonitor;}
-
 };
 
 #endif

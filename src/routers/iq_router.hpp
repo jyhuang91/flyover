@@ -50,6 +50,8 @@ class BufferMonitor;
 
 class IQRouter : public Router {
 
+protected:
+
   int _vcs;
 
   bool _vc_busy_when_full;
@@ -118,7 +120,7 @@ class IQRouter : public Router {
 
   bool _SWAllocAddReq(int input, int vc, int output);
 
-  void _InputQueuing( );
+  virtual void _InputQueuing( );
 
   void _RouteEvaluate( );
   void _VCAllocEvaluate( );
@@ -126,13 +128,13 @@ class IQRouter : public Router {
   void _SWAllocEvaluate( );
   void _SwitchEvaluate( );
 
-  void _RouteUpdate( );
-  void _VCAllocUpdate( );
-  void _SWHoldUpdate( );
-  void _SWAllocUpdate( );
-  void _SwitchUpdate( );
+  virtual void _RouteUpdate( );
+  virtual void _VCAllocUpdate( );
+  virtual void _SWHoldUpdate( );
+  virtual void _SWAllocUpdate( );
+  virtual void _SwitchUpdate( );
 
-  void _OutputQueuing( );
+  virtual void _OutputQueuing( );
 
   void _SendFlits( );
   void _SendCredits( );
