@@ -33,6 +33,7 @@ CPPFLAGS += -O3
 CPPFLAGS += -g
 LFLAGS +=
 
+CCFLAGS += -Wall -O3 -g $(INCPATH) $(DEFINE)
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   CPPFLAGS +=
@@ -72,10 +73,10 @@ $(YACC_SRCS) $(YACC_HDRS): config.y
 	$(YACC) -d $<
 
 $(LEX_OBJS): $(LEX_SRCS) $(YACC_HDRS)
-	$(CC) $(CPPFLAGS) -c $< -o $@
+	$(CC) $(CCFLAGS) -c $< -o $@
 
 $(YACC_OBJS): $(YACC_SRCS)
-	$(CC) $(CPPFLAGS) -c $< -o $@
+	$(CC) $(CCFLAGS) -c $< -o $@
 
 ${OBJDIR}/%.o: %.cpp 
 	$(CXX) $(CPPFLAGS) -MMD -c $< -o $@
