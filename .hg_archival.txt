@@ -1,0 +1,4 @@
+repo: 478d6f905e9102b1c6e7b9111fa4d51402cb65b3
+node: bdb307e8be54a5808a9af2537e9261d88de6ed1b
+branch: default
+tag: stable_2014_12_14
