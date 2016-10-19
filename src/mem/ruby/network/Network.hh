@@ -118,6 +118,9 @@ class Network : public ClockedObject
     std::vector<bool> m_in_use;
     std::vector<bool> m_ordered;
 
+    // Jiayi, use booksim2 or other network model
+    bool m_use_booksim;
+
   private:
     //! Callback class used for collating statistics from all the
     //! controller of this type.
