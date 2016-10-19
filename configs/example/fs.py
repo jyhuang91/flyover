@@ -313,5 +313,9 @@ if options.timesync:
 if options.frame_capture:
     VncServer.frame_capture = True
 
+# Jiayi: disable the listening sockets, 05/18/16
+#        in order to simulate more processors
+m5.disableAllListeners()
+
 Simulation.setWorkCountOptions(test_sys, options)
 Simulation.run(options, root, test_sys, FutureClass)
