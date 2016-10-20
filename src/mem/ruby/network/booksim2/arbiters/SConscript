@@ -1,0 +1,14 @@
+# -*- mode:python -*-
+
+# Authors: Jiayi Huang
+
+Import('*')
+
+if env['PROTOCOL'] == 'None':
+    Return()
+
+Source('arbiter.cc')
+Source('matrix_arb.cc')
+Source('prio_arb.cc')
+Source('roundrobin_arb.cc')
+Source('tree_arb.cc')
