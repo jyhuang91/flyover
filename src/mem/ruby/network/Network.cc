@@ -73,8 +73,10 @@ Network::Network(const Params *p)
 
     // Initialize the controller's network pointers
     if (m_use_booksim) {
-        for (int n = 0; n < m_nodes; n++)
+        for (int n = 0; n < m_nodes; n++) {
             m_toNetQueues[n].resize(m_virtual_networks, nullptr);
+            m_fromNetQueues[n].resize(m_virtual_networks, nullptr);
+        }
         for (std::vector<AbstractController*>::const_iterator i =
                 p->ext_nodes.begin(); i != p->ext_nodes.end(); ++i) {
             AbstractController *abs_cntrl = (*i);
