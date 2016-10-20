@@ -44,7 +44,7 @@ class TechParameter;
 class SRAM;
 class Register;
 
-class Buffer
+class OrionBuffer
 {
   public:
     enum BufferModel
@@ -55,7 +55,7 @@ class Buffer
     };
 
   public:
-    Buffer(
+    OrionBuffer(
       const string& buffer_model_str_,
       bool is_fifo_,
       bool is_outdrv_,
@@ -65,7 +65,7 @@ class Buffer
       uint32_t num_write_port_,
       const OrionConfig* orion_cfg_ptr_
     );
-    ~Buffer();
+    ~OrionBuffer();
 
   public:
     double get_dynamic_energy(bool is_read_, bool is_max_) const;

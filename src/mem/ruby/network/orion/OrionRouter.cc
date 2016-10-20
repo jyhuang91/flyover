@@ -367,12 +367,12 @@ void OrionRouter::init()
         bool is_fifo = true;
         bool is_outdrv = (!m_is_in_shared_buf) && (m_is_in_shared_switch);
         const string& in_buf_model_str = m_orion_cfg_ptr->get<string>("IN_BUF_MODEL");
-        m_in_buf_ary_ptr = new Buffer* [m_num_vclass];
+        m_in_buf_ary_ptr = new OrionBuffer* [m_num_vclass];
         for (uint32_t i = 0; i < m_num_vclass; i++)
         {
             uint32_t in_buf_num_read_port = m_orion_cfg_ptr->get<uint32_t>("IN_BUF_NUM_READ_PORT");
             uint32_t in_buf_num_set = m_in_buf_num_set_ary[i];
-            m_in_buf_ary_ptr[i] = new Buffer(in_buf_model_str, is_fifo, is_outdrv, 
+            m_in_buf_ary_ptr[i] = new OrionBuffer(in_buf_model_str, is_fifo, is_outdrv, 
                     in_buf_num_set, m_flit_width, in_buf_num_read_port, 1, m_orion_cfg_ptr);
         }
     }

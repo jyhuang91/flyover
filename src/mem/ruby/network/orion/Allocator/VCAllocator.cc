@@ -136,7 +136,7 @@ VCAllocator::VCAllocator(
 
     uint32_t vc_select_buf_num_set = m_num_vchannel;
     uint32_t vc_select_buf_line_width = (uint32_t)ceil(log2(m_num_vchannel));
-    m_vc_select_ptr = new Buffer(vc_select_buf_model_str_, true, false, 
+    m_vc_select_ptr = new OrionBuffer(vc_select_buf_model_str_, true, false, 
             vc_select_buf_num_set, vc_select_buf_line_width, 1, 1, orion_cfg_ptr_);
 }
 
