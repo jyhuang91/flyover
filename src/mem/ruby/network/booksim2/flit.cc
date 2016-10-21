@@ -85,6 +85,8 @@ void Flit::Reset()
   flov_hops = 0 ;
   /* ==== Power Gate - End ==== */
   // gem5
+  src_router = -1;
+  dest_router = -1;
   gem5_vnet = -1;
   msg_ptr = 0;
 }  

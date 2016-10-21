@@ -92,6 +92,8 @@ public:
   OutputSet la_route_set;
 
   // Fields for gem5
+  int src_router;
+  int dest_router;
   int gem5_vnet;
   MsgPtr msg_ptr;
 
