@@ -75,6 +75,9 @@ def define_options(parser):
     parser.add_option("--booksim-config", action="store", type="string",
                       default='configs/ruby_booksim/gem5booksim.cfg',
                       help="path to booksim config file")
+    parser.add_option("--noc-pg", action="store_true", default=False,
+                      help="NoC power gating, create different core router \
+                            map in topology")
 
     # ruby mapping options
     parser.add_option("--numa-high-bit", type="int", default=0,
@@ -175,7 +178,10 @@ def create_system(options, system, piobus = None, dma_ports = []):
 
     # Create the network topology
     if options.booksim_network:
-        topology.makeBooksimTopology(options, network)
+        if options.noc_pg:
+            topology.makeFLOVTopology(options, network)
+        else:
+            topology.makeBooksimTopology(options, network)
     else:
         topology.makeTopology(options, network, IntLinkClass, ExtLinkClass,
                 RouterClass)

@@ -199,3 +199,67 @@ class MeshDirCorners(SimpleTopology):
         network.ext_nodes = ext_nodes
         network.attached_router_id = attached_router_id
 
+    def makeFLOVTopology(self, options, network):
+        nodes = self.nodes
+
+        num_routers = 64#options.num_cpus
+        num_rows = options.mesh_rows
+
+        # First determine which nodes are cache cntrls vs. dirs vs. dma
+        cache_nodes = []
+        dir_nodes = []
+        dma_nodes = []
+        for node in nodes:
+            if node.type == 'L1Cache_Controller' or \
+            node.type == 'L2Cache_Controller':
+                cache_nodes.append(node)
+            elif node.type == 'Directory_Controller':
+                dir_nodes.append(node)
+            elif node.type == 'DMA_Controller':
+                dma_nodes.append(node)
+
+        # Obviously the number or rows must be <= the number of routers
+        # and evenly divisible.  Also the number of caches must be a
+        # multiple of the number of routers and the number of directories
+        # must be four.
+        assert(num_rows <= num_routers)
+        num_columns = int(num_routers / num_rows)
+        assert(num_columns * num_rows == num_routers)
+        caches_per_router, remainder = divmod(len(cache_nodes), num_routers)
+        assert(remainder == 0)
+        assert(len(dir_nodes) == 4)
+
+        # extern node id to set unique node id
+        #node_count = 0
+        # attached router id of extern nodes
+        attached_router_id = [0, 1, 3, 6, 7, 8, 11, 12, 15, 17, 19, 21, 22,
+                25, 27, 28, 31, 32, 36, 37, 40, 42, 43, 46, 50, 52, 53, 55,
+                56, 57, 59, 63]
+        attached_router_id = attached_router_id + attached_router_id
+
+        # Connect each cache controller to the appropriate router
+        ext_nodes = []
+        for (i, n) in enumerate(cache_nodes):
+            #cntrl_level, router_id = divmod(i, num_routers)
+            #assert(cntrl_level < caches_per_router)
+            ext_nodes.append(n)
+            #attached_router_id.append(router_id)
+
+        # Connect the dir nodes to the corners.
+        ext_nodes.append(dir_nodes[0])
+        attached_router_id.append(0)
+        ext_nodes.append(dir_nodes[1])
+        attached_router_id.append(num_columns - 1)
+        ext_nodes.append(dir_nodes[2])
+        attached_router_id.append(num_routers - num_columns)
+        ext_nodes.append(dir_nodes[3])
+        attached_router_id.append(num_routers - 1)
+
+        # Connect the dma nodes to router 0. THese should only be DMA nodes.
+        for (i, node) in enumerate(dma_nodes):
+            assert(node.type == 'DMA_Controller')
+            ext_nodes.append(node)
+            attached_router_id.append(0)
+
+        network.ext_nodes = ext_nodes
+        network.attached_router_id = attached_router_id
