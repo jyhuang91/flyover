@@ -51,6 +51,10 @@ RPRouter::RPRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
 : IQRouter( config, parent, name, id, inputs, outputs )
 {
+    cout << FullName() << " | rp |"
+        << inputs << " inputs, "
+        << outputs << " outputs."
+        << endl;
 }
 
 RPRouter::~RPRouter( )
@@ -335,7 +339,7 @@ void RPRouter::_VCAllocUpdate( )
         if (_speculative) {
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _sw_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
+            pair<uint64_t, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
             if (item.second.first == input_vc) {
               _sw_alloc_vcs.erase(_sw_alloc_vcs.begin()+i);
               break;
@@ -891,7 +895,7 @@ void RPRouter::_SWAllocUpdate( )
           assert(dest_vc == -1);
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
+            pair<uint64_t, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
             if (item.second.first == input_vc) {
               _vc_alloc_vcs.erase(_vc_alloc_vcs.begin()+i);
             }

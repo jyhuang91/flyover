@@ -57,13 +57,23 @@ FLOVRouter::FLOVRouter( Configuration const & config, Module *parent,
   for (int k = 0; k < _outputs; ++k) {
     _credit_counter[k].resize(_vcs, 0);
   }
-  _clear_credits.resize(_outputs - 1, false);
-  _drain_done_sent.resize(_outputs - 1, false);
-  _drain_tags.resize(_inputs - 1, false);
+//  _clear_credits.resize(_outputs - 1, false);
+//  _drain_done_sent.resize(_outputs - 1, false);
+//  _drain_tags.resize(_inputs - 1, false);
+//
+//  _handshake_buffer.resize(_outputs - 1);
 
-  _handshake_buffer.resize(_outputs - 1);
+  _clear_credits.resize(4, false);
+  _drain_done_sent.resize(4, false);
+  _drain_tags.resize(4, false);
+
+  _handshake_buffer.resize(4);
   /* ==== Power Gate - End ==== */
 
+  cout << FullName() << " | flov | "
+      << inputs << " inputs, "
+      << outputs << " outputs."
+      << endl;
 
 }
 
@@ -99,7 +109,8 @@ void FLOVRouter::PowerStateEvaluate()
   switch (_power_state) {
   case power_on: {
     _drain_tags.clear();
-    _drain_tags.resize(_inputs - 1, false);
+    //_drain_tags.resize(_inputs - 1, false);
+    _drain_tags.resize(4, false);
     if (_outstanding_requests)
       if (_idle_timer > 0)
         --_idle_timer;  // or should be 0?
@@ -123,9 +134,11 @@ void FLOVRouter::PowerStateEvaluate()
         _drain_timer = 0;
         ++_drain_counter;
         _drain_tags.clear();
-        _drain_tags.resize(_inputs - 1, false);
+        //_drain_tags.resize(_inputs - 1, false);
+        _drain_tags.resize(4, false);
         assert(_out_queue_handshakes.empty());
-        for (int out = 0; out < _outputs - 1; ++out) {
+        for (int out = 0; out < 4; ++out) {
+        //for (int out = 0; out < _outputs - 1; ++out) {
           if (_downstream_states[out] == power_off)
             _drain_tags[out] = true;
           if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0) ||
@@ -147,7 +160,8 @@ void FLOVRouter::PowerStateEvaluate()
     assert(_outstanding_requests == 0);
     bool neighbor_wakeup = false;
     bool neighbor_draining = false;
-    for (int out = 0; out < _outputs - 1; ++out) {
+    for (int out = 0; out < 4; ++out) {
+    //for (int out = 0; out < _outputs - 1; ++out) {
       if (_downstream_states[out] == wakeup)
         neighbor_wakeup = true;
       if (_downstream_states[out] == draining)
@@ -174,7 +188,8 @@ void FLOVRouter::PowerStateEvaluate()
       _wakeup_signal = false;
       _power_state = power_on;
       _drain_tags.clear();
-      _drain_tags.resize(_inputs - 1, false);
+      _drain_tags.resize(4, false);
+      //_drain_tags.resize(_inputs - 1, false);
       _idle_timer = 0;
       _drain_timer = 0;
       assert(_out_queue_handshakes.empty());
@@ -201,7 +216,8 @@ void FLOVRouter::PowerStateEvaluate()
       }
       _power_state = power_off;
       _drain_tags.clear();
-      _drain_tags.resize(_inputs - 1, false);
+      _drain_tags.resize(4, false);
+      //_drain_tags.resize(_inputs - 1, false);
       _off_timer = 0;
       assert(_out_queue_handshakes.empty());
       for (int out = 0; out < _outputs - 1; ++out) {
@@ -227,10 +243,12 @@ void FLOVRouter::PowerStateEvaluate()
     } else if (_drain_timer > _drain_threshold) {
       _power_state = power_on;
       _drain_tags.clear();
-      _drain_tags.resize(_inputs - 1, false);
+      _drain_tags.resize(4, false);
+      //_drain_tags.resize(_inputs - 1, false);
       _idle_timer = 0;
       assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < _outputs - 1; ++out) {
+      //for (int out = 0; out < _outputs - 1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0)
             || (out == 2 && _id / 8 == 7) || (out == 3 && _id / 8 == 0))
           continue;	// for edge routers
@@ -254,7 +272,8 @@ void FLOVRouter::PowerStateEvaluate()
 
   case power_off: {
     _drain_tags.clear();
-    _drain_tags.resize(_inputs - 1, false);
+    _drain_tags.resize(4, false);
+    //_drain_tags.resize(_inputs - 1, false);
     for (int in_port = 0; in_port < _inputs; ++in_port) {
       Buffer const * const cur_buf = _buf[in_port];
       for (int vc = 0; vc < _vcs; ++vc) {
@@ -267,7 +286,8 @@ void FLOVRouter::PowerStateEvaluate()
       ++_off_timer;
       bool neighbor_wakeup = false;
       bool neighbor_draining = false;
-      for (int out = 0; out < _outputs - 1; ++out) {
+      //for (int out = 0; out < _outputs - 1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if (_downstream_states[out] == wakeup) {
           neighbor_wakeup = true;
           break;
@@ -288,9 +308,11 @@ void FLOVRouter::PowerStateEvaluate()
         _off_timer = 0;
         ++_off_counter; // used for poewr gating overhead
         _drain_tags.clear();
-        _drain_tags.resize(_inputs - 1, false);
+        //_drain_tags.resize(_inputs - 1, false);
+        _drain_tags.resize(4, false);
         assert(_out_queue_handshakes.empty());
-        for (int out = 0; out < _outputs - 1; ++out) {
+        //for (int out = 0; out < _outputs - 1; ++out) {
+        for (int out = 0; out < 4; ++out) {
           if (_downstream_states[out] == power_off)
             _drain_tags[out] = true;          
           if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0)
@@ -313,7 +335,8 @@ void FLOVRouter::PowerStateEvaluate()
         assert(cur_buf->GetState(vc) == VC::idle);
       }
     }
-    for (int out = 0; out < _outputs-1; ++out) {
+    //for (int out = 0; out < _outputs-1; ++out) {
+    for (int out = 0; out < 4; ++out) {
       if (_downstream_states[out] == power_off)
         _drain_tags[out] = true;
     }
@@ -332,11 +355,13 @@ void FLOVRouter::PowerStateEvaluate()
       _idle_timer = 0;
       _power_state = power_on;
       _drain_tags.clear();
-      _drain_tags.resize(_inputs - 1, false);
+      _drain_tags.resize(4, false);
+      //_drain_tags.resize(_inputs - 1, false);
       // _out_queue_handshakes don't need to be empty when it needs
       // to relay drain_tag for downstream waking up routers
       //assert(_out_queue_handshakes.empty()); // the why assertion???
-      for (int out = 0; out < _outputs - 1; ++out) {
+      //for (int out = 0; out < _outputs - 1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0) ||
             (out == 2 && _id / 8 == 7) || (out == 3 && _id / 8 == 0))
           continue;
@@ -348,7 +373,8 @@ void FLOVRouter::PowerStateEvaluate()
       }
       // set drain_done_tag based on my downstream information
       // not very clear here, 10/15/16
-      for (int out = 0; out < _outputs-1; ++out) {
+      //for (int out = 0; out < _outputs-1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if (_downstream_states[out] == wakeup || _downstream_states[out] == draining) {
           int opp_out = out;
           if (out % 2)
@@ -474,7 +500,8 @@ void FLOVRouter::WriteOutputs( )
 /* ==== Power Gate - Begin ==== */
 void FLOVRouter::_ReceiveHandshakes()
 {
-  for (int input = 0; input < _inputs - 1; ++input) {
+  //for (int input = 0; input < _inputs - 1; ++input) {
+  for (int input = 0; input < 4; ++input) {
     Handshake * const h = _input_handshakes[input]->Receive();
     if (h) {
       _proc_handshakes.push_back(make_pair(input, h));
@@ -655,7 +682,7 @@ void FLOVRouter::_RouteUpdate( )
     // avoid rerouting by VCAlloc again and again
     f->rtime = GetSimTime();
 
-    if (f->dest != _id) {
+    if (f->dest_router != _id) {
       OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
       assert(route_set);
       set<OutputSet::sSetElement> const setlist = route_set->GetSet();
@@ -666,13 +693,13 @@ void FLOVRouter::_RouteUpdate( )
         const FlitChannel * channel = _output_channels[out_port];
         Router * router = channel->GetSink();
         assert(router);
-        if (f->dest == router->GetID()) {
+        if (f->dest_router == router->GetID()) {
           if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
             cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
               << router->GetID() << " is "
               << POWERSTATE[_neighbor_states[out_port]] << ", but actually is "
               << POWERSTATE[router->GetPowerState()] << "(flit " << f->id
-              << " dest " << f->dest << ")" << endl;
+              << " dest " << f->dest_router << ")" << endl;
             assert(f->type == Flit::READ_REPLY || f->type == Flit::WRITE_REPLY);
             assert(0); // means should not come here??
           }
@@ -781,7 +808,7 @@ void FLOVRouter::_VCAllocUpdate( )
           // should remove the speculative SA
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _sw_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
+            pair<uint64_t, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
             if (item.second.first == input_vc) {
               _sw_alloc_vcs.erase(_sw_alloc_vcs.begin()+i);
             }
@@ -868,7 +895,7 @@ void FLOVRouter::_VCAllocUpdate( )
           // should remove the speculative SA
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _sw_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
+            pair<uint64_t, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
             if (item.second.first == input_vc) {
               _sw_alloc_vcs.erase(_sw_alloc_vcs.begin()+i);
             }
@@ -884,7 +911,7 @@ void FLOVRouter::_VCAllocUpdate( )
         if (_speculative) {
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _sw_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
+            pair<uint64_t, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
             if (item.second.first == input_vc) {
               _sw_alloc_vcs.erase(_sw_alloc_vcs.begin()+i);
               break;
@@ -1284,7 +1311,7 @@ void FLOVRouter::_SWAllocUpdate( )
               assert(_speculative);
               pair<int, int> input_vc = make_pair(input, vc);
               for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
-                pair<int, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
+                pair<uint64_t, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
                 if (item.second.first == input_vc) {
                   _vc_alloc_vcs.erase(_vc_alloc_vcs.begin()+i);
                   break;
@@ -1485,7 +1512,7 @@ void FLOVRouter::_SWAllocUpdate( )
             back_to_route = true;
             pair<int, int> input_vc = make_pair(input, vc);
             for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
-              pair<int, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
+              pair<uint64_t, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
               if (item.second.first == input_vc) {
                 _vc_alloc_vcs.erase(_vc_alloc_vcs.begin()+i);
                 break;
@@ -1571,7 +1598,7 @@ void FLOVRouter::_SWAllocUpdate( )
           assert(dest_vc == -1);
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
+            pair<uint64_t, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
             if (item.second.first == input_vc) {
               _vc_alloc_vcs.erase(_vc_alloc_vcs.begin()+i);
               break;
@@ -1638,7 +1665,8 @@ void FLOVRouter::_OutputQueuing( )
 /* ==== Power Gate - Begin ==== */
 void FLOVRouter::_SendHandshakes()
 {
-  for (int output = 0; output < _outputs - 1; ++output) {
+  //for (int output = 0; output < _outputs - 1; ++output) {
+  for (int output = 0; output < 4; ++output) {
     if (!_handshake_buffer[output].empty()) {
       Handshake * const h = _handshake_buffer[output].front();
       assert(h);
@@ -1745,7 +1773,7 @@ void FLOVRouter::_FlovStep() {
     //	 1	 -->   0
     //	 2	 -->   3
     //	 3	 -->   2
-    if (output != 4) {
+    if (output < 4) {
       int input = output;
       if (output % 2)
         --input;
@@ -1762,12 +1790,13 @@ void FLOVRouter::_FlovStep() {
       }
     }
     
-    if (output == 4)
+    if (output >= 4)
       c->Free();
     _proc_credits.pop_front();
   }
-  
-  for (int in = 0; in < _inputs - 1; ++in) {
+
+  //for (int in = 0; in < _inputs - 1; ++in) {
+  for (int in = 0; in < 4; ++in) {
     int out = in;
     if (in % 2)
       --out;
@@ -2054,8 +2083,9 @@ void FLOVRouter::_HandshakeEvaluate() {
 
 void FLOVRouter::_HandshakeResponse() {
   assert(_power_state == power_on || _power_state == draining);
-  
-  for (int out_port = 0; out_port < _outputs - 1; ++out_port) {
+
+  //for (int out_port = 0; out_port < _outputs - 1; ++out_port) {
+  for (int out_port = 0; out_port < 4; ++out_port) {
     if (_downstream_states[out_port] == draining
         || _downstream_states[out_port] == wakeup) {
       if (_drain_done_sent[out_port])

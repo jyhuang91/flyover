@@ -12,6 +12,7 @@
 
 #include "mem/ruby/network/booksim2/networks/gem5net.hh"
 #include "mem/ruby/network/booksim2/misc_utils.hh"
+#include "mem/ruby/network/booksim2/routetbl.hh"
 
 vector<int> Gem5Net::node_router_map;
 vector<map<int, int> > Gem5Net::node_port_map;
@@ -69,7 +70,7 @@ void Gem5Net::_BuildNet(const Configuration &config)
 
     for (int router = 0; router < _size; router++) {
 
-        router_name << "router";
+        router_name << config.GetStr("router") << "_router";
 
         if (_k > 1) {
             for (int dim_offset = _size / _k; dim_offset >= 1; dim_offset /=
@@ -85,6 +86,23 @@ void Gem5Net::_BuildNet(const Configuration &config)
         _timed_modules.push_back(_routers[router]);
 
         router_name.str("");
+
+        /* ==== Power Gate - Begin ==== */
+        string type = config.GetStr("router");
+        bool is_rp = (type == "rp");
+        if (_router_states[router] == false) {
+          _routers[router]->SetRouterState(false);
+          if (is_rp) {
+              _routers[router]->SetPowerState(Router::power_off);
+          }
+        } else if (is_rp) {
+          RouteTbl rt = RouteTbl(router, _size, _router_states);
+          rt.BuildRoute();
+          rt.BuildEscRoute(_fabric_manager);
+          _routers[router]->SetRouteTable(rt.GetRouteTbl());
+          _routers[router]->SetEscRouteTable(rt.GetEscRouteTbl());
+        }
+        /* ==== Power Gate - End ==== */
 
         for (int dim = 0; dim  < _n; dim++) {
 
@@ -105,12 +123,20 @@ void Gem5Net::_BuildNet(const Configuration &config)
                     _chan_cred[right_input]);
             _routers[router]->AddInputChannel(_chan[left_input],
                     _chan_cred[left_input]);
+            /* ==== Power Gate - Begin ==== */
+            _routers[router]->AddInputHandshake(_chan_handshake[right_input]);
+            _routers[router]->AddInputHandshake(_chan_handshake[left_input]);
+            /* ==== Power Gate - End ==== */
 
             // set input channel latency
             _chan[right_input]->SetLatency(latency);
             _chan[left_input]->SetLatency(latency);
             _chan_cred[right_input]->SetLatency(latency);
             _chan_cred[left_input]->SetLatency(latency);
+            /* ==== Power Gate - Begin ==== */
+            _chan_handshake[right_input]->SetLatency( latency );
+            _chan_handshake[left_input]->SetLatency( latency );
+            /* ==== Power Gate - End ==== */
 
             // get the output channel number
             right_output = _RightChannel(router, dim);
@@ -121,12 +147,20 @@ void Gem5Net::_BuildNet(const Configuration &config)
                     _chan_cred[right_output]);
             _routers[router]->AddOutputChannel(_chan[left_output],
                     _chan_cred[left_output]);
+            /* ==== Power Gate - Begin ==== */
+            _routers[router]->AddOutputHandshake(_chan_handshake[right_output]);
+            _routers[router]->AddOutputHandshake(_chan_handshake[left_output]);
+            /* ==== Power Gate - End ==== */
 
             // set output channel latency
             _chan[right_output]->SetLatency(latency);
             _chan[left_output]->SetLatency(latency);
             _chan_cred[right_output]->SetLatency(latency);
             _chan_cred[left_output]->SetLatency(latency);
+            /* ==== Power Gate - Begin ==== */
+            _chan_handshake[right_output]->SetLatency(latency);
+            _chan_handshake[left_output]->SetLatency(latency);
+            /* ==== Power Gate - End ==== */
         }
 
         // injection and ejection channel, always 1 latency
@@ -209,54 +243,3 @@ int Gem5Net::NodeToPort(int node)
 
     return port;
 }
-
-/**********************************************************
- * Routing functions for Gem5Net
- *********************************************************/
-//void dor_gem5mesh(const Router *r, const Flit *f, int in_channel, OutputSet
-//        *outputs, bool inject)
-//{
-//    int vcBegin = 0, vcEnd = gNumVCs - 1;
-//    if (f->type == Flit::READ_REQUEST) {
-//        vcBegin = gReadReqBeginVC;
-//        vcEnd = gReadReqEndVC;
-//    } else if (f->type == Flit::WRITE_REQUEST) {
-//        vcBegin = gWriteReqBeginVC;
-//        vcEnd = gWriteReqEndVC;
-//    } else if (f->type == Flit::READ_REPLY) {
-//        vcBegin = gReadReplyBeginVC;
-//        vcEnd = gReadReplyEndVC;
-//    } else if (f->type == Flit::WRITE_REPLY) {
-//        vcBegin = gWriteReplyBeginVC;
-//        vcEnd = gWriteReplyEndVC;
-//    }
-//    assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc <
-//                    0)));
-//
-//    int out_port;
-//
-//    if (inject) {
-//        out_port = -1;
-//    } else {
-//        int dest_router = Gem5Net::NodeToRouter(f->dest);
-//        if (dest_router == r->GetID()) {
-//            out_port = Gem5Net::NodeToPort(f->dest);
-//        } else {
-//            out_port = dor_next_mesh(r->GetID(), dest_router);
-//        }
-//    }
-//
-//    if (!inject && f->watch) {
-//        *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
-//            << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-//            << " at output port " << out_port
-//            << " for flit " << f->id
-//            << " (input port " << in_channel
-//            << ", destination " << f->dest << ")." << endl;
-//    }
-//
-//    outputs->Clear();
-//
-//    outputs->AddRange(out_port, vcBegin, vcEnd);
-//}
-
