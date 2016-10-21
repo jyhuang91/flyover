@@ -2114,6 +2114,135 @@ void dor_gem5net(const Router *r, const Flit *f, int in_channel, OutputSet
     outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
+void flov_gem5net( const Router *r, const Flit *f, int in_channel,
+    OutputSet *outputs, bool inject )
+{
+  assert(gNumVCperVnet > 1);
+  int vcBegin = f->gem5_vnet * gNumVCperVnet;
+  int vcEnd = vcBegin + gNumVCperVnet - 1;
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  int cur_router = r->GetID();
+  int dest_router = Gem5Net::NodeToRouter(f->dest);
+  int out_port;
+
+  if (inject) {
+    out_port = -1;
+  } else if (dest_router == cur_router) {
+      out_port = Gem5Net::NodeToPort(f->dest);
+  } else {
+
+    int in_vc;
+    if (in_channel >= 2*gN) {
+      in_vc = vcBegin;  // ignore the injection VC
+    } else {
+      in_vc = f->vc;
+    }
+
+    bool escape = false;
+    if (in_vc == vcEnd) // vcEnd is the escape channel
+      escape = true;
+
+    out_port = dor_next_mesh(cur_router, dest_router);
+
+    if (r->GetNeighborPowerState(out_port) != Router::power_on)
+      out_port = dor_next_mesh(cur_router, dest_router, true);
+
+    if (GetSimTime() - f->rtime > 300)
+      escape = true;
+
+    if ((cur_router % gK != dest_router % gK) &&
+        (cur_router / gK != dest_router / gK) &&
+        (r->GetNeighborPowerState(out_port) != Router::power_on))
+      escape = true; // not in same row/column
+
+    if (escape == true) {
+      if (cur_router < 56 && (cur_router % gK != dest_router % gK) &&
+          (cur_router / gK != dest_router / gK))
+        out_port = 2;
+      vcBegin = vcEnd;
+    } else if (!inject && dest_router != cur_router) {
+      // injection and ejection can use all VCs
+      vcEnd--;
+    }
+  }
+
+  if (!inject && f->watch) {
+    *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+      << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+      << " at output port " << out_port << " for flit " << f->id
+      << " (input port " << in_channel << ", destination " << f->dest
+      << " attached to router " << dest_router
+      << ")." << endl;
+  }
+
+  assert((inject && out_port == -1) || out_port >= 0);
+
+  outputs->Clear( );
+  outputs->AddRange(out_port, vcBegin, vcEnd);
+}
+
+void rp_gem5net( const Router *r, const Flit *f, int in_channel,
+    OutputSet *outputs, bool inject )
+{
+  assert(gNumVCperVnet > 1);
+  int vcBegin = f->gem5_vnet * gNumVCperVnet;
+  int vcEnd = vcBegin + gNumVCperVnet - 1;
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  int cur_router = r->GetID();
+  int dest_router = Gem5Net::NodeToRouter(f->dest);
+  assert(dest_router == f->dest_router);
+  int out_port;
+
+  if (inject) {
+    out_port = -1;
+  } else if (cur_router == dest_router) {
+    out_port = Gem5Net::NodeToPort(f->dest);
+  } else {
+
+    int in_vc;
+
+    if (in_channel >= 2*gN) {
+      in_vc = vcBegin; // ignore the injection VC
+    } else {
+      in_vc = f->vc;
+    }
+
+    bool escape = false;
+    if (in_vc == vcEnd)
+      escape = true;
+    if (GetSimTime() - f->rtime >= 300) {
+      escape = true;
+    }
+
+    if (!escape) {
+      const vector<int> & routing_table = r->GetRouteTable();
+      out_port = routing_table[dest_router];
+      vcEnd--;
+    } else {
+      const vector<int> & escape_routing_table = r->GetEscRouteTable();
+      out_port = escape_routing_table[dest_router];
+      vcBegin = vcEnd;
+    }
+  }
+  //assert(out_port >= 0 && out_port <= 4); // may be more than one node to each router
+
+  if (f->watch && !inject) {
+    *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+      << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+      << " at output port " << out_port << " for flit " << f->id
+      << " (input port " << in_channel << ", destination " << f->dest
+      << " at router " << dest_router << ")"
+      << "." << endl;
+  }
+
+  assert((inject && out_port == -1) || out_port >= 0);
+
+  outputs->Clear( );
+  outputs->AddRange(out_port, vcBegin, vcEnd);
+}
+
 /**************************************************************/
 
 //=============================================================
@@ -2210,4 +2339,6 @@ void InitializeRoutingMap( const Configuration & config )
   /* ==== Power Gate - End ==== */
   /* routing function for Gem5Net registration */
   gRoutingFunctionMap["dor_gem5net"] = &dor_gem5net;
+  gRoutingFunctionMap["flov_gem5net"] = &flov_gem5net;
+  gRoutingFunctionMap["rp_gem5net"] = &rp_gem5net;
 }
