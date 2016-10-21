@@ -16,4 +16,5 @@ m5out
 
 .cproject
 .project
-/log
+log
+scripts/*.rcS
