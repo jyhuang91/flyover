@@ -142,13 +142,232 @@ BooksimNetwork::functionalWrite(Packet *pkt)
 void
 BooksimNetwork::regStats()
 {
+    regMsgStats();
+    regPerfStats();
+    regPowerStats();
+}
+
+void
+BooksimNetwork::regMsgStats()
+{
+    _ctrl_flits_received
+        .init(m_virtual_networks)
+        .name(name() + ".ctrl_flits_received")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _ctrl_flits_injected
+        .init(m_virtual_networks)
+        .name(name() + ".ctrl_flits_injected")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _data_flits_received
+        .init(m_virtual_networks)
+        .name(name() + ".data_flits_received")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _data_flits_injected
+        .init(m_virtual_networks)
+        .name(name() + ".data_flits_injected")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _ctrl_pkts_received
+        .init(m_virtual_networks)
+        .name(name() + ".ctrl_pkts_received")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _ctrl_pkts_injected
+        .init(m_virtual_networks)
+        .name(name() + ".ctrl_pkts_injected")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _data_pkts_received
+        .init(m_virtual_networks)
+        .name(name() + ".data_pkts_received")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _data_pkts_injected
+        .init(m_virtual_networks)
+        .name(name() + ".data_pkts_injected")
+        .flags(Stats::pdf | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+
+    for (int i = 0; i < m_virtual_networks; i++) {
+        _ctrl_flits_received.subname(i, csprintf("vnet-%i", i));
+        _ctrl_flits_injected.subname(i, csprintf("vnet-%i", i));
+        _data_flits_received.subname(i, csprintf("vnet-%i", i));
+        _data_flits_injected.subname(i, csprintf("vnet-%i", i));
+        _ctrl_pkts_received.subname(i, csprintf("vnet-%i", i));
+        _ctrl_pkts_injected.subname(i, csprintf("vnet-%i", i));
+        _data_pkts_received.subname(i, csprintf("vnet-%i", i));
+        _data_pkts_injected.subname(i, csprintf("vnet-%i", i));
+    }
+
+    _flits_received
+        .name(name() + ".flits_received")
+        .flags(Stats::oneline);
+    _flits_received = _ctrl_flits_received + _data_flits_received;
+
+    _flits_injected
+        .name(name() + ".flits_injected")
+        .flags(Stats::oneline);
+    _flits_injected = _ctrl_flits_injected + _data_flits_injected;
+
+    _pkts_received
+        .name(name() + ".pkts_received")
+        .flags(Stats::oneline);
+    _pkts_received = _ctrl_pkts_received + _data_pkts_received;
+
+    _pkts_injected
+        .name(name() + "pkts_injected")
+        .flags(Stats::oneline);
+    _pkts_injected = _ctrl_pkts_injected + _data_pkts_injected;
+
+}
+
+void
+BooksimNetwork::regPerfStats()
+{
+    _plat
+        .init(m_virtual_networks)
+        .name(name() + ".packet_latency")
+        .flags(Stats::oneline)
+        ;
+
+    _nlat
+        .init(m_virtual_networks)
+        .name(name() + ".network_latency")
+        .flags(Stats::oneline)
+        ;
+
+    _qlat
+        .init(m_virtual_networks)
+        .name(name() + ".queueing_latency")
+        .flags(Stats::oneline)
+        ;
+
+    _flat
+        .init(m_virtual_networks)
+        .name(name() + ".flit_latency")
+        .flags(Stats::oneline)
+        ;
+
+    _frag
+        .init(m_virtual_networks)
+        .name(name() + ".fragmentation")
+        .flags(Stats::oneline)
+        ;
+
+    _hops
+        .init(m_virtual_networks)
+        .name(name() + ".hops")
+        .flags(Stats::oneline)
+        ;
+
+    _flov_hops
+        .init(m_virtual_networks)
+        .name(name() + ".flov_hops")
+        .flags(Stats::oneline)
+        ;
+
+    for (int i = 0; i < m_virtual_networks; i++) {
+        _plat.subname(i, csprintf("vnet-%i", i));
+        _nlat.subname(i, csprintf("vnet-%i", i));
+        _qlat.subname(i, csprintf("vnet-%i", i));
+        _flat.subname(i, csprintf("vnet-%i", i));
+        _frag.subname(i, csprintf("vnet-%i", i));
+        _hops.subname(i, csprintf("vnet-%i", i));
+        _flov_hops.subname(i, csprintf("vnet-%i", i));
+    }
+
+    _avg_vplat
+        .name(name() + ".average_vpkt_latency")
+        .flags(Stats::oneline);
+    _avg_vplat = _plat / _pkts_received;
+
+    _avg_vnlat
+        .name(name() + ".average_vnet_latency")
+        .flags(Stats::oneline);
+    _avg_vnlat = _nlat / _pkts_received;
+
+    _avg_vqlat
+        .name(name() + ".average_vqueue_latency")
+        .flags(Stats::oneline);
+    _avg_vqlat = _qlat / _pkts_received;
+
+    _avg_vflat
+        .name(name() + ".average_vflit_latency")
+        .flags(Stats::oneline);
+    _avg_vflat = _flat / _flits_received;
+
+    _avg_vfrag
+        .name(name() + ".average_vfragmentation")
+        .flags(Stats::oneline);
+    _avg_vfrag = _frag / _pkts_received;
+
+    _avg_plat.name(name() + ".average_packet_latency");
+    _avg_plat = sum(_plat) / sum(_pkts_received);
+
+    _avg_nlat.name(name() + ".average_network_latency");
+    _avg_nlat = sum(_nlat) / sum(_pkts_received);
+
+    _avg_qlat.name(name() + ".average_queueing_latency");
+    _avg_qlat = sum(_qlat) / sum(_pkts_received);
+
+    _avg_flat.name(name() + ".average_flit_latency");
+    _avg_flat = sum(_flat) / sum(_flits_received);
+
+    _avg_frag.name(name() + ".average_fragmentation");
+    _avg_frag = sum(_frag) / sum(_pkts_received);
+
+    _avg_vhops
+        .name(name() + ".average_vhops")
+        .flags(Stats::oneline);
+    _avg_vhops = _hops / _pkts_received;
+
+    _avg_hops.name(name() + ".average_hops");
+    _avg_hops = sum(_hops) / sum(_pkts_received);
+
+    _avg_vflov_hops
+        .name(name() + ".average_vflov_hops")
+        .flags(Stats::oneline);
+    _avg_vflov_hops = _flov_hops / _pkts_received;
+
+    _avg_flov_hops.name(name() + ".average_flov_hops");
+    _avg_flov_hops = sum(_flov_hops) / sum(_pkts_received);
+}
+
+void
+BooksimNetwork::regPowerStats()
+{
+    _dynamic_link_power.name(name() + ".link_dynamic_power");
+    _static_link_power.name(name() + ".link_static_power");
+
+    _total_link_power.name(name() + ".link_total_power");
+    _total_link_power = _dynamic_link_power + _static_link_power;
+
+    _dynamic_router_power.name(name() + ".router_dynamic_power");
+    _static_router_power.name(name() + ".router_static_power");
+    _clk_power.name(name() + ".clk_power");
+
+    _total_router_power.name(name() + ".router_total_power");
+    _total_router_power = _dynamic_router_power +
+                          _static_router_power +
+                          _clk_power;
 }
 
 void
 BooksimNetwork::collateStats()
 {
     //RubySystem *rs = params()->ruby_system;
-    //double time_delta = double(curCycle() - rs->getStartCycle());
+    //double time_delta = double(curCycle() - g_ruby_start);
 }
 
 void
@@ -161,6 +380,35 @@ BooksimNetwork *
 BooksimNetworkParams::create()
 {
     return new BooksimNetwork(this);
+}
+
+bool
+BooksimNetwork::isDataMsg(MessageSizeType size_type)
+{
+    switch(size_type) {
+      case MessageSizeType_Control:
+      case MessageSizeType_Request_Control:
+      case MessageSizeType_Reissue_Control:
+      case MessageSizeType_Response_Control:
+      case MessageSizeType_Writeback_Control:
+      case MessageSizeType_Broadcast_Control:
+      case MessageSizeType_Multicast_Control:
+      case MessageSizeType_Forwarded_Control:
+      case MessageSizeType_Invalidate_Control:
+      case MessageSizeType_Unblock_Control:
+      case MessageSizeType_Persistent_Control:
+      case MessageSizeType_Completion_Control:
+        return false;
+      case MessageSizeType_Data:
+      case MessageSizeType_Response_Data:
+      case MessageSizeType_ResponseLocal_Data:
+      case MessageSizeType_ResponseL2hit_Data:
+      case MessageSizeType_Writeback_Data:
+        return true;
+      default:
+        panic("Invalid range for type MessageSizeType");
+        break;
+    }
 }
 
 // useless stuff

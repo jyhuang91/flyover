@@ -8,6 +8,7 @@
 #include "mem/ruby/network/booksim2/booksim.hh"
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
 #include "mem/ruby/network/booksim2/random_utils.hh"
+#include "mem/ruby/network/booksim2/networks/gem5net.hh"
 #include "mem/ruby/slicc_interface/NetworkMessage.hh"
 #include "mem/ruby/network/Network.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
@@ -34,17 +35,43 @@ Gem5TrafficManager::~Gem5TrafficManager()
 void Gem5TrafficManager::_RetireFlit(Flit *f, int dest)
 {
     // send to the output message buffer
-    if (f) {
-        if (f->tail) {
-            _output_buffer[dest][f->gem5_vnet]->enqueue(
-                    f->msg_ptr, Cycles(1));
-            if (f->watch) {
-                *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                    << *(_output_buffer[dest][f->gem5_vnet])
-                    << " consumes the packet " << f->pid << "." << endl;
-            }
+    assert(f);
+    if (f->tail) {
+        _output_buffer[dest][f->gem5_vnet]->enqueue(
+                f->msg_ptr, Cycles(1));
+        if (f->watch) {
+            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                << *(_output_buffer[dest][f->gem5_vnet])
+                << " consumes the packet " << f->pid << "." << endl;
         }
     }
+
+    _net_ptr->increment_flat(Cycles(f->atime - f->itime), f->gem5_vnet);
+
+    if (f->tail && (_sim_state == warming_up || f->record)) {
+
+        _net_ptr->increment_hops(f->hops, f->gem5_vnet);
+        _net_ptr->increment_flov_hops(f->flov_hops, f->gem5_vnet);
+
+        Flit * head;
+        if (f->head) {
+            head = f;
+        } else {
+            map<int, Flit *>::iterator iter =
+                _retired_packets[f->cl].find(f->pid);
+            head = iter->second;
+        }
+
+        _net_ptr->increment_plat(Cycles(f->atime - head->ctime), f->gem5_vnet);
+        _net_ptr->increment_nlat(Cycles(f->atime - head->itime), f->gem5_vnet);
+        _net_ptr->increment_frag(
+                Cycles((f->atime - head->atime) - (f->id - head->id)),
+                f->gem5_vnet);
+        _net_ptr->increment_qlat(
+                Cycles(head->ctime - _net_ptr->ticksToCycles(head->msg_ptr->getTime())),
+                head->gem5_vnet);
+    }
+
     TrafficManager::_RetireFlit(f, dest);
 }
 
@@ -90,11 +117,12 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
 
         if (watch) {
             *gWatchOut << GetSimTime() << " | "
-                << "node" << source << " | "
+                << "node " << source << " | "
                 << "Enqueuing packet " << _cur_pid
                 << " at time " << time
-                //<< "." << endl;
+                << " through router " << Gem5Net::NodeToRouter(source)
                 << " (to node " << packet_dest
+                << " attached to router " << Gem5Net::NodeToRouter(packet_dest)
                 << ")." << endl;
         }
 
@@ -112,6 +140,7 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
             f->ctime = time;
             f->record = record;
             f->cl = cl;
+            f->src_router = Gem5Net::NodeToRouter(source);
             f->gem5_vnet = vnet;
             //f->vc = vnet; // why assign it?
             f->msg_ptr = new_msg_ptr;
@@ -129,9 +158,11 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
                 f->head = true;
                 // packets are only generated to nodes smaller or equal to limit
                 f->dest = packet_dest;
+                f->dest_router = Gem5Net::NodeToRouter(packet_dest);
             } else {
                 f->head = false;
                 f->dest = -1;
+                f->dest_router = -1;
             }
             switch (_pri_type) {
             case class_based:
@@ -159,10 +190,11 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
 
             if (f->watch) {
                 *gWatchOut << GetSimTime() << " | "
-                      << "node" << source << " | "
+                      << "node " << source << " | "
                       << "Enqueueing flit " << f->id
                       << " (packet " << f->pid
-                      << ") at time " << time
+                      << ") through router " << f->src_router
+                      << " at time " << time
                       << "." << endl;
             }
 
@@ -175,7 +207,7 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
 void Gem5TrafficManager::_Inject()
 {
     for (int input = 0; input < _nodes; input++) {
-    	if (_partial_packets[input][0].empty()) {
+        if (_partial_packets[input][0].empty()) {
 
             int const last_vnet = _last_vnet[input];
 
@@ -198,6 +230,7 @@ void Gem5TrafficManager::_Inject()
                 }
             }
         } else {
+            //??
         }
     }
 }
@@ -222,14 +255,29 @@ void Gem5TrafficManager::_Step()
                           << "node" << n << " | "
                           << "Ejecting flit " << f->id
                           << " (packet " << f->pid << ")"
+                          << " through router " << f->src_router
                           << " from VC " << f->vc
                           << "." << endl;
                 }
                 flits[subnet].insert(make_pair(n, f));
 
                 if ((_sim_state == warming_up) || (_sim_state == running)) {
+                    NetworkMessage *net_msg_ptr =
+                        safe_cast<NetworkMessage *>(f->msg_ptr.get());
+                    bool is_data = _net_ptr->isDataMsg(
+                            net_msg_ptr->getMessageSize());
+                    if (is_data) {
+                        _net_ptr->increment_received_data_flits(f->gem5_vnet);
+                    } else {
+                        _net_ptr->increment_received_ctrl_flits(f->gem5_vnet);
+                    }
                     _accepted_flits[f->cl][n]++;
                     if (f->tail) {
+                        if (is_data) {
+                            _net_ptr->increment_received_data_pkts(f->gem5_vnet);
+                        } else {
+                            _net_ptr->increment_received_ctrl_pkts(f->gem5_vnet);
+                        }
                         _accepted_packets[f->cl][n]++;
                     }
                 }
@@ -453,8 +501,22 @@ void Gem5TrafficManager::_Step()
                  }
 
                  if ((_sim_state == warming_up) || (_sim_state == running)) {
+                     NetworkMessage *net_msg_ptr =
+                         safe_cast<NetworkMessage *>(f->msg_ptr.get());
+                     bool is_data = _net_ptr->isDataMsg(
+                             net_msg_ptr->getMessageSize());
+                     if (is_data) {
+                         _net_ptr->increment_injected_data_flits(f->gem5_vnet);
+                     } else {
+                         _net_ptr->increment_injected_ctrl_flits(f->gem5_vnet);
+                     }
                      _sent_flits[c][n]++;
                      if (f->head) {
+                        if (is_data) {
+                            _net_ptr->increment_injected_data_pkts(f->gem5_vnet);
+                        } else {
+                            _net_ptr->increment_injected_ctrl_pkts(f->gem5_vnet);
+                        }
                          _sent_packets[c][n]++;
                      }
                  }

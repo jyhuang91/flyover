@@ -23,8 +23,13 @@ public:
     void init();
     void wakeup();
 
+    static bool isDataMsg(MessageSizeType size_type);
+
     void collateStats();
     void regStats();
+    void regMsgStats();
+    void regPerfStats();
+    void regPowerStats();
     void print(std::ostream& out) const;
 
     // set the queue
@@ -58,8 +63,42 @@ public:
         return m_toNetQueues;
     }
     std::vector<std::vector<MessageBuffer*> > const & GetOutBuffers() {
-        return &m_fromNetQueues;
+        return m_fromNetQueues;
     }
+
+    void increment_received_ctrl_flits(int vnet) {
+        _ctrl_flits_received[vnet]++;
+    }
+    void increment_injected_ctrl_flits(int vnet) {
+        _ctrl_flits_injected[vnet]++;
+    }
+    void increment_received_data_flits(int vnet) {
+        _data_flits_received[vnet]++;
+    }
+    void increment_injected_data_flits(int vnet) {
+        _data_flits_injected[vnet]++;
+    }
+    void increment_received_ctrl_pkts(int vnet) {
+        _ctrl_pkts_received[vnet]++;
+    }
+    void increment_injected_ctrl_pkts(int vnet) {
+        _ctrl_pkts_injected[vnet]++;
+    }
+    void increment_received_data_pkts(int vnet) {
+        _data_pkts_received[vnet]++;
+    }
+    void increment_injected_data_pkts(int vnet) {
+        _data_pkts_injected[vnet]++;
+    }
+
+    void increment_plat(Cycles lat, int vnet) { _plat[vnet] += lat; }
+    void increment_nlat(Cycles lat, int vnet) { _nlat[vnet] += lat; }
+    void increment_qlat(Cycles lat, int vnet) { _qlat[vnet] += lat; }
+    void increment_flat(Cycles lat, int vnet) { _flat[vnet] += lat; }
+    void increment_frag(Cycles lat, int vnet) { _frag[vnet] += lat; }
+
+    void increment_hops(int hops, int vnet) { _hops[vnet] += hops; }
+    void increment_flov_hops(int hops, int vnet) { _flov_hops[vnet] += hops; }
 
 private:
     BooksimNetwork(const BooksimNetwork& obj);
@@ -75,42 +114,57 @@ private:
     int _next_report_time;
     int _vc_per_vnet;
 
-    // Statistical variables
-    Stats::Vector _flits_received;
-    Stats::Vector _flits_injected;
+    // Statistical variables for performance
+    Stats::Vector _ctrl_flits_received;
+    Stats::Vector _ctrl_flits_injected;
+    Stats::Vector _data_flits_received;
+    Stats::Vector _data_flits_injected;
+    Stats::Formula _flits_received;
+    Stats::Formula _flits_injected;
     Stats::Vector _ctrl_pkts_received;
     Stats::Vector _ctrl_pkts_injected;
     Stats::Vector _data_pkts_received;
     Stats::Vector _data_pkts_injected;
+    Stats::Formula _pkts_received;
+    Stats::Formula _pkts_injected;
 
-    Stats::Vector _ctrl_flit_nlat;  // network latency
-    Stats::Vector _ctrl_flit_qlat;  // queuing latency
-    Stats::Vector _ctrl_flit_lat;
-    Stats::Vector _data_flit_netlat;
-    Stats::Vector _data_flit_qlat;
-    Stats::Vector _data_flit_lat;
-    Stats::Vector _ctrl_pkt_netowrk_latency;
-    Stats::Vector _ctrl_pkt_queueing_latency;
-    Stats::Vector _data_pkt_network_latency;
-    Stats::Vector _data_pkt_queueing_latency;
-    Stats::Vector _pkt_network_latency;
-    Stats::Vector _pkt_queueing_latency;
+    // control and data packets are split into vnets,
+    // can see from ctrl and data inject/receive stats
+    Stats::Vector _plat;
+    Stats::Vector _nlat;
+    Stats::Vector _qlat;
+    Stats::Vector _flat;
+    Stats::Vector _frag;
 
-    Stats::Formula _avg_ctrl_flit_network_latency;
-    Stats::Formula _avg_ctrl_flit_queueing_latency;
-    Stats::Formula _avg_ctrl_flit_latency;
-    Stats::Formula _avg_data_flit_network_latency;
-    Stats::Formula _avg_data_flit_queueing_latency;
-    Stats::Formula _avg_data_flit_latency;
-    Stats::Formula _avg_ctrl_pkt_network_latency;
-    Stats::Formula _avg_ctrl_pkt_queueing_latency;
-    Stats::Formula _avg_ctrl_pkt_latency;
-    Stats::Formula _avg_data_pkt_network_latency;
-    Stats::Formula _avg_data_pkt_queueing_latency;
-    Stats::Formula _avg_data_pkt_latency;
-    Stats::Formula _avg_pkt_network_latency;
-    Stats::Formula _avg_pkt_queueing_latency;
-    Stats::Formula _avg_pkt_latency;
+    Stats::Formula _avg_vplat;
+    Stats::Formula _avg_vnlat;
+    Stats::Formula _avg_vqlat;
+    Stats::Formula _avg_vflat;
+    Stats::Formula _avg_vfrag;
+    Stats::Formula _avg_plat;
+    Stats::Formula _avg_nlat;
+    Stats::Formula _avg_qlat;
+    Stats::Formula _avg_flat;
+    Stats::Formula _avg_frag;
+
+    Stats::Vector _hops;
+    Stats::Formula _avg_vhops;
+    Stats::Formula _avg_hops;
+
+    Stats::Vector _flov_hops;
+    Stats::Formula _avg_vflov_hops;
+    Stats::Formula _avg_flov_hops;
+
+    // Statistical variables for power
+    Stats::Scalar _dynamic_link_power;
+    Stats::Scalar _static_link_power;
+    Stats::Formula _total_link_power;
+
+    Stats::Scalar _dynamic_router_power;
+    Stats::Scalar _static_router_power;
+    Stats::Scalar _clk_power;
+    Stats::Formula _total_router_power;
+
 };
 
 //extern inline

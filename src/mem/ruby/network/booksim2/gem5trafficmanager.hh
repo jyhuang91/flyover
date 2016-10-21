@@ -44,7 +44,7 @@ public:
     virtual void DisplayStats(ostream& out) const;
     virtual void _Step();
     void RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
-    							vector<vector<MessageBuffer *> >& out);
+                                vector<vector<MessageBuffer *> >& out);
 
     bool functionalRead(Packet *pkt);
     uint32_t functionalWrite(Packet *pkt);
