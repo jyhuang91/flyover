@@ -39,14 +39,14 @@
 #include "mem/ruby/network/booksim2/networks/kncube.hh"
 #include "mem/ruby/network/booksim2/random_utils.hh"
 #include "mem/ruby/network/booksim2/misc_utils.hh"
- //#include "iq_router.hpp"
+//#include "iq_router.hpp"
 /* ==== Power Gate - Begin ==== */
 #include "mem/ruby/network/booksim2/routetbl.hh"
 /* ==== Power Gate - End ==== */
 
 
 KNCube::KNCube( const Configuration &config, const string & name, bool mesh ) :
-BSNetwork( config, name )
+  BSNetwork( config, name )
 {
   _mesh = mesh;
 
@@ -86,20 +86,22 @@ void KNCube::_BuildNet( const Configuration &config )
   //latency type, noc or conventional network
   bool use_noc_latency;
   use_noc_latency = (config.GetInt("use_noc_latency")==1);
-  
+
   for ( int node = 0; node < _size; ++node ) {
 
     router_name << "router";
-    
+
     if ( _k > 1 ) {
       for ( int dim_offset = _size / _k; dim_offset >= 1; dim_offset /= _k ) {
-	router_name << "_" << ( node / dim_offset ) % _k;
+        router_name << "_" << ( node / dim_offset ) % _k;
       }
     }
 
     _routers[node] = Router::NewRouter( config, this, router_name.str( ), 
-					node, 2*_n + 1, 2*_n + 1 );
+        node, 2*_n + 1, 2*_n + 1 );
     _timed_modules.push_back(_routers[node]);
+
+    router_name.str("");
 
     /* ==== Power Gate - Begin ==== */
     string type = config.GetStr("router");
@@ -114,8 +116,6 @@ void KNCube::_BuildNet( const Configuration &config )
       _routers[node]->SetEscRouteTable(rt.GetEscRouteTbl());
     }
     /* ==== Power Gate - End ==== */
-
-    router_name.str("");
 
     for ( int dim = 0; dim < _n; ++dim ) {
 
@@ -149,19 +149,19 @@ void KNCube::_BuildNet( const Configuration &config )
 
       //set input channel latency
       if(use_noc_latency){
-	_chan[right_input]->SetLatency( latency );
-	_chan[left_input]->SetLatency( latency );
-	_chan_cred[right_input]->SetLatency( latency );
-	_chan_cred[left_input]->SetLatency( latency );
+        _chan[right_input]->SetLatency( latency );
+        _chan[left_input]->SetLatency( latency );
+        _chan_cred[right_input]->SetLatency( latency );
+        _chan_cred[left_input]->SetLatency( latency );
         /* ==== Power Gate - Begin ==== */
         _chan_handshake[right_input]->SetLatency( latency );
         _chan_handshake[left_input]->SetLatency( latency );
         /* ==== Power Gate - End ==== */
       } else {
-	_chan[left_input]->SetLatency( 1 );
-	_chan_cred[right_input]->SetLatency( 1 );
-	_chan_cred[left_input]->SetLatency( 1 );
-	_chan[right_input]->SetLatency( 1 );
+        _chan[left_input]->SetLatency( 1 );
+        _chan_cred[right_input]->SetLatency( 1 );
+        _chan_cred[left_input]->SetLatency( 1 );
+        _chan[right_input]->SetLatency( 1 );
         /* ==== Power Gate - Begin ==== */
         _chan_handshake[right_input]->SetLatency(1);
         _chan_handshake[left_input]->SetLatency(1);
@@ -170,7 +170,7 @@ void KNCube::_BuildNet( const Configuration &config )
       //get the output channel number
       right_output = _RightChannel( node, dim );
       left_output  = _LeftChannel( node, dim );
-      
+
       //add the output channel
       _routers[node]->AddOutputChannel( _chan[right_output], _chan_cred[right_output] );
       _routers[node]->AddOutputChannel( _chan[left_output], _chan_cred[left_output] );
@@ -181,19 +181,19 @@ void KNCube::_BuildNet( const Configuration &config )
 
       //set output channel latency
       if(use_noc_latency){
-	_chan[right_output]->SetLatency( latency );
-	_chan[left_output]->SetLatency( latency );
-	_chan_cred[right_output]->SetLatency( latency );
-	_chan_cred[left_output]->SetLatency( latency );
+        _chan[right_output]->SetLatency( latency );
+        _chan[left_output]->SetLatency( latency );
+        _chan_cred[right_output]->SetLatency( latency );
+        _chan_cred[left_output]->SetLatency( latency );
         /* ==== Power Gate - Begin ==== */
         _chan_handshake[right_output]->SetLatency(latency);
         _chan_handshake[left_output]->SetLatency(latency);
         /* ==== Power Gate - End ==== */
       } else {
-	_chan[right_output]->SetLatency( 1 );
-	_chan[left_output]->SetLatency( 1 );
-	_chan_cred[right_output]->SetLatency( 1 );
-	_chan_cred[left_output]->SetLatency( 1 );
+        _chan[right_output]->SetLatency( 1 );
+        _chan[left_output]->SetLatency( 1 );
+        _chan_cred[right_output]->SetLatency( 1 );
+        _chan_cred[left_output]->SetLatency( 1 );
         /* ==== Power Gate - Begin ==== */
         _chan_handshake[right_output]->SetLatency(1);
         _chan_handshake[left_output]->SetLatency(1);
@@ -272,7 +272,7 @@ int KNCube::GetK( ) const
 void KNCube::InsertRandomFaults( const Configuration &config )
 {
   int num_fails = config.GetInt( "link_failures" );
-  
+
   if ( _size && num_fails ) {
     vector<long> save_x;
     vector<double> save_u;
@@ -294,17 +294,17 @@ void KNCube::InsertRandomFaults( const Configuration &config )
       // edge test
       bool edge = false;
       for ( int n = 0; n < _n; ++n ) {
-	if ( ( ( node % _k ) == 0 ) ||
-	     ( ( node % _k ) == _k - 1 ) ) {
-	  edge = true;
-	}
-	node /= _k;
+        if ( ( ( node % _k ) == 0 ) ||
+            ( ( node % _k ) == _k - 1 ) ) {
+          edge = true;
+        }
+        node /= _k;
       }
 
       if ( edge ) {
-	fail_nodes[i] = true;
+        fail_nodes[i] = true;
       } else {
-	fail_nodes[i] = false;
+        fail_nodes[i] = false;
       }
     }
 
@@ -316,30 +316,30 @@ void KNCube::InsertRandomFaults( const Configuration &config )
       int t;
 
       for ( t = 0; ( t < _size ) && (!available); ++t ) {
-	int node = ( j + t ) % _size;
-       
-	if ( !fail_nodes[node] ) {
-	  // check neighbors
-	  int c = RandomInt( 2*_n - 1 );
+        int node = ( j + t ) % _size;
 
-	  for ( int n = 0; ( n < 2*_n ) && (!available); ++n ) {
-	    chan = ( n + c ) % 2*_n;
+        if ( !fail_nodes[node] ) {
+          // check neighbors
+          int c = RandomInt( 2*_n - 1 );
 
-	    if ( chan % 1 ) {
-	      available = fail_nodes[_LeftNode( node, chan/2 )];
-	    } else {
-	      available = fail_nodes[_RightNode( node, chan/2 )];
-	    }
-	  }
-	}
-	
-	if ( !available ) {
-	  cout << "skipping " << node << endl;
-	}
+          for ( int n = 0; ( n < 2*_n ) && (!available); ++n ) {
+            chan = ( n + c ) % 2*_n;
+
+            if ( chan % 1 ) {
+              available = fail_nodes[_LeftNode( node, chan/2 )];
+            } else {
+              available = fail_nodes[_RightNode( node, chan/2 )];
+            }
+          }
+        }
+
+        if ( !available ) {
+          cout << "skipping " << node << endl;
+        }
       }
 
       if ( t == _size ) {
-	Error( "Could not find another possible fault channel" );
+        Error( "Could not find another possible fault channel" );
       }
 
       assert(node != -1);
@@ -348,12 +348,12 @@ void KNCube::InsertRandomFaults( const Configuration &config )
       fail_nodes[node] = true;
 
       for ( int n = 0; ( n < _n ) && available ; ++n ) {
-	fail_nodes[_LeftNode( node, n )]  = true;
-	fail_nodes[_RightNode( node, n )] = true;
+        fail_nodes[_LeftNode( node, n )]  = true;
+        fail_nodes[_RightNode( node, n )] = true;
       }
 
       cout << "failure at node " << node << ", channel " 
-	   << chan << endl;
+        << chan << endl;
     }
 
     RestoreRandomState( save_x, save_u );
