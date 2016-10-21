@@ -26,6 +26,8 @@ Gem5TrafficManager::Gem5TrafficManager(const Configuration &config, const
     _network_time = 0;
     _next_report = REPORT_INTERVAL;
     _watch_all_pkts = (config.GetInt("watch_all_pkts") > 0);
+
+    _sim_state = running;
 }
 
 Gem5TrafficManager::~Gem5TrafficManager()
@@ -48,7 +50,7 @@ void Gem5TrafficManager::_RetireFlit(Flit *f, int dest)
 
     _net_ptr->increment_flat(Cycles(f->atime - f->itime), f->gem5_vnet);
 
-    if (f->tail && (_sim_state == warming_up || f->record)) {
+    if (f->tail) {
 
         _net_ptr->increment_hops(f->hops, f->gem5_vnet);
         _net_ptr->increment_flov_hops(f->flov_hops, f->gem5_vnet);
@@ -261,25 +263,23 @@ void Gem5TrafficManager::_Step()
                 }
                 flits[subnet].insert(make_pair(n, f));
 
-                if ((_sim_state == warming_up) || (_sim_state == running)) {
-                    NetworkMessage *net_msg_ptr =
-                        safe_cast<NetworkMessage *>(f->msg_ptr.get());
-                    bool is_data = _net_ptr->isDataMsg(
-                            net_msg_ptr->getMessageSize());
+                NetworkMessage *net_msg_ptr =
+                    safe_cast<NetworkMessage *>(f->msg_ptr.get());
+                bool is_data = _net_ptr->isDataMsg(
+                        net_msg_ptr->getMessageSize());
+                if (is_data) {
+                    _net_ptr->increment_received_data_flits(f->gem5_vnet);
+                } else {
+                    _net_ptr->increment_received_ctrl_flits(f->gem5_vnet);
+                }
+                _accepted_flits[f->cl][n]++;
+                if (f->tail) {
                     if (is_data) {
-                        _net_ptr->increment_received_data_flits(f->gem5_vnet);
+                        _net_ptr->increment_received_data_pkts(f->gem5_vnet);
                     } else {
-                        _net_ptr->increment_received_ctrl_flits(f->gem5_vnet);
+                        _net_ptr->increment_received_ctrl_pkts(f->gem5_vnet);
                     }
-                    _accepted_flits[f->cl][n]++;
-                    if (f->tail) {
-                        if (is_data) {
-                            _net_ptr->increment_received_data_pkts(f->gem5_vnet);
-                        } else {
-                            _net_ptr->increment_received_ctrl_pkts(f->gem5_vnet);
-                        }
-                        _accepted_packets[f->cl][n]++;
-                    }
+                    _accepted_packets[f->cl][n]++;
                 }
             }
 
@@ -500,25 +500,23 @@ void Gem5TrafficManager::_Step()
                      nf->vc = f->vc;
                  }
 
-                 if ((_sim_state == warming_up) || (_sim_state == running)) {
-                     NetworkMessage *net_msg_ptr =
-                         safe_cast<NetworkMessage *>(f->msg_ptr.get());
-                     bool is_data = _net_ptr->isDataMsg(
-                             net_msg_ptr->getMessageSize());
+                 NetworkMessage *net_msg_ptr =
+                     safe_cast<NetworkMessage *>(f->msg_ptr.get());
+                 bool is_data = _net_ptr->isDataMsg(
+                         net_msg_ptr->getMessageSize());
+                 if (is_data) {
+                     _net_ptr->increment_injected_data_flits(f->gem5_vnet);
+                 } else {
+                     _net_ptr->increment_injected_ctrl_flits(f->gem5_vnet);
+                 }
+                 _sent_flits[c][n]++;
+                 if (f->head) {
                      if (is_data) {
-                         _net_ptr->increment_injected_data_flits(f->gem5_vnet);
+                         _net_ptr->increment_injected_data_pkts(f->gem5_vnet);
                      } else {
-                         _net_ptr->increment_injected_ctrl_flits(f->gem5_vnet);
+                         _net_ptr->increment_injected_ctrl_pkts(f->gem5_vnet);
                      }
-                     _sent_flits[c][n]++;
-                     if (f->head) {
-                        if (is_data) {
-                            _net_ptr->increment_injected_data_pkts(f->gem5_vnet);
-                        } else {
-                            _net_ptr->increment_injected_ctrl_pkts(f->gem5_vnet);
-                        }
-                         _sent_packets[c][n]++;
-                     }
+                     _sent_packets[c][n]++;
                  }
 
 #ifdef TRACK_FLOW
