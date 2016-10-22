@@ -124,7 +124,7 @@ void Power_Module::calcChannel(const FlitChannel* f){
   channelArea += areaChannel(K,N,M);
 
   //activity factor;
-  const vector<int> temp = f->GetActivity();
+  const vector<uint64_t> temp = f->GetActivity();
   vector<double> a(classes);
   for(int i = 0; i< classes; i++){
 
@@ -226,8 +226,8 @@ void Power_Module::calcBuffer(const BufferMonitor *bm){
   double Pleak = powerMemoryBitLeak( depth ) * channel_width ;
   //area
 
-  const vector<int> reads = bm->GetReads();
-  const vector<int> writes = bm->GetWrites();
+  const vector<uint64_t> reads = bm->GetReads();
+  const vector<uint64_t> writes = bm->GetWrites();
   for(int i = 0; i<bm->NumInputs(); i++){
     inputArea += areaInputModule( depth );
     inputLeakagePower += Pleak ;
@@ -305,7 +305,7 @@ void Power_Module::calcSwitch(const SwitchMonitor* sm){
   outputArea += areaOutputModule(sm->NumOutputs());
   switchPowerLeak += powerCrossbarLeak(channel_width, sm->NumInputs(), sm->NumOutputs());
 
-  const vector<int> activity = sm->GetActivity();
+  const vector<uint64_t> activity = sm->GetActivity();
   vector<double> type_activity(classes);
 
   for(int i = 0; i<sm->NumOutputs(); i++){

@@ -80,7 +80,7 @@ public:
   inline int const & GetSinkPort() const {
     return _routerSinkPort;
   }
-  inline vector<int> const & GetActivity() const {
+  inline vector<uint64_t> const & GetActivity() const {
     return _active;
   }
 
@@ -114,8 +114,8 @@ private:
   int _routerSinkPort;
 
   // Statistics for Activity Factors
-  vector<int> _active;
-  int _idle;
+  vector<uint64_t> _active;
+  uint64_t _idle;
 };
 
 #endif

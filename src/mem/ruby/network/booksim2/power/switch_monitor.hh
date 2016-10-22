@@ -36,16 +36,16 @@ using namespace std;
 class Flit;
 
 class SwitchMonitor {
-  int  _cycles ;
+  uint64_t  _cycles ;
   int  _inputs ;
   int  _outputs ;
   int  _classes ;
-  vector<int> _event ;
+  vector<uint64_t> _event ;
   int index( int input, int output, int cl ) const ;
 public:
   SwitchMonitor( int inputs, int outputs, int classes ) ;
   void cycle() ;
-  vector<int> const & GetActivity() const {
+  vector<uint64_t> const & GetActivity() const {
     return _event;
   }
   inline int const & NumInputs() const {

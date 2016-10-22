@@ -8,6 +8,7 @@
 #include "mem/ruby/network/booksim2/networks/network.hh"
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
 #include "mem/ruby/network/booksim2/booksim_config.hh"
+#include "mem/ruby/network/booksim2/routers/iq_router.hh"
 
 extern TrafficManager * trafficManager;
 
@@ -18,14 +19,19 @@ BooksimNetwork::BooksimNetwork(const Params *p)
 {
     _booksim_config =  new BookSimConfig();
     _booksim_config->ParseFile(p->booksim_config);
+    _vcs_per_vnet = p->vcs_per_vnet;
+    _flit_size = p->flit_size;
+    _buffers_per_vc = p->buffers_per_vc;
 
-    _vc_per_vnet = _booksim_config->GetInt("vc_per_vnet");
+    _booksim_config->Assign("vcs_per_vnet", _vcs_per_vnet);
+    _booksim_config->Assign("channel_width", _flit_size*8);
+    _booksim_config->Assign("vc_buf_size", (int)_buffers_per_vc);
 
     _booksim_config->Assign("nodes", (int) m_nodes);
-    _booksim_config->Assign("num_vcs", (int) m_virtual_networks*_vc_per_vnet);
+    _booksim_config->Assign("num_vcs", (int) m_virtual_networks*_vcs_per_vnet);
     InitializeRoutingMap(*_booksim_config);
     assert(_booksim_config->GetInt("num_vcs") ==
-            m_virtual_networks*_vc_per_vnet);
+            m_virtual_networks*_vcs_per_vnet);
 
     _vnet_type_names.resize(m_virtual_networks);
 
@@ -144,6 +150,7 @@ BooksimNetwork::regStats()
 {
     regMsgStats();
     regPerfStats();
+    regActivityStats();
     regPowerStats();
 }
 
@@ -226,7 +233,7 @@ BooksimNetwork::regMsgStats()
     _pkts_received = _ctrl_pkts_received + _data_pkts_received;
 
     _pkts_injected
-        .name(name() + "pkts_injected")
+        .name(name() + ".pkts_injected")
         .flags(Stats::oneline);
     _pkts_injected = _ctrl_pkts_injected + _data_pkts_injected;
 
@@ -345,6 +352,54 @@ BooksimNetwork::regPerfStats()
 }
 
 void
+BooksimNetwork::regActivityStats()
+{
+    _router_buffer_reads
+        .init(_net[0]->NumRouters())
+        .name(name() + ".router_buffer_reads")
+        .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _router_buffer_writes
+        .init(_net[0]->NumRouters())
+        .name(name() + ".router_buffer_writes")
+        .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    for (int i = 0; i < _net[0]->NumRouters(); i++) {
+    	_router_buffer_reads.subname(i, csprintf("router-%i", i));
+    	_router_buffer_writes.subname(i, csprintf("router-%i", i));
+    }
+
+    _inject_link_activity
+        .init(m_nodes)
+        .name(name() + ".inject_link_activity")
+        .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    _eject_link_activity
+        .init(m_nodes)
+        .name(name() + ".eject_link_activity")
+        .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    for (int i = 0; i < m_nodes; i++) {
+    	_inject_link_activity.subname(i, csprintf("inject-link-%i", i));
+    	_eject_link_activity.subname(i, csprintf("eject-link-%i", i));
+    }
+
+    _int_link_activity
+        .init(_net[0]->NumChannels())
+        .name(name() + ".int_link_activity")
+        .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
+        ;
+
+    for (int i = 0; i < _net[0]->NumChannels(); i++) {
+    	_int_link_activity.subname(i, csprintf("internal-link-%i", i));
+    }
+}
+
+void
 BooksimNetwork::regPowerStats()
 {
     _dynamic_link_power.name(name() + ".link_dynamic_power");
@@ -368,6 +423,36 @@ BooksimNetwork::collateStats()
 {
     //RubySystem *rs = params()->ruby_system;
     //double time_delta = double(curCycle() - g_ruby_start);
+
+	vector<Router *> routers = _net[0]->GetRouters();
+	for (size_t r = 0; r < routers.size(); r++) {
+		IQRouter * temp = dynamic_cast<IQRouter*>(routers[r]);
+		_router_buffer_reads[r] = temp->GetBufferReads();
+		_router_buffer_writes[r] = temp->GetBufferWrites();
+	}
+
+	vector<FlitChannel *> inject = _net[0]->GetInject();
+	vector<FlitChannel *> eject = _net[0]->GetEject();
+	vector<FlitChannel *> chan = _net[0]->GetChannels();
+
+	for (int i = 0; i < m_nodes; i++) {
+		const vector<uint64_t> ai = inject[i]->GetActivity();
+		for (int j = 0; j < ai.size(); j++) {
+			_inject_link_activity[i] += ai[j];
+		}
+
+		const vector<uint64_t> ae = eject[i]->GetActivity();
+		for (int j = 0; j < ae.size(); j++) {
+			_eject_link_activity[i] += ae[j];
+		}
+	}
+
+	for (int i = 0; i < _net[0]->NumChannels(); i++) {
+		const vector<uint64_t> ac = chan[i]->GetActivity();
+		for (int j = 0; j < ac.size(); j++) {
+			_int_link_activity[i] += ac[j];
+		}
+	}
 }
 
 void

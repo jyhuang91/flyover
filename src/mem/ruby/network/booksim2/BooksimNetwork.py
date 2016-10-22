@@ -10,3 +10,7 @@ class BooksimNetwork(RubyNetwork):
     attached_router_id = VectorParam.Int("Node router association map")
     booksim_config = Param.String("configs/ruby_booksim/gem5booksim.cfg",
                                   "path to booksim config file")
+    flit_size = Param.Int(16, "network flit size in bytes (ni and link)")
+    vcs_per_vnet = Param.Int(4, "virtual channels per virtual network");
+
+    buffers_per_vc = Param.UInt32(4, "buffers per virtual channel");

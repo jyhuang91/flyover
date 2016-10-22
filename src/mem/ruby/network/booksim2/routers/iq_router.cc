@@ -2405,3 +2405,27 @@ void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) {
     }
   }
 }
+
+uint64_t IQRouter::GetBufferReads()
+{
+	uint64_t total_reads = 0;
+	const vector<uint64_t> reads = _bufferMonitor->GetReads();
+	int limits = _bufferMonitor->NumInputs() * _bufferMonitor->NumClasses();
+	for (int i = 0; i < limits; i++) {
+		total_reads += reads[i];
+	}
+
+	return total_reads;
+}
+
+uint64_t IQRouter::GetBufferWrites()
+{
+	uint64_t total_writes = 0;
+	const vector<uint64_t> writes = _bufferMonitor->GetWrites();
+	int limits = _bufferMonitor->NumInputs() * _bufferMonitor->NumClasses();
+	for (int i = 0; i < limits; i++) {
+		total_writes += writes[i];
+	}
+
+	return total_writes;
+}

@@ -39,18 +39,18 @@ class BufferMonitor {
   int  _cycles ;
   int  _inputs ;
   int  _classes ;
-  vector<int> _reads ;
-  vector<int> _writes ;
+  vector<uint64_t> _reads ;
+  vector<uint64_t> _writes ;
   int index( int input, int cl ) const ;
 public:
   BufferMonitor( int inputs, int classes ) ;
   void cycle() ;
   void write( int input, Flit const * f ) ;
   void read( int input, Flit const * f ) ;
-  inline const vector<int> & GetReads() const {
+  inline const vector<uint64_t> & GetReads() const {
     return _reads;
   }
-  inline const vector<int> & GetWrites() const {
+  inline const vector<uint64_t> & GetWrites() const {
     return _writes;
   }
   inline int NumInputs() const {

@@ -29,6 +29,7 @@ public:
     void regStats();
     void regMsgStats();
     void regPerfStats();
+    void regActivityStats();
     void regPowerStats();
     void print(std::ostream& out) const;
 
@@ -112,7 +113,9 @@ private:
     Configuration* _booksim_config;
     std::vector<BSNetwork*> _net;
     int _next_report_time;
-    int _vc_per_vnet;
+    int _vcs_per_vnet;
+    int _flit_size;	// in Byte
+    uint32_t _buffers_per_vc;
 
     // Statistical variables for performance
     Stats::Vector _ctrl_flits_received;
@@ -154,6 +157,16 @@ private:
     Stats::Vector _flov_hops;
     Stats::Formula _avg_vflov_hops;
     Stats::Formula _avg_flov_hops;
+
+    // Statistical variables for activities
+    Stats::Vector _router_buffer_reads;
+    Stats::Vector _router_buffer_writes;
+    Stats::Vector _inject_link_activity;
+    Stats::Vector _eject_link_activity;
+    Stats::Vector _int_link_activity;
+//    Stats::Formula _buffer_reads;
+//    Stats::Formula _buffer_writes;
+//    Stats::Formula _link_activity;
 
     // Statistical variables for power
     Stats::Scalar _dynamic_link_power;
