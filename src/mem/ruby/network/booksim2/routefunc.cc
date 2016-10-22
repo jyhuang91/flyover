@@ -2253,7 +2253,7 @@ void InitializeRoutingMap( const Configuration & config )
   gNumVCs = config.GetInt( "num_vcs" );
 
   // gem5net
-  gNumVCperVnet = config.GetInt("vc_per_vnet");
+  gNumVCperVnet = config.GetInt("vcs_per_vnet");
 
   //
   // traffic class partitions
