@@ -67,9 +67,8 @@ def parseConfig(config_file):
         print("ERROR: Ruby network not found in '", config_file)
         sys.exit(1)
 
-    if config.get("system.ruby.network", "type") != "GarnetNetwork_d" or
-       config.get("system.ruby.network", "type") != "BooksimNetwork":
-        print("ERROR: Garnet network or Booksim network not used in '", config_file)
+    if config.get("system.ruby.network", "type") != "GarnetNetwork_d" :
+        print("ERROR: Garnet network not used in '", config_file)
         sys.exit(1)
 
     number_of_virtual_networks = config.getint("system.ruby.network",

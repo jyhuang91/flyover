@@ -57,7 +57,7 @@ static PyMethodDef DSENTMethods[] = {
     {"computeRouterPowerAndArea", dsent_computeRouterPowerAndArea,
      METH_VARARGS, "compute quantities related power consumption of a router"},
 
-    {"computeLinkPower", dsent_computeLinkPower, METH_O,
+    {"computeLinkPower", dsent_computeLinkPower, METH_VARARGS,
      "compute quantities related power consumption of a link"},
 
     {NULL, NULL, 0, NULL}
@@ -114,6 +114,7 @@ dsent_computeRouterPowerAndArea(PyObject *self, PyObject *args)
     unsigned int num_vclass;
     unsigned int num_vchannels;
     unsigned int num_buffers;
+    float inj_rate;
 
     unsigned int flit_width;
     const char *input_port_buffer_model;
@@ -125,9 +126,9 @@ dsent_computeRouterPowerAndArea(PyObject *self, PyObject *args)
     double clk_tree_wire_width_mult;
 
     // Read the arguments sent from the python script
-    if (!PyArg_ParseTuple(args, "KIIIIII", &frequency, &num_in_port,
+    if (!PyArg_ParseTuple(args, "KIIIIIIf", &frequency, &num_in_port,
                           &num_out_port, &num_vclass, &num_vchannels,
-                          &num_buffers, &flit_width)) {
+                          &num_buffers, &flit_width, &inj_rate)) {
         Py_RETURN_NONE;
     }
 
@@ -136,6 +137,7 @@ dsent_computeRouterPowerAndArea(PyObject *self, PyObject *args)
     assert(num_out_port != 0);
     assert(num_vclass != 0);
     assert(flit_width != 0);
+    assert(inj_rate >= 0.0);
 
     vector<unsigned int> num_vchannels_vec(num_vclass, num_vchannels);
     vector<unsigned int> num_buffers_vec(num_vclass, num_buffers);
@@ -151,6 +153,18 @@ dsent_computeRouterPowerAndArea(PyObject *self, PyObject *args)
     params["NumberBuffersPerVirtualChannel"] =
         vectorToString<unsigned int>(num_buffers_vec);
     params["NumberBitsPerFlit"] = String(flit_width);
+    params["InjectionRate"] = String(inj_rate);
+
+//    cout << "Frequency: " << params["Frequency"] << endl
+//        << "NumberInputPorts: " << params["NumberInputPorts"] << endl
+//        << "NumberOutputPorts: " << params["NumberOutputPorts"] << endl
+//        << "NumberVirtualNetworks: " << params["NumberVirtualNetworks"] << endl
+//        << "NumberVCPerVNet: "
+//        << params["NumberVirtualChannelsPerVirtualNetwork"] << endl
+//        << "NumberBuffersPerVirtualChannel: "
+//        << params["NumberVirtualChannelsPerVirtualNetwork"] << endl
+//        << "NumberBitsPerFlit: " << params["NumberBitsPerFlit"] << endl
+//        << "InjectionRate: " << params["InjectionRate"] << endl;
 
     // Run DSENT
     DSENT::run(params, ms_model, outputs);
@@ -174,18 +188,19 @@ dsent_computeRouterPowerAndArea(PyObject *self, PyObject *args)
 
 
 static PyObject *
-dsent_computeLinkPower(PyObject *self, PyObject *arg)
+dsent_computeLinkPower(PyObject *self, PyObject *args)
 {
-    uint64_t frequency = PyLong_AsLongLong(arg);
+    uint64_t frequency; // = PyLong_AsLongLong(arg);
+    float inj_rate;
 
-    // Read the arguments sent from the python script
-    if (frequency == -1) {
+    if (!PyArg_ParseTuple(args, "Kf", &frequency, &inj_rate)) {
         Py_RETURN_NONE;
     }
 
     // DSENT outputs
     map<string, double> outputs;
     params["Frequency"] = String(frequency);
+    params["InjectionRate"] = String(inj_rate);
 
     // Run DSENT
     DSENT::run(params, ms_model, outputs);
