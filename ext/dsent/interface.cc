@@ -192,8 +192,9 @@ dsent_computeLinkPower(PyObject *self, PyObject *args)
 {
     uint64_t frequency; // = PyLong_AsLongLong(arg);
     float inj_rate;
+    unsigned int num_bits;
 
-    if (!PyArg_ParseTuple(args, "Kf", &frequency, &inj_rate)) {
+    if (!PyArg_ParseTuple(args, "KIf", &frequency, &num_bits, &inj_rate)) {
         Py_RETURN_NONE;
     }
 
@@ -201,6 +202,7 @@ dsent_computeLinkPower(PyObject *self, PyObject *args)
     map<string, double> outputs;
     params["Frequency"] = String(frequency);
     params["InjectionRate"] = String(inj_rate);
+    params["NumberBits"] = String(num_bits);
 
     // Run DSENT
     DSENT::run(params, ms_model, outputs);

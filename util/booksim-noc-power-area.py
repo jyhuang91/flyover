@@ -26,7 +26,18 @@
 
 
 from ConfigParser import ConfigParser
-import string, sys, subprocess, os
+import string, sys, subprocess, os, re
+
+# Shell command ignore CalledProcessError
+def shell(command):
+    try:
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    except Exception, e:
+        output = str(e.output)
+
+    #print output
+    return output
+
 
 # Compile DSENT to generate the Python module and then import it.
 # This script assumes it is executed from the gem5 root.
@@ -87,7 +98,8 @@ def parseConfig(config_file):
 
 
     return (config, number_of_virtual_networks, vcs_per_vnet,
-            buffers_per_vc, flit_size_bits, attached_router_id)
+            buffers_per_vc, flit_size_bits, attached_router_id,
+            booksim_config)
 
 
 def getClock(obj, config):
@@ -126,25 +138,22 @@ def computeRouterPowerAndArea(router, stats_file, config, number_of_virtual_netw
 
 
 ## Compute the power consumed by the given link
-def computeLinkPower(link, stats_file, config, sim_seconds, act_factor):
+def computeLinkPower(link, stats_file, config, sim_seconds, num_bits, act_factor):
     cycle_time_in_ps = getClock("system.ruby.clk_domain", config)
     frequency = 100000000000 / cycle_time_in_ps
-    power = dsent.computeLinkPower(frequency, act_factor)
+    power = dsent.computeLinkPower(frequency, num_bits, act_factor)
     dyn = power[0][1] * 2
     static = power[1][1] * 2
     power_new = ((power[0][0], dyn), (power[1][0], static))
     power = power_new
-    print("%s Power: " % link, power)
+    #print("%s Power: " % link, power)
 
     return power
-
-    #power = dsent.computeLinkPower(frequency)
-    #print("%s.nls1 Power: " % link, power)
 
 
 def parseStats(stats_file, config, router_config_file, link_config_file,
                attached_router_id, number_of_virtual_networks, vcs_per_vnet,
-               buffers_per_vc, flit_size_bits):
+               buffers_per_vc, flit_size_bits, booksim_config):
 
     # Open the stats.txt file and parse it to for the required numbers
     # and the number of routers.
@@ -196,13 +205,29 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
     eject_act = [int(s) for s in l3.split() if s.isdigit()]
     eject_link_rate = [act / cycles for act in eject_act]
     # internal link activiy
-    pattern = "intt_link_activity"
+    pattern = "int_link_activity"
     lines = string.split(subprocess.check_output(
                 ["grep", pattern, stats_file]), '\n', -1)
     assert len(lines) >= 2
     [l1,l2,l3] = lines[0].partition(" ")
     int_link_act = [int(s) for s in l3.split() if s.isdigit()]
     int_link_rate = [act / cycles for act in int_link_act]
+
+    # Open the gem5booksim.cfg file and parse it to for the off routers.
+    try:
+        booksim_config_handle = open(booksim_config, 'r')
+        booksim_config_handle.close()
+    except IOError:
+        print("Failed to open ", stats_file, " for reading")
+        exit(-1)
+    # get off routers
+    pattern = "off_routers"
+    lines = shell(["grep", pattern, booksim_config])
+    off_routers = []
+    if len(lines) >= 1:
+        l1 = re.findall('\d+', lines)
+        off_routers = map(int, l1)
+    #print off_routers
 
     # Initialize DSENT with a configuration file
     dsent.initialize(router_config_file)
@@ -217,7 +242,8 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
                                            attached_router_id,
                                            flit_size_bits, inj)
         router_dynamic_power += rpower[2][1]
-        router_static_power += rpower[3][1]
+        if r not in off_routers:
+            router_static_power += rpower[3][1]
 
     # Finalize DSENT
     dsent.finalize()
@@ -232,7 +258,7 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
         link = "inject_link#" + str(i)
         lpower = computeLinkPower(link, stats_file, config,
                                   simulation_length_in_seconds,
-                                  act_factor)
+                                  flit_size_bits, act_factor)
         link_dynamic_power += lpower[0][1]
         link_static_power += lpower[1][1]
 
@@ -240,7 +266,7 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
         link = "eject_link#" + str(i)
         lpower = computeLinkPower(link, stats_file, config,
                                   simulation_length_in_seconds,
-                                  act_factor)
+                                  flit_size_bits, act_factor)
         link_dynamic_power += lpower[0][1]
         link_static_power += lpower[1][1]
 
@@ -248,7 +274,7 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
         link = "internal_link#" + str(i)
         lpower = computeLinkPower(link, stats_file, config,
                                   simulation_length_in_seconds,
-                                  act_factor)
+                                  flit_size_bits, act_factor)
         link_dynamic_power += lpower[0][1]
         link_static_power += lpower[1][1]
 
@@ -257,12 +283,17 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
 
     dynamic_power = router_dynamic_power + link_dynamic_power
     static_power = router_static_power + link_static_power
+    dynamic_energy = dynamic_power * simulation_length_in_seconds
+    static_energy = static_power * simulation_length_in_seconds
     print "total router dynamic power: " + str(router_dynamic_power)
     print "total router static power: " + str(router_static_power)
     print "total link dynamic power: " + str(link_dynamic_power)
     print "total link static power: " + str(link_static_power)
     print "network dynamic power: " + str(dynamic_power)
     print "network static power: " + str(static_power)
+    print "\nNetwork Energy:"
+    print "    Dynamic Energy: " + str(dynamic_energy)
+    print "    Static Energy:  " + str(static_energy)
 
 # This script parses the config.ini and the stats.txt from a run and
 # generates the power and the area of the on-chip network using DSENT
@@ -276,12 +307,12 @@ def main():
           "Changes made to one are not reflected in the other.")
 
     (config, number_of_virtual_networks, vcs_per_vnet, buffers_per_vc,
-     flit_size_bits, attached_router_id) = parseConfig(
+     flit_size_bits, attached_router_id, booksim_config) = parseConfig(
              "%s/%s/config.ini" % (sys.argv[1], sys.argv[2]))
 
     parseStats("%s/%s/stats.txt" % (sys.argv[1], sys.argv[2]), config,
                sys.argv[3], sys.argv[4], attached_router_id, number_of_virtual_networks,
-               vcs_per_vnet, buffers_per_vc, flit_size_bits)
+               vcs_per_vnet, buffers_per_vc, flit_size_bits, booksim_config)
 
 if __name__ == "__main__":
     main()
