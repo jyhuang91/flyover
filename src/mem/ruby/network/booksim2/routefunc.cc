@@ -2143,18 +2143,32 @@ void flov_gem5net( const Router *r, const Flit *f, int in_channel,
     if (in_vc == vcEnd) // vcEnd is the escape channel
       escape = true;
 
-    out_port = dor_next_mesh(cur_router, dest_router);
+    // if neighbor in x direction is off, route yx
+    int xport;
+    int yport;
+    bool xneighbor_on = true;
+    bool yneighbor_on = true;
 
-    if (r->GetNeighborPowerState(out_port) != Router::power_on)
-      out_port = dor_next_mesh(cur_router, dest_router, true);
+    // output port for xy
+    xport = dor_next_mesh(cur_router, dest_router);
+    if (r->GetNeighborPowerState(xport) != Router::power_on)
+        xneighbor_on = false;
+    // output port for yx
+    yport = dor_next_mesh(cur_router, dest_router, true);
+    if (r->GetNeighborPowerState(yport) != Router::power_on)
+        yneighbor_on = false;
 
     if (GetSimTime() - f->rtime > 300)
       escape = true;
 
-    if ((cur_router % gK != dest_router % gK) &&
-        (cur_router / gK != dest_router / gK) &&
-        (r->GetNeighborPowerState(out_port) != Router::power_on))
-      escape = true; // not in same row/column
+    if (xneighbor_on || (cur_router / gK == dest_router / gK)) {
+        out_port = xport; // xport could be y direction
+    } else if ((yneighbor_on && in_channel != yport) ||//FIXME: no Uturn
+            (cur_router % gK == dest_router % gK)) {
+        out_port = yport;
+    } else {
+        out_port = 2;
+    }
 
     if (escape == true) {
       if (cur_router < 56 && (cur_router % gK != dest_router % gK) &&
@@ -2163,7 +2177,51 @@ void flov_gem5net( const Router *r, const Flit *f, int in_channel,
       vcBegin = vcEnd;
     } else if (!inject && dest_router != cur_router) {
       // injection and ejection can use all VCs
-      vcEnd--;
+      //vcEnd--; // also send to escape, don't waste it
+    }
+  }
+
+  if (!inject && f->watch) {
+    *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+      << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+      << " at output port " << out_port << " for flit " << f->id
+      << " (input port " << in_channel << ", destination " << f->dest
+      << " attached to router " << dest_router
+      << ")." << endl;
+  }
+
+  assert((inject && out_port == -1) || out_port >= 0);
+
+  outputs->Clear( );
+  outputs->AddRange(out_port, vcBegin, vcEnd);
+}
+
+void flovesc_gem5net( const Router *r, const Flit *f, int in_channel,
+    OutputSet *outputs, bool inject )
+{
+  assert(gNumVCperVnet > 1);
+  int vcBegin = f->gem5_vnet * gNumVCperVnet;
+  int vcEnd = vcBegin + gNumVCperVnet - 1;
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  int cur_router = r->GetID();
+  int dest_router = Gem5Net::NodeToRouter(f->dest);
+  int out_port;
+
+  if (inject) {
+    out_port = -1;
+  } else if (dest_router == cur_router) {
+      out_port = Gem5Net::NodeToPort(f->dest);
+  } else {
+
+    if (cur_router < 56 && (cur_router % gK != dest_router % gK) &&
+        (cur_router / gK != dest_router / gK)) {
+        out_port = 2;
+      //vcBegin = vcEnd;
+    } else if (!inject && dest_router != cur_router) {
+      out_port = dor_next_mesh(cur_router, dest_router, false);
+      // injection and ejection can use all VCs
+      //vcEnd--;
     }
   }
 
@@ -2340,5 +2398,6 @@ void InitializeRoutingMap( const Configuration & config )
   /* routing function for Gem5Net registration */
   gRoutingFunctionMap["dor_gem5net"] = &dor_gem5net;
   gRoutingFunctionMap["flov_gem5net"] = &flov_gem5net;
+  gRoutingFunctionMap["flovesc_gem5net"] = &flovesc_gem5net;
   gRoutingFunctionMap["rp_gem5net"] = &rp_gem5net;
 }
