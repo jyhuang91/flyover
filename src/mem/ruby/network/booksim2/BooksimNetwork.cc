@@ -74,7 +74,6 @@ BooksimNetwork::init()
 {
     Network::init();
     _manager->RegisterMessageBuffers(m_toNetQueues, m_fromNetQueues);
-
 }
 
 BooksimNetwork::~BooksimNetwork()
@@ -128,7 +127,9 @@ void
 BooksimNetwork::wakeup()
 {
     _manager->_Step();
-    if (_manager->in_flight()) {
+    if (_manager->in_flight() ||
+        _manager->router_power_state_transition() ||
+        _manager->credit_outstanding()) {
         scheduleEventAbsolute(clockEdge(Cycles(1)));
     }
 }

@@ -36,6 +36,8 @@ Gem5TrafficManager::~Gem5TrafficManager()
 
 void Gem5TrafficManager::_RetireFlit(Flit *f, int dest)
 {
+	_deadlock_timer = 0;
+
     // send to the output message buffer
     assert(f);
     if (f->tail) {
@@ -245,6 +247,24 @@ void Gem5TrafficManager::_Step()
     for (int c = 0; c < _classes; c++) {
         flits_in_flight |= !_total_in_flight_flits[c].empty();
     }
+    if(flits_in_flight && (_deadlock_timer++ >= _deadlock_warn_timeout)){
+        _deadlock_timer = 0;
+        cout << "WARNING: Possible network deadlock.\n";
+        /* ==== Power Gate Debug - Begin ==== */
+//        cout << GetSimTime() << endl;
+//        const vector<Router *> routers = _net[0]->GetRouters();
+//        for (int n = 0; n < routers.size(); ++n) {
+//            if (n % 8 == 0) {
+//                cout << endl;
+//            }
+//            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+//        }
+//        cout << endl;
+//        for (int n = 0; n < routers.size(); ++n)
+//            routers[n]->Display(cout);
+//        cout << endl << endl;
+        /* ==== Power Gate Debug - End ==== */
+    }
 
     vector<map<int, Flit *> > flits(_subnets);
 
@@ -257,7 +277,7 @@ void Gem5TrafficManager::_Step()
                           << "node" << n << " | "
                           << "Ejecting flit " << f->id
                           << " (packet " << f->pid << ")"
-                          << " through router " << f->src_router
+                          << " through router " << f->dest_router
                           << " from VC " << f->vc
                           << "." << endl;
                 }
@@ -549,6 +569,9 @@ void Gem5TrafficManager::_Step()
             }
         }
         flits[subnet].clear();
+        /* ==== Power Gate - Begin ==== */
+        //_net[subnet]->PowerStateEvaluate();
+        /* ==== Power Gate - End ==== */
         _net[subnet]->Evaluate();
         _net[subnet]->WriteOutputs();
     }
@@ -606,6 +629,25 @@ int Gem5TrafficManager::in_flight()
         num_in_flight_flits += _total_in_flight_flits[c].size();
     }
     return num_in_flight_flits;
+}
+
+bool Gem5TrafficManager::router_power_state_transition()
+{
+	for (int subnet = 0; subnet < _subnets; subnet++) {
+		const vector<Router *> routers = _net[subnet]->GetRouters();
+		for (int r = 0; r < routers.size(); r++) {
+			Router::ePowerState ps = routers[r]->GetPowerState();
+			if (ps == Router::draining || ps == Router::wakeup)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+bool Gem5TrafficManager::credit_outstanding()
+{
+    return (Credit::OutStanding() > 0);
 }
 
 void Gem5TrafficManager::DisplayStats(ostream& out) const

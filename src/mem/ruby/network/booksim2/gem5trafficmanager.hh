@@ -51,6 +51,8 @@ public:
 
     void init_net_ptr(BooksimNetwork* net_ptr) { _net_ptr = net_ptr; }
     int in_flight();
+    bool router_power_state_transition();
+    bool credit_outstanding();
 
     //inline
     int getNetworkTime() {
