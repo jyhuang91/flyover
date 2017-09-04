@@ -797,11 +797,29 @@ void TrafficManager::_GeneratePacket( int source, int stype,
 {
     assert(stype!=0);
 
+    /* ==== Power Gate - Begin ==== */
+    vector<bool> & core_states = _net[0]->GetCoreStates();
+    assert(core_states[source] == true);
+    /* ==== Power Gate - End ==== */
+
     Flit::FlitType packet_type = Flit::ANY_TYPE;
     int size = _GetNextPacketSize(cl); //input size 
     int pid = _cur_pid++;
     assert(_cur_pid);
     int packet_destination = _traffic_pattern[cl]->dest(source);
+    /* ==== Power Gate - Begin ==== */
+    if (_traffic[cl] == "tornado") {
+        for (int i = 1; i < _nodes; ++i) {
+            packet_destination = _traffic_pattern[cl]->dest((source+i)%_nodes);
+            if (core_states[packet_destination] == true)
+                break;
+        }
+    } else {
+        while (core_states[packet_destination] != true)
+            packet_destination = _traffic_pattern[cl]->dest(source);
+    }
+    assert(core_states[packet_destination] == true);
+    /* ==== Power Gate - End ==== */
     bool record = false;
     bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0);
     if(_use_read_write[cl]){
@@ -931,7 +949,15 @@ void TrafficManager::_GeneratePacket( int source, int stype,
 
 void TrafficManager::_Inject(){
 
+    /* ==== Power Gate - Begin ==== */
+    vector<bool> & core_states = _net[0]->GetCoreStates();
+    /* ==== Power Gate - End ==== */
+
     for ( int input = 0; input < _nodes; ++input ) {
+        /* ==== Power Gate - Begin ==== */
+        if (core_states[input] == false)
+            continue;
+        /* ==== Power Gate - End ==== */
         for ( int c = 0; c < _classes; ++c ) {
             // Potentially generate packets for any (input,class)
             // that is currently empty
@@ -941,6 +967,18 @@ void TrafficManager::_Inject(){
                     int stype = _IssuePacket( input, c );
 	  
                     if ( stype != 0 ) { //generate a packet
+                        /* ==== Power Gate - Begin ==== */
+                        int i = 0;
+                        if (_traffic[c] == "tornado") {
+                            for (i = 0; i < _nodes; ++i) {
+                                int pkt_dest = _traffic_pattern[c]->dest((input+i)%_nodes);
+                                if (core_states[pkt_dest] == true)
+                                    break;
+                            }
+                        }
+                        if (i == _nodes)
+                            break;
+                        /* ==== Power Gate - End ==== */
                         _GeneratePacket( input, stype, c, 
                                          _include_queuing==1 ? 
                                          _qtime[input][c] : _time );

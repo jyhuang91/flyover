@@ -61,7 +61,10 @@ OBJS :=  $(CPP_OBJS) $(LEX_OBJS) $(YACC_OBJS)
 
 .PHONY: clean
 
-all: $(PROG)
+all: $(OBJDIR) $(PROG)
+
+$(OBJDIR):
+	 mkdir -p $(OBJDIR)
 
 $(PROG): $(OBJS)
 	 $(CXX) $(LFLAGS) $^ -o $@
@@ -106,11 +109,13 @@ clean:
 	rm -f $(LEX_SRCS)
 	rm -f $(CPP_DEPS)
 	rm -f $(OBJS)
+	rm -rf $(OBJDIR)
 	rm -f $(PROG)
 
 distclean: clean
 	rm -f *~ */*~
 	rm -f *.o */*.o
 	rm -f *.d */*.d
+	rm -rf $(OBJDIR)
 
 -include $(CPP_DEPS)

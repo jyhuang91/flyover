@@ -245,7 +245,7 @@ void RouteTbl::_BFS(int current)
   deque<int> bfs_q;
 
   bfs_q.push_back(current);
-  _visited[current] = 1;
+  _visited[current] = true;
 
   while (!bfs_q.empty()) {
     current = bfs_q.front();
