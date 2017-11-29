@@ -45,6 +45,49 @@
 #include "config_utils.hpp"
 #include "globals.hpp"
 
+/* ==== DSENT power model - Begin ==== */
+class netEnergyStats {
+ public:
+  // link energy
+  double link_dynamic_energy;
+  double link_leakage_energy;
+  // buffer energy
+  double buf_rd_energy;
+  double buf_wt_energy;
+  double buf_leakage_energy;
+  // switch energy
+  double sw_dynamic_energy;
+  double sw_leakage_energy;
+  // crossbar energy
+  double xbar_dynamic_energy;
+  double xbar_leakage_energy;
+  // clock energy
+  double clk_dynamic_energy;
+  double clk_leakage_energy;
+  // power gating overhead
+  double power_gate_energy;
+
+  // total router energy
+  double tot_rt_dynamic_energy;
+  double tot_rt_leakage_energy;
+  double tot_rt_energy;
+
+  // total NoC energy
+  double tot_net_dynamic_energy;
+  double tot_net_leakage_energy;
+  double tot_net_energy;
+
+  // total running time in cycle
+  double tot_time;
+
+  netEnergyStats();
+  ~netEnergyStats();
+  void Reset();
+  void AddEnergy(netEnergyStats &stat);
+  void ComputeTotalEnergy();
+};
+/* ==== DSENT power model - End ==== */
+
 typedef Channel<Credit> CreditChannel;
 /* ==== Power Gate - Begin ==== */
 typedef Channel<Handshake> HandshakeChannel;
@@ -68,6 +111,10 @@ protected:
 
   vector<FlitChannel *> _chan;
   vector<CreditChannel *> _chan_cred;
+
+  /* ==== DSENT power model - Begin ==== */
+  netEnergyStats _net_energy_stats;
+  /* ==== DSENT power model - End ==== */
 
   /* ==== Power Gate - Begin ==== */
   int _fabric_manager;  // RP
@@ -132,6 +179,9 @@ public:
   const vector<Router *> & GetRouters(){return _routers;}
   Router * GetRouter(int index) {return _routers[index];}
   int NumRouters() const {return _size;}
+  /* ==== DSENT power model - Begin ==== */
+  inline netEnergyStats &GetNetEnergyStats() { return _net_energy_stats; }
+  /* ==== DSENT power model - End ==== */
   /* ==== Power Gate - Begin ==== */
   vector<bool> & GetCoreStates(){return _core_states;}
   vector<bool> & GetRouterStates(){return _router_states;}

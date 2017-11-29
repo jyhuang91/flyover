@@ -53,6 +53,7 @@
 #include "network.hpp"
 #include "injection.hpp"
 #include "power_module.hpp"
+#include "dsent_power_module.hpp"
 
 
 
@@ -137,8 +138,15 @@ bool Simulate( BookSimConfig const & config )
 
     ///Power analysis
     if(config.GetInt("sim_power") > 0){
-      Power_Module pnet(net[i], config);
-      pnet.run();
+      if (config.GetInt("dsent_model")) {
+        /* ==== DSENT power model - Begin ==== */
+        DSENT_Power_Module pnet(net[i], config);
+        pnet.run();
+        /* ==== DSENT power model - End ==== */
+      } else {
+        Power_Module pnet(net[i], config);
+        pnet.run();
+      }
     }
 
     delete net[i];

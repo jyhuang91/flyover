@@ -49,6 +49,81 @@
 #include "dragonfly.hpp"
 
 
+/* ==== DSENT power model - Begin ==== */
+netEnergyStats::netEnergyStats() { Reset(); }
+
+netEnergyStats::~netEnergyStats() {}
+
+void netEnergyStats::Reset() {
+  link_dynamic_energy = 0;
+  link_leakage_energy = 0;
+
+  buf_rd_energy = 0;
+  buf_wt_energy = 0;
+  buf_leakage_energy = 0;
+
+  sw_dynamic_energy = 0;
+  sw_leakage_energy = 0;
+
+  xbar_dynamic_energy = 0;
+  xbar_leakage_energy = 0;
+
+  clk_dynamic_energy = 0;
+  clk_leakage_energy = 0;
+
+  power_gate_energy = 0;
+
+  tot_rt_dynamic_energy = 0;
+  tot_rt_leakage_energy = 0;
+  tot_rt_energy = 0;
+
+  tot_net_dynamic_energy = 0;
+  tot_net_leakage_energy = 0;
+  tot_net_energy = 0;
+
+  tot_time = 0;
+}
+
+void netEnergyStats::AddEnergy(netEnergyStats &stat) {
+  link_dynamic_energy += stat.link_dynamic_energy;
+  link_leakage_energy += stat.link_leakage_energy;
+  buf_rd_energy += stat.buf_rd_energy;
+  buf_wt_energy += stat.buf_wt_energy;
+  buf_leakage_energy += stat.buf_leakage_energy;
+  sw_dynamic_energy += stat.sw_dynamic_energy;
+  sw_leakage_energy += stat.sw_leakage_energy;
+  xbar_dynamic_energy += stat.xbar_dynamic_energy;
+  xbar_leakage_energy += stat.xbar_leakage_energy;
+  clk_dynamic_energy += stat.clk_dynamic_energy;
+  clk_leakage_energy += stat.clk_leakage_energy;
+  power_gate_energy += stat.power_gate_energy;
+
+  tot_rt_dynamic_energy += stat.tot_rt_dynamic_energy;
+  tot_rt_leakage_energy += stat.tot_rt_leakage_energy;
+  tot_rt_energy += stat.tot_rt_energy;
+
+  tot_net_dynamic_energy += stat.tot_net_dynamic_energy;
+  tot_net_leakage_energy += stat.tot_net_leakage_energy;
+  tot_net_energy += stat.tot_net_energy;
+
+  tot_time += stat.tot_time;
+}
+
+void netEnergyStats::ComputeTotalEnergy() {
+  tot_rt_dynamic_energy = buf_rd_energy + buf_wt_energy + sw_dynamic_energy +
+                          xbar_dynamic_energy + clk_dynamic_energy;
+  tot_rt_leakage_energy = buf_leakage_energy + sw_leakage_energy +
+                          xbar_leakage_energy + clk_leakage_energy;
+  tot_rt_energy =
+      tot_rt_dynamic_energy + tot_rt_leakage_energy + power_gate_energy;
+
+  tot_net_dynamic_energy = tot_rt_dynamic_energy + link_dynamic_energy;
+  tot_net_leakage_energy = tot_rt_leakage_energy + link_leakage_energy;
+  tot_net_energy =
+      tot_net_dynamic_energy + tot_net_leakage_energy + power_gate_energy;
+}
+/* ==== DSENT power model - End ==== */
+
 Network::Network( const Configuration &config, const string & name ) :
   TimedModule( 0, name )
 {
@@ -56,6 +131,9 @@ Network::Network( const Configuration &config, const string & name ) :
   _nodes    = -1; 
   _channels = -1;
   _classes  = config.GetInt("classes");
+  /* ==== DSENT power model - Begin ==== */
+  _net_energy_stats.Reset();
+  /* ==== DSENT power model - End ==== */
   /* ==== Power Gate - Begin ==== */
   _fabric_manager = config.GetInt("fabric_manager");
   string type = config.GetStr("sim_type");
