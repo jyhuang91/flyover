@@ -132,7 +132,7 @@ protected:
   int _min_drain_time;
   vector<ePowerState> _neighbor_states;
   vector<ePowerState> _downstream_states;
-  double _outstanding_requests;
+  double _outstanding_requests; // for request/response traffic and xy_yx routing
   vector<bool> _drain_done_sent;
   vector<bool> _drain_tags;
   bool _router_state; // set by trafficmanager, on is true, off is false
