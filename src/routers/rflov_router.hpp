@@ -34,7 +34,7 @@
 class Handshake;
 /* ==== Power Gate - End ==== */
 
-class FLOVRouter : public IQRouter {
+class RFLOVRouter : public IQRouter {
 
 protected:
 
@@ -44,11 +44,10 @@ protected:
   map<int, Handshake *> _out_queue_handshakes;
 
   vector<vector<int> > _credit_counter;
-  vector<bool> _clear_credits;
+  //vector<bool> _clear_credits;
 
   vector<queue<Handshake *> > _handshake_buffer;
  
-
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */
 
