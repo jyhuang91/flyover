@@ -120,13 +120,13 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   if (_id / gK == 0) {
     _neighbor_states[3] = power_off;
     _downstream_states[3] = power_off;
-  } else if (_id / gK == 7) {
+  } else if (_id / gK == gK-1) {
     _neighbor_states[2] = power_off;
     _downstream_states[2] = power_off;
   } else if (_id % gK == 0) {
     _neighbor_states[1] = power_off;
     _downstream_states[1] = power_off;
-  } else if (_id % gK == 7) {
+  } else if (_id % gK == gK-1) {
     _neighbor_states[0] = power_off;
     _downstream_states[0] = power_off;
   }

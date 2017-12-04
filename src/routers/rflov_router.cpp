@@ -126,9 +126,11 @@ void RFLOVRouter::PowerStateEvaluate()
         _drain_tags.resize(_inputs - 1, false);
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < _outputs - 1; ++out) {
-//          if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0) ||
-//              (out == 2 && _id / 8 == 7) || (out == 3 && _id / 8 == 0))
-//            continue;
+          if (_neighbor_states[out] == power_off) // for edge routers
+            _drain_tags[out] = true;
+          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % 8 == 0) ||
+              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / 8 == 0))
+            continue;
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
           _out_queue_handshakes[out]->new_state = draining;
           //_out_queue_handshakes[out]->src_state = _power_state;
@@ -177,8 +179,8 @@ void RFLOVRouter::PowerStateEvaluate()
       _drain_timer = 0;
       assert(_out_queue_handshakes.empty());
       for (int out = 0; out < _outputs - 1; ++out) {
-//        if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0) ||
-//            (out == 2 && _id / 8 == 7) || (out == 3 && _id / 8 == 0))
+//        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % 8 == 0) ||
+//            (out == 2 && _id / gK == gK-1) || (out == 3 && _id / 8 == 0))
 //          continue;
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
@@ -200,8 +202,8 @@ void RFLOVRouter::PowerStateEvaluate()
 			_drain_timer = 0;
     } else if (drain_done) {
       for (int i = 0; i < 4; ++i) {
-//        if ((i == 0 && _id % 8 == 0) || (i == 1 && _id % 8 == 7) ||
-//            (i == 2 && _id / 8 == 0) || (i == 3 && _id / 8 == 7))
+//        if ((i == 0 && _id % gK == 0) || (i == 1 && _id % 8 == gK-1) ||
+//            (i == 2 && _id / gK == 0) || (i == 3 && _id / 8 == gK-1))
 //          continue;
         const BufferState * dest_buf = _next_buf[i];
         for (int vc = 0; vc < _vcs; ++vc) {
@@ -216,8 +218,8 @@ void RFLOVRouter::PowerStateEvaluate()
       _off_timer = 0;
       assert(_out_queue_handshakes.empty());
       for (int out = 0; out < _outputs - 1; ++out) {
-//        if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0) ||
-//            (out == 2 && _id / 8 == 7) || (out == 3 && _id / 8 == 0))
+//        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % 8 == 0) ||
+//            (out == 2 && _id / gK == gK-1) || (out == 3 && _id / 8 == 0))
 //          continue;
 //        int in = out;
 //        if (out % 2)
@@ -241,8 +243,8 @@ void RFLOVRouter::PowerStateEvaluate()
       _idle_timer = 0;
       assert(_out_queue_handshakes.empty());
       for (int out = 0; out < _outputs - 1; ++out) {
-//        if ((out == 0 && _id % 8 == 7) || (out == 1 && _id % 8 == 0)
-//            || (out == 2 && _id / 8 == 7) || (out == 3 && _id / 8 == 0))
+//        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % 8 == 0)
+//            || (out == 2 && _id / gK == gK-1) || (out == 3 && _id / 8 == 0))
 //          continue;	// for edge routers
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
@@ -746,7 +748,7 @@ void RFLOVRouter::_VCAllocUpdate( )
           assert(f->head);
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
             << " Sink router " << router->GetID() << " is "
-            << POWERSTATE[_downstream_states[match_output]]
+            << POWERSTATE[_neighbor_states[match_output]]
             << ", back to RC stage." << endl;
 
           cur_buf->Display(*gWatchOut);
@@ -1232,7 +1234,7 @@ void RFLOVRouter::_SWAllocUpdate( )
             if (f->watch) {
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                 << " SA: Sink router " << router->GetID() << " is "
-                << POWERSTATE[_downstream_states[output]]
+                << POWERSTATE[_neighbor_states[output]]
                 << ", back to RC stage." << endl;
             }
             if (cur_buf->GetState(vc) == VC::vc_alloc) {
@@ -1607,8 +1609,6 @@ void RFLOVRouter::_SendHandshakes()
 // RFLOV Facilities
 //--------------------------------
 
-
-/* ==== Power Gate - End ==== */
 void RFLOVRouter::_RFlovStep() {
   assert(_power_state == power_off || _power_state == wakeup);
   assert(_route_vcs.empty());
@@ -1741,6 +1741,7 @@ void RFLOVRouter::_RFlovStep() {
     }
   }
 }
+
 void RFLOVRouter::_HandshakeEvaluate() {
   while (!_proc_handshakes.empty()) {
     pair<int, Handshake *> const & item = _proc_handshakes.front();
@@ -1763,6 +1764,11 @@ void RFLOVRouter::_HandshakeEvaluate() {
       _neighbor_states[output] = (ePowerState) h->new_state;
     } else if (h->new_state == power_on && _neighbor_states[output] == wakeup) {
       _drain_done_sent[output] = false;
+      BufferState * dest_buf = _next_buf[output];
+      dest_buf->FullCredits();
+      _neighbor_states[output] = (ePowerState) h->new_state;
+    } else if (h->new_state == draining || h->new_state == wakeup) {
+      _drain_done_sent[output] = false;
       _neighbor_states[output] = (ePowerState) h->new_state;
     }
 
@@ -1780,7 +1786,7 @@ void RFLOVRouter::_HandshakeEvaluate() {
 
 void RFLOVRouter::_HandshakeResponse() {
   assert(_power_state == power_on || _power_state == draining);
-  
+
   for (int out_port = 0; out_port < _outputs - 1; ++out_port) {
     if (_neighbor_states[out_port] == draining
         || _neighbor_states[out_port] == wakeup) {
@@ -1836,3 +1842,4 @@ void RFLOVRouter::_HandshakeResponse() {
   }
 }
 
+/* ==== Power Gate - End ==== */
