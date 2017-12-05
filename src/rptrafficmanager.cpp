@@ -326,7 +326,7 @@ void RPTrafficManager::_Step( )
         cout << GetSimTime() << endl;
         const vector<Router *> routers = _net[0]->GetRouters();
         for (int n = 0; n < _nodes; ++n) {
-            if (n % 8)
+            if (n % gK == 0)
                 cout << endl;
             cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
         }
