@@ -40,6 +40,7 @@ public:
   bool drain_done;
   int wakeup;
   int id;
+  int hid;
 
   void Reset();
   

@@ -138,6 +138,7 @@ void RFLOVRouter::PowerStateEvaluate()
           _out_queue_handshakes[out]->new_state = draining;
           //_out_queue_handshakes[out]->src_state = _power_state;
           _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
       } else {
         _idle_timer = 0;
@@ -195,6 +196,7 @@ void RFLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes[out]->new_state = power_on;
         //_out_queue_handshakes[out]->src_state = _power_state;
         _out_queue_handshakes[out]->id = _id;
+        _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
     } else if (neighbor_draining || neighbor_off_wakeup) {
       _power_state = power_on;
@@ -205,6 +207,7 @@ void RFLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
         _out_queue_handshakes[out]->id = _id;
+        _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
       _idle_timer = 0;
       _drain_timer = 0;
@@ -237,6 +240,7 @@ void RFLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_off;
         _out_queue_handshakes[out]->id = _id;
+        _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
       _drain_time_q.push_back(_drain_timer);
       if (_max_drain_time < _drain_timer)
@@ -257,6 +261,7 @@ void RFLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
         _out_queue_handshakes[out]->id = _id;
+        _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
       ++_drain_timeout_counter;
       _drain_time_q.push_back(_drain_timer);
@@ -300,6 +305,7 @@ void RFLOVRouter::PowerStateEvaluate()
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
           _out_queue_handshakes[out]->new_state = wakeup;
           _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
       }
     }
@@ -329,6 +335,7 @@ void RFLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
         _out_queue_handshakes[out]->id = _id;
+        _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
     }
     break;
@@ -1790,14 +1797,15 @@ void RFLOVRouter::_HandshakeEvaluate() {
     }
 
     if (h->drain_done) {
-      if (_power_state == power_off) {
-        cout << GetSimTime() << " | off router#" << _id << " receives drain_done from router#" << h->id << endl;
-        //<< " (" << POWERSTATE[h->new_state] << ")" << endl;
-      }
       assert(_power_state == draining || _power_state == wakeup || _power_state == power_on);
-      if (_power_state == draining || _power_state == wakeup) {
+      if (h->hid == _req_hids[input] && (_power_state == draining || _power_state == wakeup)) {
         _drain_tags[input] = true;
       }
+      /*if (_power_state == draining || _power_state == wakeup) {
+        _drain_tags[input] = true;
+      }*/
+    } else {
+      _resp_hids[output] = h->hid;
     }
 
     h->Free();
@@ -1809,8 +1817,8 @@ void RFLOVRouter::_HandshakeResponse() {
   assert(_power_state == power_on || _power_state == draining);
 
   for (int out_port = 0; out_port < _outputs - 1; ++out_port) {
-    if (_neighbor_states[out_port] == draining
-        || _neighbor_states[out_port] == wakeup) {
+    if ((_neighbor_states[out_port] == draining || _neighbor_states[out_port] == wakeup) &&
+        (_power_state != draining || _power_state != wakeup)) {
       if (_drain_done_sent[out_port])
         continue;
       bool drain_done = true;
@@ -1857,6 +1865,7 @@ void RFLOVRouter::_HandshakeResponse() {
         }
         _out_queue_handshakes[out_port]->drain_done = true;
         _out_queue_handshakes[out_port]->id = _id;
+        _out_queue_handshakes[out_port]->hid = _resp_hids[out_port];
         _drain_done_sent[out_port] = true;
       }
     }

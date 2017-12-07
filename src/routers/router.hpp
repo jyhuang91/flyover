@@ -139,6 +139,9 @@ protected:
   // routing tables
   vector<int> _rt_tbl;
   vector<int> _esc_rt_tbl;
+  // asyncrhonous handshaking
+  vector<int> _req_hids;
+  vector<int> _resp_hids;
   /* ==== Power Gate - End ==== */
 
 public:

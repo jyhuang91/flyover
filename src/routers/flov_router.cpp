@@ -102,7 +102,7 @@ void FLOVRouter::PowerStateEvaluate()
     _drain_tags.resize(_inputs - 1, false);
     if (_outstanding_requests)
       if (_idle_timer > 0)
-        --_idle_timer;  // or should be 0?
+        _idle_timer = 0; //--_idle_timer;  // or should be 0?
     if (_wakeup_signal == true) {
       _wakeup_signal = false;
       _idle_timer = 0;
@@ -135,6 +135,7 @@ void FLOVRouter::PowerStateEvaluate()
           _out_queue_handshakes.find(out)->second->new_state = draining;
           _out_queue_handshakes.find(out)->second->src_state = _power_state;
           _out_queue_handshakes.find(out)->second->id = _id;
+          _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
         }
       } else {
         --_idle_timer;
@@ -187,6 +188,7 @@ void FLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.find(out)->second->new_state = power_on;
         _out_queue_handshakes.find(out)->second->src_state = _power_state;
         _out_queue_handshakes.find(out)->second->id = _id;
+        _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
       }
     } else if (drain_done) {
       for (int i = 0; i < 4; ++i) {
@@ -218,6 +220,7 @@ void FLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.find(out)->second->new_state = _downstream_states[in];
         _out_queue_handshakes.find(out)->second->src_state = _power_state;
         _out_queue_handshakes.find(out)->second->id = _id;
+        _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
       }
       _drain_time_q.push_back(_drain_timer);
       if (_max_drain_time < _drain_timer)
@@ -239,6 +242,7 @@ void FLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.find(out)->second->new_state = power_on;
         _out_queue_handshakes.find(out)->second->src_state = _power_state;
         _out_queue_handshakes.find(out)->second->id = _id;
+        _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
       }
       if (_drain_timer > _drain_threshold) {
         ++_drain_timeout_counter;
@@ -301,6 +305,7 @@ void FLOVRouter::PowerStateEvaluate()
           _out_queue_handshakes.find(out)->second->new_state = wakeup;
           _out_queue_handshakes.find(out)->second->src_state = _power_state;
           _out_queue_handshakes.find(out)->second->id = _id;
+          _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
         }
       }
     }
@@ -346,6 +351,7 @@ void FLOVRouter::PowerStateEvaluate()
         _out_queue_handshakes.find(out)->second->new_state = power_on;
         _out_queue_handshakes.find(out)->second->src_state = _power_state;
         _out_queue_handshakes.find(out)->second->id = _id;
+        _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
       }
       // set drain_done_tag based on my downstream information
       // not very clear here, 10/15/16
@@ -1790,9 +1796,9 @@ void FLOVRouter::_FlovStep() {
 void FLOVRouter::_HandshakeEvaluate() {
   // Should be evaluated before PowerStateEvaluate(), so put in ReadInputs()
   assert(_out_queue_handshakes.empty());
-  
+
   vector<ePowerState> new_downstream_states = _downstream_states;
-  
+
   while (!_proc_handshakes.empty()) {
     pair<int, Handshake *> const & item = _proc_handshakes.front();
     int const input = item.first;
@@ -1849,12 +1855,15 @@ void FLOVRouter::_HandshakeEvaluate() {
           _next_buf[input]->ClearCredits();
         }
       }
-      if (h->drain_done)
+      //if (h->drain_done)
         // I was draining previously
         // Or due to draining of my leftside and it back to on,
         // but I wakeup later, and use the first tag to on.
         //assert(0);
-        ; // do nothing
+        //; // do nothing
+      if (!h->drain_done && src_state >= 0) {
+        _resp_hids[input] = h->hid;
+      }
     }
     break;
     
@@ -1888,7 +1897,10 @@ void FLOVRouter::_HandshakeEvaluate() {
           cout << GetSimTime() << " | " << FullName() << " | router#" << _id
             << " has received drain tag from input " << input << endl;
         assert(!_drain_tags[input]);
-        _drain_tags[input] = true;
+        if (h->hid == _req_hids[input])
+          _drain_tags[input] = true;
+      } else if (src_state >= 0) {
+        _resp_hids[input] = h->hid;
       }
     }
     break;
@@ -1914,7 +1926,9 @@ void FLOVRouter::_HandshakeEvaluate() {
             _credit_counter[input][vc] = 0;
           _next_buf[input]->ClearCredits();
         }
+        if (!h->drain_done) _resp_hids[input] = h->hid;
       }
+      /* // now they can send drain_done, since the hid should be able to handle that
       if (h->drain_done) {
         // previous my right side are all off, so the left side routers can set tag directly,
         // later the draining is reflected to right side if one is wakeup, a tag is sent,
@@ -1923,6 +1937,7 @@ void FLOVRouter::_HandshakeEvaluate() {
         if (_downstream_states[output] != wakeup && _downstream_states[output] != draining)
           h->drain_done = false;
       }
+      */
     }
     break;
 
@@ -1955,6 +1970,8 @@ void FLOVRouter::_HandshakeEvaluate() {
               _out_queue_handshakes.find(input)->second->id = _id;
             }
             _out_queue_handshakes.find(input)->second->drain_done = true;
+            _resp_hids[input] = h->hid;
+            _out_queue_handshakes.find(input)->second->hid = _resp_hids[input];
             _drain_done_sent[input] = true; // in case that when I wake up I send the tag again
           }
         } else if (src_state == power_off) {
@@ -1964,6 +1981,7 @@ void FLOVRouter::_HandshakeEvaluate() {
             _credit_counter[input][vc] = 0;
           _next_buf[input]->ClearCredits();
         }
+        if (!h->drain_done) _resp_hids[input] = h->hid;
       }
       if (h->drain_done) {
         // FIXME: get two tags
@@ -1971,11 +1989,13 @@ void FLOVRouter::_HandshakeEvaluate() {
         // but later it back to on and I should wake up, then another tag may be sent
         // due to my state change (off->wakeup), but this tag is out dated.
         //assert(!_drain_tags[input]);
-        _drain_tags[input] = true;
+        if (h->hid == _req_hids[input])
+          _drain_tags[input] = true;
         assert(h->new_state == -1 || h->new_state == power_on);
         if (_downstream_states[output] == wakeup) {
           if (_out_queue_handshakes.count(output) == 0) {
             _out_queue_handshakes.insert(make_pair(output, h));
+            h->hid = _resp_hids[output];
           }
           _drain_done_sent[output] = true;
         }
@@ -2028,6 +2048,7 @@ void FLOVRouter::_HandshakeEvaluate() {
           _out_queue_handshakes.find(output)->second->src_state = power_off;
         else
           _out_queue_handshakes.find(output)->second->src_state = -1;
+        _out_queue_handshakes[output]->hid = _resp_hids[output];
       }
     } else {
       assert(_power_state == power_off);
@@ -2041,6 +2062,7 @@ void FLOVRouter::_HandshakeEvaluate() {
           h->drain_done = false;
         if (h->new_state != -1 || h->src_state != -1 || h->drain_done) {
           _out_queue_handshakes.insert(make_pair(output, h));
+          if (h->drain_done) h->hid = _resp_hids[output];
         } else {
           h->Free();
         }
@@ -2106,6 +2128,7 @@ void FLOVRouter::_HandshakeResponse() {
         }
         _out_queue_handshakes.find(out_port)->second->drain_done = true;
         _out_queue_handshakes.find(out_port)->second->id = _id;
+        _out_queue_handshakes[out_port]->hid = _resp_hids[out_port];
         _drain_done_sent[out_port] = true;
       }
     }
