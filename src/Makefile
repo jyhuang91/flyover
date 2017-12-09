@@ -26,6 +26,7 @@
 
 LEX = flex
 YACC   = bison -y
+# DEBUG Flags: DEBUG_POWERGATE DEBUG_ROUTE DEBUG_POWERGATE_CONFIG
 DEFINE = 
 INCPATH = -I. -Iarbiters -Iallocators -Irouters -Inetworks -Ipower
 CPPFLAGS += -Wall $(INCPATH) $(DEFINE)

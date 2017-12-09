@@ -5,7 +5,6 @@
 #include "misc_utils.hpp"
 #include "routetbl.hpp"
 
-#define DEBUG
 
 RouteTbl::RouteTbl()
 {
@@ -20,7 +19,7 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
 {
   _Init();
 
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << "Power-on routers: ";
   for (int i = 0; i < _num_nodes; i++) {
     if (_router_states[i])
@@ -54,7 +53,7 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
       }
     }
   }
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << "Adjacent Matrix: " << endl;
   for (int i = 0; i < _num_nodes; i++) {
     cout << i << ": ";
@@ -185,7 +184,7 @@ void RouteTbl::BuildRoute()
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << endl;
   cout << "Regular routes:" << endl;
   _PrintAllPath();
@@ -232,7 +231,7 @@ void RouteTbl::BuildEscRoute(int root)
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << "Escape Up*/Down* tree routes:" << endl;
   _PrintAllPath();
 #endif
