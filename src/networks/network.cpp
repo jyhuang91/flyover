@@ -50,6 +50,7 @@
 #include "anynet.hpp"
 #include "dragonfly.hpp"
 
+#define DEBUG_POWERGATE_CONFIG
 
 /* ==== DSENT power model - Begin ==== */
 netEnergyStats::netEnergyStats() { Reset(); }
@@ -240,6 +241,7 @@ void Network::_Alloc( )
       err << "percentile of power-gating is too high, should keep one row active" << endl;
       Error(err.str());
     }
+    assert(_fabric_manager < _size);
     RandomSeed(_powergate_seed);
     for (unsigned i = 0; i < num_off_cores; ++i) {
       int cid = RandomInt(_nodes - 1 - gK);
