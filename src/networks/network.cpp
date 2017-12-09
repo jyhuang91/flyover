@@ -50,7 +50,6 @@
 #include "anynet.hpp"
 #include "dragonfly.hpp"
 
-#define DEBUG_POWERGATE_CONFIG
 
 /* ==== DSENT power model - Begin ==== */
 netEnergyStats::netEnergyStats() { Reset(); }
@@ -236,6 +235,11 @@ void Network::_Alloc( )
     _off_routers.clear();
     // random off core id generation for core parking
     unsigned num_off_cores = _nodes * _powergate_percentile / 100;
+    if (num_off_cores + gK > _nodes) {
+      ostringstream err;
+      err << "percentile of power-gating is too high, should keep one row active" << endl;
+      Error(err.str());
+    }
     RandomSeed(_powergate_seed);
     for (unsigned i = 0; i < num_off_cores; ++i) {
       int cid = RandomInt(_nodes - 1 - gK);
@@ -247,12 +251,14 @@ void Network::_Alloc( )
     }
     assert(_off_cores.size() == num_off_cores);
     sort(_off_cores.begin(), _off_cores.end());
-#ifdef DEBUG_POWERGATE_CONFIG
-    cout << "random auto generated off cores (seed = " << _powergate_seed << "):" << endl << "\t";
     for (unsigned i = 0; i < num_off_cores; i++) {
       int cid = _off_cores[i];
       _core_states[cid] = false;
-      cout << cid << ", ";
+    }
+#ifdef DEBUG_POWERGATE_CONFIG
+    cout << "random auto generated off cores (seed = " << _powergate_seed << "):" << endl << "\t";
+    for (unsigned i = 0; i < num_off_cores; i++) {
+      cout << _off_cores[i] << ", ";
     }
     cout << endl;
 #endif
@@ -320,7 +326,7 @@ void Network::_Alloc( )
         }
         sort(new_component.begin(), new_component.end());
 #ifdef DEBUG_POWERGATE_CONFIG
-        cout << "new component: ";
+        cout << "component " << strong_cnctd_comps.size() << ": ";
         for (unsigned k = 0; k < new_component.size(); ++k) {
           cout << new_component[k] << ", ";
         }
