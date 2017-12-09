@@ -50,6 +50,7 @@
 #include "anynet.hpp"
 #include "dragonfly.hpp"
 
+#define DEBUG_POWERGATE_CONFIG
 
 /* ==== DSENT power model - Begin ==== */
 netEnergyStats::netEnergyStats() { Reset(); }
@@ -247,7 +248,7 @@ void Network::_Alloc( )
     assert(_off_cores.size() == num_off_cores);
     sort(_off_cores.begin(), _off_cores.end());
 #ifdef DEBUG_POWERGATE_CONFIG
-    cout << "generated off cores: ";
+    cout << "random auto generated off cores (seed = " << _powergate_seed << "):" << endl << "\t";
     for (unsigned i = 0; i < num_off_cores; i++) {
       int cid = _off_cores[i];
       _core_states[cid] = false;
@@ -284,9 +285,9 @@ void Network::_Alloc( )
         }
       }
 #ifdef DEBUG_POWERGATE_CONFIG
-      cout << "Adjacent Matrix: " << endl;
+      cout << "Adjacent List: " << endl;
       for (int i = 0; i < _size; ++i) {
-        cout << i << ": ";
+        cout << "\t" << i << ": ";
         for (int j = 0; j < _size; ++j) {
           if (adj_mat[i][j] > 0) cout << j << " ";
         }
@@ -353,7 +354,7 @@ void Network::_Alloc( )
             continue;
 
           vector<int> connected_routers;
-          unsigned num_off_routers_on_path = 0;
+          unsigned num_off_routers_on_path = _size;
           int fx = _fabric_manager % gK;
           int fy = _fabric_manager / gK;
           for (int k = 0; k < 8; ++k) {
@@ -366,17 +367,17 @@ void Network::_Alloc( )
             int rx = edge_rid % gK;
             int ry = edge_rid / gK;
             int r = edge_rid;
-            connected_routers.clear();
+            vector<int> off_routers_on_path;
             // x dimention
             if (rx > fx) {
               for (int d = 1; d <= rx - fx; ++d) {
                 --r;
-                if (_router_states[r] == false) connected_routers.push_back(r);
+                if (_router_states[r] == false) off_routers_on_path.push_back(r);
               }
             } else {
               for (int d = 1; d <= fx - rx; ++d) {
                 ++r;
-                if (_router_states[r] == false) connected_routers.push_back(r);
+                if (_router_states[r] == false) off_routers_on_path.push_back(r);
               }
             }
             assert(r % gK == fx);
@@ -384,17 +385,19 @@ void Network::_Alloc( )
             if (ry > fy) {
               for (int d = 1; d <= ry - fy; ++d) {
                 r = r - gK;
-                if (_router_states[r] == false) connected_routers.push_back(r);
+                if (_router_states[r] == false) off_routers_on_path.push_back(r);
               }
             } else {
               for (int d = 1; d <= fy - ry; ++d) {
                 r = r + gK;
-                if (_router_states[r] == false) connected_routers.push_back(r);
+                if (_router_states[r] == false) off_routers_on_path.push_back(r);
               }
             }
             assert(r == _fabric_manager);
-            if (connected_routers.size() < num_off_routers_on_path) {
-              num_off_routers_on_path = connected_routers.size();
+            if (off_routers_on_path.size() < num_off_routers_on_path) {
+              num_off_routers_on_path = off_routers_on_path.size();
+              connected_routers.clear();
+              connected_routers = off_routers_on_path;
             }
           }
           for (unsigned i = 0; i < connected_routers.size(); ++i) {
@@ -403,10 +406,59 @@ void Network::_Alloc( )
           }
         }
       }
+    } else if (_powergate_type == "rpc") {  // conservative RP
+      for (unsigned i = 0; i < _off_cores.size(); ++i) {
+        int cid = _off_cores[i];
+        int cx = cid % gK;
+        int cy = cid / gK;
+        bool neighbors_parked = false;
+        // direct neighbors
+        if (cx - 1 >= 0) {
+          int nid = cid - 1;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (cx + 1 < gK) {
+          int nid = cid + 1;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (cy - 1 >= 0) {
+          int nid = cid - gK;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (cy + 1 < gK) {
+          int nid = cid + gK;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        // indirect neighbors (diagonal)
+        if (cx - 1 >= 0 && cy - 1 >= 0) {
+          int nid = cid - gK - 1;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (cx - 1 >= 0 && cy + 1 < gK) {
+          int nid = cid + gK - 1;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (cx + 1 < gK && cy - 1 >= 0) {
+          int nid = cid - gK + 1;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (cx + 1 < gK && cy + 1 < gK) {
+          int nid = cid + gK + 1;
+          if (_router_states[nid] == false) neighbors_parked = true;
+        }
+        if (neighbors_parked == false) {
+          _router_states[cid] = false;  // park the router
+        }
+      }
+    } else if (_powergate_type != "no_pg") {
+      ostringstream err;
+      err << "Unknown power-gating type: " << _powergate_type << endl;
+      Error(err.str());
+    }
 #ifdef DEBUG_POWERGATE_CONFIG
       cout << "core (router) states:";
       for (int r = 0; r < _size; ++r) {
-        if (r % gK == 0) cout << endl;
+        if (r % gK == 0) cout << endl << "\t";
         if (_core_states[r] == true) {
           cout << "on (";
         } else {
@@ -420,13 +472,6 @@ void Network::_Alloc( )
       }
       cout << endl;
 #endif
-    } else if (_powergate_type == "rpc") {  // conservative RP
-
-    } else if (_powergate_type != "no_pg") {
-      ostringstream err;
-      err << "Unknown power-gating type: " << _powergate_type << endl;
-      Error(err.str());
-    }
   } else {
     // Core parking
     for (unsigned i = 0; i < _off_cores.size(); ++i) {
