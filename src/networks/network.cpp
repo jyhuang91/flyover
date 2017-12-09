@@ -34,9 +34,11 @@
 
 #include <cassert>
 #include <sstream>
+#include <algorithm>
 
 #include "booksim.hpp"
 #include "network.hpp"
+#include "random_utils.hpp"
 
 #include "kncube.hpp"
 #include "fly.hpp"
@@ -138,8 +140,12 @@ Network::Network( const Configuration &config, const string & name ) :
   _fabric_manager = config.GetInt("fabric_manager");
   string type = config.GetStr("sim_type");
   assert((_fabric_manager >= 0 && type == "rp") || _fabric_manager < 0);
+  _powergate_auto_config = config.GetInt("powergate_auto_config") > 0;
+  _powergate_type = config.GetStr("powergate_type");
   _off_cores = config.GetIntArray("off_cores");
   _off_routers = config.GetIntArray("off_routers");
+  _powergate_seed = config.GetInt("powergate_seed");
+  _powergate_percentile = config.GetInt("powergate_percentile");
   /* ==== Power Gate - End ==== */
 }
 
@@ -222,16 +228,215 @@ void Network::_Alloc( )
   gNodes = _nodes;
 
   /* ==== Power Gate - Begin ==== */
-  // Core parking
   _core_states.resize(_size, true);
   _router_states.resize(_size, true);
-  for (unsigned i = 0; i < _off_cores.size(); ++i) {
-    int c_id = _off_cores[i];
-    _core_states[c_id] = false;
-  }
-  for (unsigned i = 0; i < _off_routers.size(); ++i) {
-    int r_id = _off_routers[i];
-    _router_states[r_id] = false;
+  if (_powergate_auto_config) {
+    _off_cores.clear();
+    _off_routers.clear();
+    // random off core id generation for core parking
+    unsigned num_off_cores = _nodes * _powergate_percentile / 100;
+    RandomSeed(_powergate_seed);
+    for (unsigned i = 0; i < num_off_cores; ++i) {
+      int cid = RandomInt(_nodes - 1 - gK);
+      while (find(_off_cores.begin(), _off_cores.end(), cid) != _off_cores.end() ||
+          cid == _fabric_manager) {
+        cid = RandomInt(_nodes - 1 - gK);
+      }
+      _off_cores.push_back(cid);
+    }
+    assert(_off_cores.size() == num_off_cores);
+    sort(_off_cores.begin(), _off_cores.end());
+#ifdef DEBUG_POWERGATE_CONFIG
+    cout << "generated off cores: ";
+    for (unsigned i = 0; i < num_off_cores; i++) {
+      int cid = _off_cores[i];
+      _core_states[cid] = false;
+      cout << cid << ", ";
+    }
+    cout << endl;
+#endif
+    // router power states
+    if (_powergate_type == "flov" || _powergate_type == "rflov") {
+      _router_states = _core_states;
+    } else if (_powergate_type == "rpa") {  // aggressive RP
+      _router_states = _core_states;
+      // initialize adjacent matrix
+      vector<vector<int> > adj_mat;
+      adj_mat.resize(_size);
+      for (int i = 0; i < _size; ++i) {
+        adj_mat[i].resize(_size, -1);
+
+        int ix = i % gK;
+        int iy = i / gK;
+        for (int j = 0; j < _size; ++j) {
+          if (_router_states[i] == false || _router_states[j] == false)
+            continue;
+
+          int jx = j % gK;
+          int jy = j / gK;
+
+          if (i == j) {
+            adj_mat[i][j] = 0;
+          } else if ( (abs(ix - jx) == 1 && iy == jy) ||
+              (abs(iy - jy) == 1 && ix == jx) ) {
+            adj_mat[i][j] = 1;
+          }
+        }
+      }
+#ifdef DEBUG_POWERGATE_CONFIG
+      cout << "Adjacent Matrix: " << endl;
+      for (int i = 0; i < _size; ++i) {
+        cout << i << ": ";
+        for (int j = 0; j < _size; ++j) {
+          if (adj_mat[i][j] > 0) cout << j << " ";
+        }
+        cout << endl;
+      }
+#endif
+      // measure network connectivity
+      vector<vector<int> > strong_cnctd_comps;
+      vector<int> new_component;
+      vector<bool> visited(_size, false);
+      for (int r = 0; r < _size; ++r) {
+        if (_router_states[r] == false) continue;
+        if (visited[r] == true) continue;
+
+        deque<int> bfs_q;
+        bfs_q.push_back(r);
+        visited[r] = true;
+        new_component.clear();
+
+        while (!bfs_q.empty()) {
+          int n = bfs_q.front();
+          bfs_q.pop_front();
+          new_component.push_back(n);
+          for (int i = 0; i < _size; ++i) {
+            if (adj_mat[n][i] == 1 && visited[i] == false) {
+              visited[i] = true;
+              bfs_q.push_back(i);
+            }
+          }
+        }
+        sort(new_component.begin(), new_component.end());
+#ifdef DEBUG_POWERGATE_CONFIG
+        cout << "new component: ";
+        for (unsigned k = 0; k < new_component.size(); ++k) {
+          cout << new_component[k] << ", ";
+        }
+        cout << endl;
+#endif
+        strong_cnctd_comps.push_back(new_component);
+      }
+      if (strong_cnctd_comps.size() == 1) {
+#ifdef DEBUG_POWERGATE_CONFIG
+        cout << "network is connected" << endl;
+#endif
+      } else {
+#ifdef DEBUG_POWERGATE_CONFIG
+        cout << "network is disjoint with " << strong_cnctd_comps.size() << " partitions" << endl;
+#endif
+        vector<bool> is_edge_router(_size, false);
+        for (int rid = 0; rid < _size; ++rid) {
+          int num_neighbors = 0;
+          for (int j = 0; j < _size; ++j) {
+            if (adj_mat[rid][j] == 1)
+              ++num_neighbors;
+          }
+          if ( ((rid == 0 || rid == gK - 1 || rid == _size - 1 || rid == _size - gK) && num_neighbors < 2) ||
+              ((rid / gK == 0 || rid % gK == 0 || rid / gK == gK - 1 || rid % gK == gK - 1) && num_neighbors < 3) ||
+              ((rid / gK > 0 && rid % gK > 0 && rid / gK < gK - 1 && rid % gK < gK - 1) && num_neighbors < 4) )
+            is_edge_router[rid] = true;
+        }
+        for (unsigned i = 0; i < strong_cnctd_comps.size(); ++i) {
+          vector<int> component = strong_cnctd_comps[i];
+          if (find(component.begin(), component.end(), _fabric_manager) != component.end())
+            continue;
+
+          vector<int> connected_routers;
+          unsigned num_off_routers_on_path = 0;
+          int fx = _fabric_manager % gK;
+          int fy = _fabric_manager / gK;
+          for (int k = 0; k < 8; ++k) {
+            int j = RandomInt(component.size() - 1);
+            int edge_rid = component[j];
+            while (is_edge_router[edge_rid] == false) {
+              j = RandomInt(component.size() - 1);
+              edge_rid = component[j];
+            }
+            int rx = edge_rid % gK;
+            int ry = edge_rid / gK;
+            int r = edge_rid;
+            connected_routers.clear();
+            // x dimention
+            if (rx > fx) {
+              for (int d = 1; d <= rx - fx; ++d) {
+                --r;
+                if (_router_states[r] == false) connected_routers.push_back(r);
+              }
+            } else {
+              for (int d = 1; d <= fx - rx; ++d) {
+                ++r;
+                if (_router_states[r] == false) connected_routers.push_back(r);
+              }
+            }
+            assert(r % gK == fx);
+            // y dimension
+            if (ry > fy) {
+              for (int d = 1; d <= ry - fy; ++d) {
+                r = r - gK;
+                if (_router_states[r] == false) connected_routers.push_back(r);
+              }
+            } else {
+              for (int d = 1; d <= fy - ry; ++d) {
+                r = r + gK;
+                if (_router_states[r] == false) connected_routers.push_back(r);
+              }
+            }
+            assert(r == _fabric_manager);
+            if (connected_routers.size() < num_off_routers_on_path) {
+              num_off_routers_on_path = connected_routers.size();
+            }
+          }
+          for (unsigned i = 0; i < connected_routers.size(); ++i) {
+            int rid = connected_routers[i];
+            _router_states[rid] = true;
+          }
+        }
+      }
+#ifdef DEBUG_POWERGATE_CONFIG
+      cout << "core (router) states:";
+      for (int r = 0; r < _size; ++r) {
+        if (r % gK == 0) cout << endl;
+        if (_core_states[r] == true) {
+          cout << "on (";
+        } else {
+          cout << "of (";
+        }
+        if (_router_states[r] == true) {
+          cout << "on)\t\t";
+        } else {
+          cout << "of)\t\t";
+        }
+      }
+      cout << endl;
+#endif
+    } else if (_powergate_type == "rpc") {  // conservative RP
+
+    } else if (_powergate_type != "no_pg") {
+      ostringstream err;
+      err << "Unknown power-gating type: " << _powergate_type << endl;
+      Error(err.str());
+    }
+  } else {
+    // Core parking
+    for (unsigned i = 0; i < _off_cores.size(); ++i) {
+      int c_id = _off_cores[i];
+      _core_states[c_id] = false;
+    }
+    for (unsigned i = 0; i < _off_routers.size(); ++i) {
+      int r_id = _off_routers[i];
+      _router_states[r_id] = false;
+    }
   }
   /* ==== Power Gate - End ==== */
 
