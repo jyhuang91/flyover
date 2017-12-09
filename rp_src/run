@@ -1,3 +1,0 @@
-#./booksim meshconfig > log 2>&1 
-./booksim meshcmp.cfg > log 2>&1 
-
