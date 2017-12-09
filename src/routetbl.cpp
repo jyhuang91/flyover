@@ -5,7 +5,7 @@
 #include "misc_utils.hpp"
 #include "routetbl.hpp"
 
-//#define DEBUG
+#define DEBUG
 
 RouteTbl::RouteTbl()
 {
@@ -175,7 +175,7 @@ void RouteTbl::BuildRoute()
         dir = EAST;
       } else if (coord == -1) {
         dir = WEST;
-      } else if (coord == 8) {
+      } else if (coord == gK) {
         dir = SOUTH;
       } else {
         dir = NORTH;
@@ -223,7 +223,7 @@ void RouteTbl::BuildEscRoute(int root)
         dir = EAST;
       } else if (coord == -1) {
         dir = WEST;
-      } else if (coord == 8) {
+      } else if (coord == gK) {
         dir = SOUTH;
       } else {
         dir = NORTH;
