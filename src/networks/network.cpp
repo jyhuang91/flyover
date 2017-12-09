@@ -50,7 +50,6 @@
 #include "anynet.hpp"
 #include "dragonfly.hpp"
 
-#define DEBUG_POWERGATE_CONFIG
 
 /* ==== DSENT power model - Begin ==== */
 netEnergyStats::netEnergyStats() { Reset(); }
