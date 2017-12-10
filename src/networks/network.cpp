@@ -139,7 +139,7 @@ Network::Network( const Configuration &config, const string & name ) :
   /* ==== Power Gate - Begin ==== */
   _fabric_manager = config.GetInt("fabric_manager");
   string type = config.GetStr("sim_type");
-  assert((_fabric_manager >= 0 && type == "rp") || _fabric_manager < 0);
+  //assert((_fabric_manager >= 0 && type == "rp") || _fabric_manager < 0);
   _powergate_auto_config = config.GetInt("powergate_auto_config") > 0;
   _powergate_type = config.GetStr("powergate_type");
   _off_cores = config.GetIntArray("off_cores");
@@ -239,6 +239,9 @@ void Network::_Alloc( )
       ostringstream err;
       err << "percentile of power-gating is too high, should keep one row active" << endl;
       Error(err.str());
+    }
+    if (_fabric_manager < 0) {
+      _fabric_manager = gK*gK/2 - gK/2 - 1;
     }
     assert(_fabric_manager < _size);
     RandomSeed(_powergate_seed);
