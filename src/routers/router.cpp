@@ -116,19 +116,28 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   // FIXME: only support mesh now
   _neighbor_states.resize(4, power_on);
   _downstream_states.resize(4, power_on);
+  _logical_neighbors.resize(4, -1);
+  _logical_neighbors[0] = _id + 1;
+  _logical_neighbors[1] = _id - 1;
+  _logical_neighbors[2] = _id + gK;
+  _logical_neighbors[3] = _id - gK;
   // for edge routers
   if (_id / gK == 0) {
     _neighbor_states[3] = power_off;
     _downstream_states[3] = power_off;
+    _logical_neighbors[3] = -1;
   } else if (_id / gK == gK-1) {
     _neighbor_states[2] = power_off;
     _downstream_states[2] = power_off;
+    _logical_neighbors[2] = -1;
   } else if (_id % gK == 0) {
     _neighbor_states[1] = power_off;
     _downstream_states[1] = power_off;
+    _logical_neighbors[1] = -1;
   } else if (_id % gK == gK-1) {
     _neighbor_states[0] = power_off;
     _downstream_states[0] = power_off;
+    _logical_neighbors[0] = -1;
   }
   _outstanding_requests = 0;
   _router_state = true;
@@ -220,12 +229,6 @@ Router *Router::NewRouter( const Configuration& config,
 }
 
 /* ==== Power Gate - Begin ==== */
-Router::ePowerState Router::GetNeighborPowerState( int out_port ) const
-{
-  assert(out_port >= 0);
-  return _neighbor_states[out_port];
-}
-
 void Router::IdleDetected()
 {
   if (_power_state == power_on)
