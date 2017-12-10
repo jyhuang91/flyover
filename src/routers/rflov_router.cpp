@@ -89,7 +89,7 @@ void RFLOVRouter::PowerStateEvaluate()
   }
 
   // bottom row routers are always on
-  if (_id >= 56)
+  if (_id >= gNodes - gK)
     assert(_power_state == power_on);
 
   /* power transition state machine */
@@ -725,7 +725,7 @@ void RFLOVRouter::_VCAllocUpdate( )
       const FlitChannel * channel = _output_channels[match_output];
       Router * router = channel->GetSink();
       if (router) {
-        const bool is_mc = (router->GetID() >= 56);
+        const bool is_mc = (router->GetID() >= gNodes - gK);
         if (!is_mc && (_neighbor_states[match_output] == draining ||
               _neighbor_states[match_output] == wakeup))
           back_to_route = true;
@@ -816,7 +816,7 @@ void RFLOVRouter::_VCAllocUpdate( )
         const FlitChannel * channel = _output_channels[out_port];
         Router * router = channel->GetSink();
         if (router) {
-          const bool is_mc = (router->GetID() >= 56);
+          const bool is_mc = (router->GetID() >= gNodes - gK);
           if (!is_mc && (_neighbor_states[out_port] == draining ||
                 _neighbor_states[out_port] == wakeup))
             delete_route = true;
@@ -1242,7 +1242,7 @@ void RFLOVRouter::_SWAllocUpdate( )
           const FlitChannel * channel = _output_channels[output];
           Router * router = channel->GetSink();
           if (router) {
-            const bool is_mc = (router->GetID() >= 56);
+            const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_neighbor_states[output] == draining ||
                   _neighbor_states[output] == wakeup)) {
               back_to_route = true;
@@ -1440,7 +1440,7 @@ void RFLOVRouter::_SWAllocUpdate( )
             const FlitChannel * channel = _output_channels[out_port];
             Router * router = channel->GetSink();
             if (router) {
-              const bool is_mc = (router->GetID() >= 56);
+              const bool is_mc = (router->GetID() >= gNodes - gK);
               if (!is_mc && (_neighbor_states[out_port] == draining ||
                     _neighbor_states[out_port] == wakeup))
                 delete_route = true;
@@ -1473,7 +1473,7 @@ void RFLOVRouter::_SWAllocUpdate( )
           const FlitChannel * channel = _output_channels[output];
           Router * router = channel->GetSink();
           if (router) {
-            const bool is_mc = (router->GetID() >= 56);
+            const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_neighbor_states[output] == draining ||
                   _neighbor_states[output] == wakeup) && !is_mc) {
               back_to_route = true;

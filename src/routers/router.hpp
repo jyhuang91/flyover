@@ -132,6 +132,7 @@ protected:
   int _min_drain_time;
   vector<ePowerState> _neighbor_states;
   vector<ePowerState> _downstream_states;
+  vector<int> _logical_neighbors;
   double _outstanding_requests; // for request/response traffic and xy_yx routing
   vector<bool> _drain_done_sent;
   vector<bool> _drain_tags;
@@ -282,8 +283,11 @@ public:
   inline const vector<int> & GetRouteTable() const {return _rt_tbl;}
   inline const vector<int> & GetEscRouteTable() const {return _esc_rt_tbl;}
 
+  inline Router::ePowerState GetNeighborPowerState(int out_port) const {return _neighbor_states[out_port];}
+  inline void SetLogicalNeighbor(int out_port, int id) {_logical_neighbors[out_port] = id;}
+  inline int GetLogicalNeighbor(int out_port) const {return _logical_neighbors[out_port];}
+
   void IdleDetected();
-  Router::ePowerState GetNeighborPowerState(int out_port) const;
   /* ==== Power Gate - End ==== */
 
 };

@@ -41,6 +41,7 @@ public:
   int wakeup;
   int id;
   int hid;
+  int logical_neighbor;
 
   void Reset();
   

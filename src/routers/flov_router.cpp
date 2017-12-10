@@ -92,7 +92,7 @@ void FLOVRouter::PowerStateEvaluate()
   }
 
   // bottom row routers are always on
-  if (_id >= 56)
+  if (_id >= gNodes - gK)
     assert(_power_state == power_on);
 
   /* power transition state machine */
@@ -218,6 +218,7 @@ void FLOVRouter::PowerStateEvaluate()
           ++in;
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes.find(out)->second->new_state = _downstream_states[in];
+        _out_queue_handshakes.find(out)->second->logical_neighbor = _logical_neighbors[in];
         _out_queue_handshakes.find(out)->second->src_state = _power_state;
         _out_queue_handshakes.find(out)->second->id = _id;
         _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
@@ -349,6 +350,7 @@ void FLOVRouter::PowerStateEvaluate()
         if (_out_queue_handshakes.count(out) == 0)
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes.find(out)->second->new_state = power_on;
+        _out_queue_handshakes.find(out)->second->logical_neighbor = _id;
         _out_queue_handshakes.find(out)->second->src_state = _power_state;
         _out_queue_handshakes.find(out)->second->id = _id;
         _out_queue_handshakes.find(out)->second->hid = ++_req_hids[out];
@@ -757,7 +759,7 @@ void FLOVRouter::_VCAllocUpdate( )
       const FlitChannel * channel = _output_channels[match_output];
       Router * router = channel->GetSink();
       if (router) {
-        const bool is_mc = (router->GetID() >= 56);
+        const bool is_mc = (router->GetID() >= gNodes - gK);
         if (!is_mc && (_downstream_states[match_output] == draining ||
                 _downstream_states[match_output] == wakeup))
           back_to_route = true;
@@ -848,7 +850,7 @@ void FLOVRouter::_VCAllocUpdate( )
         const FlitChannel * channel = _output_channels[out_port];
         Router * router = channel->GetSink();
         if (router) {
-          const bool is_mc = (router->GetID() >= 56);
+          const bool is_mc = (router->GetID() >= gNodes - gK);
           if (!is_mc && (_downstream_states[out_port] == draining ||
                 _downstream_states[out_port] == wakeup))
             delete_route = true;
@@ -1273,7 +1275,7 @@ void FLOVRouter::_SWAllocUpdate( )
           const FlitChannel * channel = _output_channels[output];
           Router * router = channel->GetSink();
           if (router) {
-            const bool is_mc = (router->GetID() >= 56);
+            const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_downstream_states[output] == draining ||
                   _downstream_states[output] == wakeup)) {
               back_to_route = true;
@@ -1473,7 +1475,7 @@ void FLOVRouter::_SWAllocUpdate( )
             const FlitChannel * channel = _output_channels[out_port];
             Router * router = channel->GetSink();
             if (router) {
-              const bool is_mc = (router->GetID() >= 56);
+              const bool is_mc = (router->GetID() >= gNodes - gK);
               if (!is_mc && (_downstream_states[out_port] == draining ||
                     _downstream_states[out_port] == wakeup))
                 delete_route = true;
@@ -1506,7 +1508,7 @@ void FLOVRouter::_SWAllocUpdate( )
           const FlitChannel * channel = _output_channels[output];
           Router * router = channel->GetSink();
           if (router) {
-            const bool is_mc = (router->GetID() >= 56);
+            const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_downstream_states[output] == draining ||
                   _downstream_states[output] == wakeup) && !is_mc) {
               back_to_route = true;
@@ -2018,6 +2020,11 @@ void FLOVRouter::_HandshakeEvaluate() {
         assert(h->src_state >= 0);
         _neighbor_states[input] = (ePowerState) h->src_state;
       }
+    }
+
+    // update logical neighbor
+    if (h->logical_neighbor >= 0) {
+      _logical_neighbors[input] = h->logical_neighbor;
     }
     
     // free or relaying handshake
