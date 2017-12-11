@@ -2025,6 +2025,8 @@ void FLOVRouter::_HandshakeEvaluate() {
     // update logical neighbor
     if (h->logical_neighbor >= 0) {
       _logical_neighbors[input] = h->logical_neighbor;
+    } else if (new_downstream_states[input] == power_off) {
+      _logical_neighbors[input] = -1;
     }
     
     // free or relaying handshake
