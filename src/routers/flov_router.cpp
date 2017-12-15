@@ -761,7 +761,8 @@ void FLOVRouter::_VCAllocUpdate( )
       if (router) {
         const bool is_mc = (router->GetID() >= gNodes - gK);
         if (!is_mc && (_downstream_states[match_output] == draining ||
-                _downstream_states[match_output] == wakeup))
+              _downstream_states[match_output] == wakeup ||
+              _downstream_states[match_output] == power_off))
           back_to_route = true;
       }
       if (!back_to_route) {
@@ -852,7 +853,8 @@ void FLOVRouter::_VCAllocUpdate( )
         if (router) {
           const bool is_mc = (router->GetID() >= gNodes - gK);
           if (!is_mc && (_downstream_states[out_port] == draining ||
-                _downstream_states[out_port] == wakeup))
+                _downstream_states[out_port] == wakeup ||
+                _downstream_states[out_port] == power_off))
             delete_route = true;
         }
 
@@ -1277,7 +1279,8 @@ void FLOVRouter::_SWAllocUpdate( )
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_downstream_states[output] == draining ||
-                  _downstream_states[output] == wakeup)) {
+                  _downstream_states[output] == wakeup ||
+                  _downstream_states[output] == power_off)) {
               back_to_route = true;
             }
           }
@@ -1477,7 +1480,8 @@ void FLOVRouter::_SWAllocUpdate( )
             if (router) {
               const bool is_mc = (router->GetID() >= gNodes - gK);
               if (!is_mc && (_downstream_states[out_port] == draining ||
-                    _downstream_states[out_port] == wakeup))
+                    _downstream_states[out_port] == wakeup ||
+                    _downstream_states[out_port] == power_off))
                 delete_route = true;
             }
 

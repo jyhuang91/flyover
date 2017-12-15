@@ -2071,7 +2071,8 @@ void opt_rflov_mesh( const Router *r, const Flit *f, int in_channel,
   }
 
   if (escape == true) {
-    if (cur < gNodes - gK && (cur % gK != dest % gK) && (cur / gK != dest / gK))
+    // deadlock-free by turn-model, can go x dimension to reduce load in bottom active row
+    if (cur < gNodes - gK && (cur % gK != dest % gK) && (cur / gK != dest / gK) && out_port == 3)
       out_port = 2;
     vcEnd = vcBegin;
   } else
@@ -2179,7 +2180,8 @@ void opt_flov_mesh( const Router *r, const Flit *f, int in_channel,
   }
 
   if (escape == true) {
-    if (cur < gNodes - gK && (cur % gK != dest % gK) && (cur / gK != dest / gK))
+    // deadlock-free by turn-model, can go x dimension to reduce load in bottom active row
+    if (cur < gNodes - gK && (cur % gK != dest % gK) && (cur / gK != dest / gK) && out_port == 3)
       out_port = 2;
     vcEnd = vcBegin;
   } else
