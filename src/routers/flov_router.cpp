@@ -102,7 +102,7 @@ void FLOVRouter::PowerStateEvaluate()
     _drain_tags.resize(_inputs - 1, false);
     if (_outstanding_requests)
       if (_idle_timer > 0)
-        _idle_timer = 0; //--_idle_timer;  // or should be 0?
+        _idle_timer = 0;
     if (_wakeup_signal == true) {
       _wakeup_signal = false;
       _idle_timer = 0;
@@ -1303,10 +1303,9 @@ void FLOVRouter::_SWAllocUpdate( )
                 }
               }
             } else {
-              ostringstream err;
-              err << "Something wrong in the pipeline stage";
-              Error(err.str());
-              //dest_buf->ReturnBuffer(match_vc);
+              assert(f->head);
+              assert(cur_buf->GetState(vc) == VC::active);
+              dest_buf->ReturnBuffer(match_vc);
             }
             cur_buf->ClearRouteSet(vc);
             cur_buf->SetState(vc, VC::routing);
@@ -1899,9 +1898,10 @@ void FLOVRouter::_HandshakeEvaluate() {
         // The one send the drain tag maybe is draining and back to on since I have
         // higher priority, and send the tag at the same time.
         assert(_downstream_states[input] == power_on || h->new_state == power_on);
-        if (_drain_tags[input])
+        if (_drain_tags[input]) {
           cout << GetSimTime() << " | " << FullName() << " | router#" << _id
             << " has received drain tag from input " << input << endl;
+        }
         assert(!_drain_tags[input]);
         if (h->hid == _req_hids[input])
           _drain_tags[input] = true;
