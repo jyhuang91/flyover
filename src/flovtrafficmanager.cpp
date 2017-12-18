@@ -1663,98 +1663,101 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //    }
 //}
 
-//void FLOVTrafficManager::DisplayOverallStats( ostream & os ) const {
-//
-//    os << "====== Overall Traffic Statistics ======" << endl;
-//    for ( int c = 0; c < _classes; ++c ) {
-//
-//        if(_measure_stats[c] == 0) {
-//            continue;
-//        }
-//
-//        os << "====== Traffic class " << c << " ======" << endl;
-//    
-//        os << "Packet latency average = " << _overall_avg_plat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_plat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_plat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//
-//        os << "Network latency average = " << _overall_avg_nlat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_nlat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_nlat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//
-//        os << "Flit latency average = " << _overall_avg_flat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_flat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_flat[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//
-//        os << "Fragmentation average = " << _overall_avg_frag[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_frag[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_frag[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//
-//        os << "Injected packet rate average = " << _overall_avg_sent_packets[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_sent_packets[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_sent_packets[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//    
-//        os << "Accepted packet rate average = " << _overall_avg_accepted_packets[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_accepted_packets[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_accepted_packets[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//
-//        os << "Injected flit rate average = " << _overall_avg_sent[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_sent[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_sent[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//    
-//        os << "Accepted flit rate average = " << _overall_avg_accepted[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tminimum = " << _overall_min_accepted[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//        os << "\tmaximum = " << _overall_max_accepted[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//    
-//        os << "Injected packet size average = " << _overall_avg_sent[c] / _overall_avg_sent_packets[c]
-//           << " (" << _total_sims << " samples)" << endl;
-//
-//        os << "Accepted packet size average = " << _overall_avg_accepted[c] / _overall_avg_accepted_packets[c]
-//           << " (" << _total_sims << " samples)" << endl;
-//    
-//        os << "Hops average = " << _overall_hop_stats[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//    
-//#ifdef TRACK_STALLS
-//        os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl
-//           << "Buffer conflict stall rate = " << (double)_overall_buffer_conflict_stalls[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl
-//           << "Buffer full stall rate = " << (double)_overall_buffer_full_stalls[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl
-//           << "Buffer reserved stall rate = " << (double)_overall_buffer_reserved_stalls[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl
-//           << "Crossbar conflict stall rate = " << (double)_overall_crossbar_conflict_stalls[c] / (double)_total_sims
-//           << " (" << _total_sims << " samples)" << endl;
-//#endif
-//    
-//    }
-//  
-//}
+void FLOVTrafficManager::DisplayOverallStats( ostream & os ) const {
+
+    os << "====== Overall Traffic Statistics ======" << endl;
+    for ( int c = 0; c < _classes; ++c ) {
+
+        if(_measure_stats[c] == 0) {
+            continue;
+        }
+
+        os << "====== Traffic class " << c << " ======" << endl;
+
+        os << "Packet latency average = " << _overall_avg_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Network latency average = " << _overall_avg_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Flit latency average = " << _overall_avg_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Fragmentation average = " << _overall_avg_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected packet rate average = " << _overall_avg_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted packet rate average = " << _overall_avg_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected flit rate average = " << _overall_avg_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted flit rate average = " << _overall_avg_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected packet size average = " << _overall_avg_sent[c] / _overall_avg_sent_packets[c]
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted packet size average = " << _overall_avg_accepted[c] / _overall_avg_accepted_packets[c]
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Hops average = " << _overall_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "FLOV hops average = " << _overall_flov_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+#ifdef TRACK_STALLS
+        os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer conflict stall rate = " << (double)_overall_buffer_conflict_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer full stall rate = " << (double)_overall_buffer_full_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer reserved stall rate = " << (double)_overall_buffer_reserved_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Crossbar conflict stall rate = " << (double)_overall_crossbar_conflict_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+#endif
+
+    }
+
+}
 
 //string FLOVTrafficManager::_OverallStatsCSV(int c) const
 //{
