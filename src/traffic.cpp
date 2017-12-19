@@ -28,6 +28,7 @@
 #include <iostream>
 #include <sstream>
 #include <ctime>
+#include <cmath>
 #include "random_utils.hpp"
 #include "traffic.hpp"
 
@@ -295,6 +296,18 @@ TornadoTrafficPattern::TornadoTrafficPattern(int nodes, int k, int n, int xr)
 int TornadoTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
+
+  /* ==== Power Gate - Begin ==== */
+  // from RP paper, garnet and other source, tornado is different in booksim
+  int src_x = source % _k;
+  int src_y = source / _k;
+
+  int dest_x = (src_x + (int) ceil(_k / 2) - 1) % _k;
+  int dest_y = src_y;
+  int dest = dest_y * _k + dest_x;
+
+  return dest;
+  /* ==== Power Gate - End ==== */
 
   int offset = 1;
   int result = 0;
