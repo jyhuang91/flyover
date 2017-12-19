@@ -48,7 +48,9 @@ public:
 	    int inputs, int outputs );
   
   virtual ~RPRouter( );
-  
+
+  virtual void PowerStateEvaluate( );
+
 };
 
 #endif
