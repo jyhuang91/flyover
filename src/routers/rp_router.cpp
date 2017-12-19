@@ -58,6 +58,14 @@ RPRouter::~RPRouter( )
 }
 
 
+void RPRouter::PowerStateEvaluate( )
+{
+  if (_power_state == power_off) {
+    ++_power_off_cycles;
+    ++_total_power_off_cycles;
+  }
+}
+
 
 //------------------------------------------------------------------------------
 // input queuing
