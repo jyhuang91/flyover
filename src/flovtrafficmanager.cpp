@@ -294,12 +294,8 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
     assert(_cur_pid);
     int packet_destination = _traffic_pattern[cl]->dest(source);
     /* ==== Power Gate - Begin ==== */
-    if (_traffic[cl] == "tornado") {
-        for (int i = 1; i < _nodes; ++i) {
-            packet_destination = _traffic_pattern[cl]->dest((source+i)%_nodes);
-            if (core_states[packet_destination] == true)
-                break;
-        }
+    if (_traffic[cl] == "tornado" && core_states[packet_destination] == false) {
+        packet_destination = source;
     } else {
         while (core_states[packet_destination] != true)
             packet_destination = _traffic_pattern[cl]->dest(source);
@@ -453,18 +449,6 @@ void FLOVTrafficManager::_Inject()
                     int stype = _IssuePacket( input, c );
 	  
                     if ( stype != 0 ) { //generate a packet
-                        /* ==== Power Gate - Begin ==== */
-                        int i = 0;
-                        if (_traffic[c] == "tornado") {
-                            for (i = 0; i < _nodes; ++i) {
-                                int pkt_dest = _traffic_pattern[c]->dest((input+i)%_nodes);
-                                if (core_states[pkt_dest] == true)
-                                    break;
-                            }
-                        }
-                        if (i == _nodes)
-                            break;
-                        /* ==== Power Gate - End ==== */
                         _GeneratePacket( input, stype, c, 
                                          _include_queuing==1 ? 
                                          _qtime[input][c] : _time );

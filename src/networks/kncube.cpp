@@ -106,6 +106,9 @@ void KNCube::_BuildNet( const Configuration &config )
     bool is_rp = (type == "rp");
     if (_router_states[node] == false) {
       _routers[node]->SetRouterState(false);
+      if (is_rp) {
+        _routers[node]->SetPowerState(Router::power_off);
+      }
     } else if (is_rp) {
       RouteTbl rt = RouteTbl(node, _size, _router_states);
       rt.BuildRoute();
