@@ -1560,12 +1560,13 @@ void FLOVRouter::_SWAllocUpdate( )
 #endif
 
       /* ==== Power Gate - Begin ==== */
-      if (GetSimTime() - f->rtime == 300 && f->head) { // timeout
-        int const input = item.second.first.first;
-        assert((input >= 0) && (input < _inputs));
-        int const vc = item.second.first.second;
-        assert((vc >= 0) && (vc < _vcs));
-        Buffer * const cur_buf = _buf[input];
+      int const input = item.second.first.first;
+      assert((input >= 0) && (input < _inputs));
+      int const vc = item.second.first.second;
+      assert((vc >= 0) && (vc < _vcs));
+      Buffer * const cur_buf = _buf[input];
+      int const escape_vc = 0;
+      if (GetSimTime() - f->rtime == 300 && f->head && cur_buf->GetOutputVC(vc) != escape_vc) { // timeout
         if (cur_buf->GetState(vc) == VC::active) {
           int const dest_output = cur_buf->GetOutputPort(vc);
           assert((dest_output >= 0) && (dest_output < _outputs));
