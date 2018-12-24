@@ -19,8 +19,10 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
   : _src(src), _num_nodes(num_nodes), _router_states(router_states)
 {
   _Init();
+  _rt_tbl.resize(_num_nodes, INVALID);
+  _esc_rt_tbl.resize(_num_nodes, INVALID);
 
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << "Power-on routers: ";
   for (int i = 0; i < _num_nodes; i++) {
     if (_router_states[i])
@@ -54,12 +56,11 @@ RouteTbl::RouteTbl(int src, int num_nodes, vector<bool> router_states)
       }
     }
   }
-#ifdef DEBUG
-  cout << "Adjacent Matrix: " << endl;
+#ifdef DEBUG_ROUTE
+  cout << "Adjacent List: " << endl;
   for (int i = 0; i < _num_nodes; i++) {
     cout << i << ": ";
     for (int j = 0; j < _num_nodes; j++) {
-      //cout << _adj_mtx[i][j] << " ";
       if (_adj_mtx[i][j] > 0)
         cout << j << " ";
     }
@@ -76,15 +77,12 @@ void RouteTbl::_Init()
   _visited.resize(_num_nodes, false);
   _pred.resize(_num_nodes, -1);
   _dist.resize(_num_nodes, numeric_limits<int>::max());
-  //_dist.resize(_num_nodes, INFINITY);
   _dist[_src] = 0;
-  _rt_tbl.resize(_num_nodes, INVALID);
-  _esc_rt_tbl.resize(_num_nodes, INVALID);
 }
 
 int RouteTbl::_ClosestUnvisited()
 {
-  int min_dist = numeric_limits<int>::max();//INFINITY;
+  int min_dist = numeric_limits<int>::max();
   int closest = -1;
   for (int i = 0; i < _num_nodes; i++) {
     if (!_visited[i] && (min_dist >= _dist[i])) {
@@ -175,7 +173,7 @@ void RouteTbl::BuildRoute()
         dir = EAST;
       } else if (coord == -1) {
         dir = WEST;
-      } else if (coord == 8) {
+      } else if (coord == gK) {
         dir = SOUTH;
       } else {
         dir = NORTH;
@@ -185,7 +183,7 @@ void RouteTbl::BuildRoute()
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << endl;
   cout << "Regular routes:" << endl;
   _PrintAllPath();
@@ -201,8 +199,10 @@ void RouteTbl::BuildEscRoute(int root)
     _updown_adj_mtx[i][i] = 0;
   }
 
+  _visited.clear();
   _visited.resize(_num_nodes, false);
   _BFS(root);
+  _CalUpDownDist();
 
   _esc_rt_tbl.resize(_num_nodes, INVALID);
   for (int i = 0; i < _num_nodes; i++) {
@@ -223,7 +223,7 @@ void RouteTbl::BuildEscRoute(int root)
         dir = EAST;
       } else if (coord == -1) {
         dir = WEST;
-      } else if (coord == 8) {
+      } else if (coord == gK) {
         dir = SOUTH;
       } else {
         dir = NORTH;
@@ -232,7 +232,7 @@ void RouteTbl::BuildEscRoute(int root)
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ROUTE
   cout << "Escape Up*/Down* tree routes:" << endl;
   _PrintAllPath();
 #endif
@@ -245,13 +245,13 @@ void RouteTbl::_BFS(int current)
   deque<int> bfs_q;
 
   bfs_q.push_back(current);
-  _visited[current] = 1;
+  _visited[current] = true;
 
   while (!bfs_q.empty()) {
     current = bfs_q.front();
     bfs_q.pop_front();
     for (int i = 0; i < _num_nodes; i++) {
-      if (_adj_mtx[current][i] == 1 && _visited[i] == 0) {
+      if (_adj_mtx[current][i] == 1 && _visited[i] == false) {
         _updown_adj_mtx[current][i] = 1;
         _updown_adj_mtx[i][current] = 1;
         _visited[i] = true;

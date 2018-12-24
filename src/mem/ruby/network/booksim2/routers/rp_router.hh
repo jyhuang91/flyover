@@ -34,6 +34,8 @@ class RPRouter : public IQRouter {
 
 protected:
 
+  virtual void _InternalStep( );
+
   virtual void _InputQueuing( );
 
   virtual void _RouteUpdate( );
@@ -48,6 +50,8 @@ public:
           int inputs, int outputs );
 
   virtual ~RPRouter( );
+
+  virtual void PowerStateEvaluate( );
 
 };
 

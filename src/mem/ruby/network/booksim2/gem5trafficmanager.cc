@@ -570,7 +570,7 @@ void Gem5TrafficManager::_Step()
         }
         flits[subnet].clear();
         /* ==== Power Gate - Begin ==== */
-        //_net[subnet]->PowerStateEvaluate();
+        _net[subnet]->PowerStateEvaluate();
         /* ==== Power Gate - End ==== */
         _net[subnet]->Evaluate();
         _net[subnet]->WriteOutputs();

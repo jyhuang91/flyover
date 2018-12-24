@@ -96,7 +96,7 @@ void FlitChannel::ReadInputs() {
     if (f->src == _routerSink->GetID())
       _routerSink->WakeUp();
   }
-  /* ==== Power Gate - Begin ==== */
+  /* ==== Power Gate - End ==== */
   Channel<Flit>::ReadInputs();
 }
 

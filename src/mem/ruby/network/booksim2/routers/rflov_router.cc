@@ -25,7 +25,7 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "mem/ruby/network/booksim2/routers/flov_router.hh"
+#include "mem/ruby/network/booksim2/routers/rflov_router.hh"
 
 #include <string>
 #include <sstream>
@@ -47,41 +47,33 @@
 #include "mem/ruby/network/booksim2/power/switch_monitor.hh"
 #include "mem/ruby/network/booksim2/power/buffer_monitor.hh"
 
-FLOVRouter::FLOVRouter( Configuration const & config, Module *parent, 
+RFLOVRouter::RFLOVRouter( Configuration const & config, Module *parent, 
     string const & name, int id, int inputs, int outputs )
-: IQRouter( config, parent, name, id, inputs, outputs )
+  : IQRouter( config, parent, name, id, inputs, outputs )
 {
   /* ==== Power Gate - Begin ==== */
-  // Alloc credit counter for FLOV flow contrl
+  // Alloc credit counter for RFLOV flow contrl
   _credit_counter.resize(_outputs);
   for (int k = 0; k < _outputs; ++k) {
     _credit_counter[k].resize(_vcs, 0);
   }
-//  _clear_credits.resize(_outputs - 1, false);
-//  _drain_done_sent.resize(_outputs - 1, false);
-//  _drain_tags.resize(_inputs - 1, false);
-//
-//  _handshake_buffer.resize(_outputs - 1);
+  //_drain_done_sent.resize(_outputs - 1, false);
+  //_drain_tags.resize(_inputs - 1, false);
 
-  _clear_credits.resize(4, false);
+  //_handshake_buffer.resize(_outputs - 1);
+
   _drain_done_sent.resize(4, false);
   _drain_tags.resize(4, false);
 
   _handshake_buffer.resize(4);
   /* ==== Power Gate - End ==== */
-
-  cout << FullName() << " | flov | "
-      << inputs << " inputs, "
-      << outputs << " outputs."
-      << endl;
-
 }
 
-FLOVRouter::~FLOVRouter( )
+RFLOVRouter::~RFLOVRouter( )
 {
 }
 
-void FLOVRouter::ReadInputs( )
+void RFLOVRouter::ReadInputs( )
 {
   bool have_flits = _ReceiveFlits( );
   bool have_credits = _ReceiveCredits( );
@@ -95,7 +87,7 @@ void FLOVRouter::ReadInputs( )
 }
 
 /* ==== Power Gate - Begin ==== */
-void FLOVRouter::PowerStateEvaluate()
+void RFLOVRouter::PowerStateEvaluate()
 {
   if (_outstanding_requests) {
     assert(_power_state == power_on);
@@ -112,23 +104,28 @@ void FLOVRouter::PowerStateEvaluate()
     //_drain_tags.resize(_inputs - 1, false);
     _drain_tags.resize(4, false);
     if (_outstanding_requests)
-        _idle_timer = 0;
+      _idle_timer = 0;
     if (_wakeup_signal == true) {
       _wakeup_signal = false;
       _idle_timer = 0;
     } else if (_router_state == false) {
       assert(_outstanding_requests == 0);
-      bool neighbor_draining_wakeup = false;
-      // constraints: no 'neighbor' routers can drian/drain or drain/wakeup at the same time
-      //for (int out = 0; out < _outputs - 1; ++out) {
-      for (int out = 0; out < 4; ++out) {
-        if (_downstream_states[out] == draining ||
-            _downstream_states[out] == wakeup) {
-          neighbor_draining_wakeup = true;
+      bool neighbor_draining = false;
+      bool neighbor_off = false;
+      for (int out = 0; out < _outputs - 1; ++out) {
+        if (_neighbor_states[out] == draining) {
+          neighbor_draining = true;
+          break;
+        } else if (_neighbor_states[out] == power_off ||
+            _neighbor_states[out] == wakeup) {
+          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
+              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
+            continue;
+          neighbor_off = true;
           break;
         }
       }
-      if (!neighbor_draining_wakeup) {
+      if (!neighbor_draining && !neighbor_off) {
         _power_state = draining;
         _idle_timer = 0;
         _drain_timer = 0;
@@ -139,19 +136,19 @@ void FLOVRouter::PowerStateEvaluate()
         assert(_out_queue_handshakes.empty());
         //for (int out = 0; out < _outputs - 1; ++out) {
         for (int out = 0; out < 4; ++out) {
-          if (_downstream_states[out] == power_off)
-            _drain_tags[out] = true;
           if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
+              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0)) {
+            _drain_tags[out] = true;
             continue;
+          }
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
           _out_queue_handshakes[out]->new_state = draining;
-          _out_queue_handshakes[out]->src_state = _power_state;
+          //_out_queue_handshakes[out]->src_state = _power_state;
           _out_queue_handshakes[out]->id = _id;
           _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
       } else {
-        --_idle_timer;
+        _idle_timer = 0;
       }
     }
     break;
@@ -160,17 +157,22 @@ void FLOVRouter::PowerStateEvaluate()
   case draining: {
     assert(_outstanding_requests == 0);
     ++_drain_timer;
-    bool neighbor_wakeup = false;
     bool neighbor_draining = false;
+    bool neighbor_off_wakeup = false;
     //for (int out = 0; out < _outputs - 1; ++out) {
     for (int out = 0; out < 4; ++out) {
-      if (_downstream_states[out] == wakeup)
-        neighbor_wakeup = true;
-      if (_downstream_states[out] == draining)
-        if (out == 1 || out == 3) // They have higher priority
-          neighbor_draining = true;
-      if (neighbor_draining || neighbor_wakeup)
+      if (_neighbor_states[out] == draining && (out == 1 || out == 3)) {
+        neighbor_draining = true;
         break;
+      } else if (_neighbor_states[out] == wakeup) {
+        neighbor_off_wakeup = true;
+        break;
+      } else if (_neighbor_states[out] == power_off) {
+        if ( (out == 1 && (_id % gK != 0)) || (out ==3 && (_id / gK != 0)) ) {
+          neighbor_off_wakeup = true;
+          break;
+        }
+      }
     }
     bool drain_done = _drain_tags[0] && _drain_tags[1] &&
       _drain_tags[2] && _drain_tags[3];
@@ -186,7 +188,7 @@ void FLOVRouter::PowerStateEvaluate()
       }
       drain_done &= _output_buffer[in_port].empty();
     }
-    if (_wakeup_signal == true || neighbor_draining || neighbor_wakeup) {
+    if (_wakeup_signal == true) {
       _wakeup_signal = false;
       _power_state = power_on;
       _drain_tags.clear();
@@ -195,17 +197,29 @@ void FLOVRouter::PowerStateEvaluate()
       _idle_timer = 0;
       _drain_timer = 0;
       assert(_out_queue_handshakes.empty());
-      //for (int out = 0; out < _outputs - 1; ++out) {
-      for (int out = 0; out < 4; ++out) {
+      for (int out = 0; out < _outputs - 1; ++out) {
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
             (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
           continue;
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
-        _out_queue_handshakes[out]->src_state = _power_state;
+        //_out_queue_handshakes[out]->src_state = _power_state;
         _out_queue_handshakes[out]->id = _id;
         _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
+    } else if (neighbor_draining || neighbor_off_wakeup) {
+      _power_state = power_on;
+      _drain_tags.clear();
+      _drain_tags.resize(_inputs - 1, false);
+      assert(_out_queue_handshakes.empty());
+      for (int out = 0; out < _outputs - 1; ++out) {// may not needed due to the priority
+        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+        _out_queue_handshakes[out]->new_state = power_on;
+        _out_queue_handshakes[out]->id = _id;
+        _out_queue_handshakes[out]->hid = ++_req_hids[out];
+      }
+      _idle_timer = 0;
+      _drain_timer = 0;
     } else if (drain_done) {
       for (int i = 0; i < 4; ++i) {
         if ((i == 0 && _id % gK == 0) || (i == 1 && _id % gK == gK-1) ||
@@ -224,20 +238,17 @@ void FLOVRouter::PowerStateEvaluate()
       //_drain_tags.resize(_inputs - 1, false);
       _off_timer = 0;
       assert(_out_queue_handshakes.empty());
-      //for (int out = 0; out < _outputs - 1; ++out) {
-      for (int out = 0; out < 4; ++out) {
+      for (int out = 0; out < _outputs - 1; ++out) {
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
             (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
           continue;
-        int in = out;
-        if (out % 2)
-          --in;
-        else
-          ++in;
+        //        int in = out;
+        //        if (out % 2)
+        //          --in;
+        //        else
+        //          ++in;
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-        _out_queue_handshakes[out]->new_state = _downstream_states[in];
-        _out_queue_handshakes[out]->logical_neighbor = _logical_neighbors[in];
-        _out_queue_handshakes[out]->src_state = _power_state;
+        _out_queue_handshakes[out]->new_state = power_off;
         _out_queue_handshakes[out]->id = _id;
         _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
@@ -261,13 +272,10 @@ void FLOVRouter::PowerStateEvaluate()
           continue;	// for edge routers
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
-        _out_queue_handshakes[out]->src_state = _power_state;
         _out_queue_handshakes[out]->id = _id;
         _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
-      if (_drain_timer > _drain_threshold) {
-        ++_drain_timeout_counter;
-      }
+      ++_drain_timeout_counter;
       _drain_time_q.push_back(_drain_timer);
       if (_max_drain_time < _drain_timer)
         _max_drain_time = _drain_timer;
@@ -292,24 +300,7 @@ void FLOVRouter::PowerStateEvaluate()
     ++_total_power_off_cycles;
     if (_router_state) {
       ++_off_timer;
-      bool neighbor_wakeup = false;
-      bool neighbor_draining = false;
-      //for (int out = 0; out < _outputs - 1; ++out) {
-      for (int out = 0; out < 4; ++out) {
-        if (_downstream_states[out] == wakeup) {
-          neighbor_wakeup = true;
-          break;
-        } else if (_downstream_states[out] == draining) {
-          neighbor_draining = true;
-          break;
-        }
-      }
-      // NOTE: if I have handshake to relay, I should delay my own handshake.
-      //       Otherwise, if the handshake to be relay is for state change from
-      //       draining->off, the credit is not initialized while my own state
-      //       change off->wakeup is sent, credit may overflow
-      if (!neighbor_wakeup && _off_timer >= _bet_threshold &&
-          _out_queue_handshakes.empty() && !neighbor_draining) {
+      if (_off_timer >= _bet_threshold) {
         _wakeup_signal = false;
         _power_state = wakeup;
         _wakeup_timer = 0;
@@ -321,14 +312,13 @@ void FLOVRouter::PowerStateEvaluate()
         assert(_out_queue_handshakes.empty());
         //for (int out = 0; out < _outputs - 1; ++out) {
         for (int out = 0; out < 4; ++out) {
-          if (_downstream_states[out] == power_off)
-            _drain_tags[out] = true;          
-          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0)
-              || (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
+          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
+              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0)) {
+            _drain_tags[out] = true;
             continue;
+          }
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
           _out_queue_handshakes[out]->new_state = wakeup;
-          _out_queue_handshakes[out]->src_state = _power_state;
           _out_queue_handshakes[out]->id = _id;
           _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
@@ -344,63 +334,30 @@ void FLOVRouter::PowerStateEvaluate()
         assert(cur_buf->GetState(vc) == VC::idle);
       }
     }
-    //for (int out = 0; out < _outputs-1; ++out) {
-    for (int out = 0; out < 4; ++out) {
-      if (_downstream_states[out] == power_off)
-        _drain_tags[out] = true;
-    }
-    // don't consider draining since wakeup has higher priority
-    // NOTE: can wake up at the same time, the handshake relaying is done
-    // in _HandshakeEvaluate()
     bool drain_done = _drain_tags[0] && _drain_tags[1] &&
       _drain_tags[2] && _drain_tags[3];
     drain_done &= _in_queue_flits.empty();
     ++_wakeup_timer;
-    // NOTE: if I have handshake to relay, I should keep my state and delay my own handshake
-    if (drain_done && _wakeup_timer >= _wakeup_threshold && 
-        _out_queue_handshakes.empty()) {
+    if (drain_done && _wakeup_timer >= _wakeup_threshold) { 
       _wakeup_signal = false;
       _wakeup_timer = 0;
       _idle_timer = 0;
       _power_state = power_on;
       _drain_tags.clear();
-      _drain_tags.resize(4, false);
       //_drain_tags.resize(_inputs - 1, false);
-      // _out_queue_handshakes don't need to be empty when it needs
-      // to relay drain_tag for downstream waking up routers
-      //assert(_out_queue_handshakes.empty()); // the why assertion???
+      _drain_tags.resize(4, false);
+      assert(_out_queue_handshakes.empty());
       //for (int out = 0; out < _outputs - 1; ++out) {
       for (int out = 0; out < 4; ++out) {
-        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-            (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-          continue;
-        if (_out_queue_handshakes.count(out) == 0)
-          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
-        _out_queue_handshakes[out]->logical_neighbor = _id;
-        _out_queue_handshakes[out]->src_state = _power_state;
         _out_queue_handshakes[out]->id = _id;
         _out_queue_handshakes[out]->hid = ++_req_hids[out];
-      }
-      // set drain_done_tag based on my downstream information
-      // not very clear here, 10/15/16
-      //for (int out = 0; out < _outputs-1; ++out) {
-      for (int out = 0; out < 4; ++out) {
-        if (_downstream_states[out] == wakeup || _downstream_states[out] == draining) {
-          int opp_out = out;
-          if (out % 2)
-            --opp_out;
-          else
-            ++opp_out;
-          if (_downstream_states[opp_out] == power_off) {
-            _drain_done_sent[out] = true;
-          }
-        }
       }
     }
     break;
   }
-  
+
   default: // Must be something wrong
     ostringstream err;
     err << "Something wrong in the power state transition state machine";
@@ -411,15 +368,13 @@ void FLOVRouter::PowerStateEvaluate()
 
 
 
-void FLOVRouter::_InternalStep( )
+void RFLOVRouter::_InternalStep( )
 {
   /* ==== Power Gate - Begin ==== */
   if (_power_state == power_off || _power_state == wakeup) {
-    _FlovStep();
+    _RFlovStep();
     _OutputQueuing();
     assert(_out_queue_handshakes.empty());
-    //_active = !_out_queue_handshakes.empty() || ...
-    _active = !_proc_credits.empty() || !_in_queue_flits.empty();
     return;
   }
   /* ==== Power Gate - End ==== */
@@ -494,7 +449,7 @@ void FLOVRouter::_InternalStep( )
   _switchMonitor->cycle( );
 }
 
-void FLOVRouter::WriteOutputs( )
+void RFLOVRouter::WriteOutputs( )
 {
   _SendFlits( );
   _SendCredits( );
@@ -509,7 +464,7 @@ void FLOVRouter::WriteOutputs( )
 //------------------------------------------------------------------------------
 
 /* ==== Power Gate - Begin ==== */
-void FLOVRouter::_ReceiveHandshakes()
+void RFLOVRouter::_ReceiveHandshakes()
 {
   //for (int input = 0; input < _inputs - 1; ++input) {
   for (int input = 0; input < 4; ++input) {
@@ -525,7 +480,7 @@ void FLOVRouter::_ReceiveHandshakes()
 // input queuing
 //------------------------------------------------------------------------------
 
-void FLOVRouter::_InputQueuing( )
+void RFLOVRouter::_InputQueuing( )
 {
   for(map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
       iter != _in_queue_flits.end();
@@ -651,7 +606,7 @@ void FLOVRouter::_InputQueuing( )
 // routing
 //------------------------------------------------------------------------------
 
-void FLOVRouter::_RouteUpdate( )
+void RFLOVRouter::_RouteUpdate( )
 {
   assert(_routing_delay);
 
@@ -691,7 +646,7 @@ void FLOVRouter::_RouteUpdate( )
     cur_buf->SetState(vc, VC::vc_alloc);
     /* ==== Power Gate - Begin ==== */
     // avoid rerouting by VCAlloc again and again
-    f->rtime = GetSimTime();
+    //f->rtime = GetSimTime();
 
     if (f->dest_router != _id) {
       OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
@@ -736,7 +691,7 @@ void FLOVRouter::_RouteUpdate( )
 // VC allocation
 //------------------------------------------------------------------------------
 
-void FLOVRouter::_VCAllocUpdate( )
+void RFLOVRouter::_VCAllocUpdate( )
 {
   assert(_vc_allocator);
 
@@ -789,9 +744,8 @@ void FLOVRouter::_VCAllocUpdate( )
       Router * router = channel->GetSink();
       if (router) {
         const bool is_mc = (router->GetID() >= gNodes - gK);
-        if (!is_mc && (_downstream_states[match_output] == draining ||
-              _downstream_states[match_output] == wakeup ||
-              _downstream_states[match_output] == power_off))
+        if (!is_mc && (_neighbor_states[match_output] == draining ||
+              _neighbor_states[match_output] == wakeup))
           back_to_route = true;
       }
       if (!back_to_route) {
@@ -830,7 +784,7 @@ void FLOVRouter::_VCAllocUpdate( )
           assert(f->head);
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
             << " Sink router " << router->GetID() << " is "
-            << POWERSTATE[_downstream_states[match_output]]
+            << POWERSTATE[_neighbor_states[match_output]]
             << ", back to RC stage." << endl;
 
           cur_buf->Display(*gWatchOut);
@@ -881,9 +835,8 @@ void FLOVRouter::_VCAllocUpdate( )
         Router * router = channel->GetSink();
         if (router) {
           const bool is_mc = (router->GetID() >= gNodes - gK);
-          if (!is_mc && (_downstream_states[out_port] == draining ||
-                _downstream_states[out_port] == wakeup ||
-                _downstream_states[out_port] == power_off))
+          if (!is_mc && (_neighbor_states[out_port] == draining ||
+                _neighbor_states[out_port] == wakeup))
             delete_route = true;
         }
 
@@ -895,7 +848,7 @@ void FLOVRouter::_VCAllocUpdate( )
           ++iset;
         }
       }
-      
+
       if (setlist.empty()) {
         back_to_route = true;
       }
@@ -945,7 +898,7 @@ void FLOVRouter::_VCAllocUpdate( )
 // switch holding
 //------------------------------------------------------------------------------
 
-void FLOVRouter::_SWHoldUpdate( )
+void RFLOVRouter::_SWHoldUpdate( )
 {
   assert(_hold_switch_for_packet);
 
@@ -1066,10 +1019,11 @@ void FLOVRouter::_SWHoldUpdate( )
 
       _crossbar_flits.push_back(make_pair(-1, make_pair(f, make_pair(expanded_input, expanded_output))));
 
+      assert(input >= 0 && input < _inputs);
       if(_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
       }
-      _out_queue_credits[input]->vc.insert(vc);
+      _out_queue_credits.find(input)->second->vc.insert(vc);
 
       if(cur_buf->Empty(vc)) {
         if(f->watch) {
@@ -1167,7 +1121,7 @@ void FLOVRouter::_SWHoldUpdate( )
 // switch allocation
 //------------------------------------------------------------------------------
 
-void FLOVRouter::_SWAllocUpdate( )
+void RFLOVRouter::_SWAllocUpdate( )
 {
   while(!_sw_alloc_vcs.empty()) {
 
@@ -1307,9 +1261,8 @@ void FLOVRouter::_SWAllocUpdate( )
           Router * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
-            if (!is_mc && (_downstream_states[output] == draining ||
-                  _downstream_states[output] == wakeup ||
-                  _downstream_states[output] == power_off)) {
+            if (!is_mc && (_neighbor_states[output] == draining ||
+                  _neighbor_states[output] == wakeup)) {
               back_to_route = true;
             }
           }
@@ -1318,7 +1271,7 @@ void FLOVRouter::_SWAllocUpdate( )
             if (f->watch) {
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                 << " SA: Sink router " << router->GetID() << " is "
-                << POWERSTATE[_downstream_states[output]]
+                << POWERSTATE[_neighbor_states[output]]
                 << ", back to RC stage." << endl;
             }
             if (cur_buf->GetState(vc) == VC::vc_alloc) {
@@ -1332,8 +1285,6 @@ void FLOVRouter::_SWAllocUpdate( )
                 }
               }
             } else {
-              assert(f->head);
-              assert(cur_buf->GetState(vc) == VC::active);
               dest_buf->ReturnBuffer(match_vc);
             }
             cur_buf->ClearRouteSet(vc);
@@ -1412,10 +1363,11 @@ void FLOVRouter::_SWAllocUpdate( )
 
       _crossbar_flits.push_back(make_pair(-1, make_pair(f, make_pair(expanded_input, expanded_output))));
 
+      assert(input >= 0 && input < _inputs);
       if(_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
       }
-      _out_queue_credits[input]->vc.insert(vc);
+      _out_queue_credits.find(input)->second->vc.insert(vc);
 
       if(cur_buf->Empty(vc)) {
         if(f->tail) {
@@ -1479,14 +1431,14 @@ void FLOVRouter::_SWAllocUpdate( )
       /* ==== Power Gate - Begin ==== */
       // in SA, push back to RC if downstream router is draining
       if (f->head) {
-        
+
         bool back_to_route = false;
 
         int output = cur_buf->GetOutputPort(vc);
         int match_vc = cur_buf->GetOutputVC(vc);
 
         if (cur_buf->GetState(vc) == VC::vc_alloc) { // mis-speculation
-          
+
           assert(_speculative);
           assert(output == -1);
           assert(match_vc == -1);
@@ -1507,9 +1459,8 @@ void FLOVRouter::_SWAllocUpdate( )
             Router * router = channel->GetSink();
             if (router) {
               const bool is_mc = (router->GetID() >= gNodes - gK);
-              if (!is_mc && (_downstream_states[out_port] == draining ||
-                    _downstream_states[out_port] == wakeup ||
-                    _downstream_states[out_port] == power_off))
+              if (!is_mc && (_neighbor_states[out_port] == draining ||
+                    _neighbor_states[out_port] == wakeup))
                 delete_route = true;
             }
 
@@ -1541,8 +1492,8 @@ void FLOVRouter::_SWAllocUpdate( )
           Router * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
-            if (!is_mc && (_downstream_states[output] == draining ||
-                  _downstream_states[output] == wakeup) && !is_mc) {
+            if (!is_mc && (_neighbor_states[output] == draining ||
+                  _neighbor_states[output] == wakeup) && !is_mc) {
               back_to_route = true;
             }
           }
@@ -1551,7 +1502,7 @@ void FLOVRouter::_SWAllocUpdate( )
             dest_buf->ReturnBuffer(match_vc);
           }
         }
-        
+
         // downstream is not power on
         if (back_to_route) {
           cur_buf->ClearRouteSet(vc);
@@ -1589,13 +1540,12 @@ void FLOVRouter::_SWAllocUpdate( )
 #endif
 
       /* ==== Power Gate - Begin ==== */
-      int const input = item.second.first.first;
-      assert((input >= 0) && (input < _inputs));
-      int const vc = item.second.first.second;
-      assert((vc >= 0) && (vc < _vcs));
-      Buffer * const cur_buf = _buf[input];
-      int const escape_vc = 0;
-      if (GetSimTime() - f->rtime == 300 && f->head && cur_buf->GetOutputVC(vc) != escape_vc) { // timeout
+      if (GetSimTime() - f->rtime == 300 && f->head) { // timeout
+        int const input = item.second.first.first;
+        assert((input >= 0) && (input < _inputs));
+        int const vc = item.second.first.second;
+        assert((vc >= 0) && (vc < _vcs));
+        Buffer * const cur_buf = _buf[input];
         if (cur_buf->GetState(vc) == VC::active) {
           int const dest_output = cur_buf->GetOutputPort(vc);
           assert((dest_output >= 0) && (dest_output < _outputs));
@@ -1638,7 +1588,7 @@ void FLOVRouter::_SWAllocUpdate( )
 // output queuing
 //------------------------------------------------------------------------------
 
-void FLOVRouter::_OutputQueuing( )
+void RFLOVRouter::_OutputQueuing( )
 {
   for(map<int, Credit *>::const_iterator iter = _out_queue_credits.begin();
       iter != _out_queue_credits.end();
@@ -1657,16 +1607,16 @@ void FLOVRouter::_OutputQueuing( )
 
   /* ==== Power Gate - Begin ==== */
   for (map<int, Handshake *>::const_iterator iter =
-       _out_queue_handshakes.begin(); iter != _out_queue_handshakes.end();
-       ++iter) {
-    
+      _out_queue_handshakes.begin(); iter != _out_queue_handshakes.end();
+      ++iter) {
+
     int const output = iter->first;
-    assert((output >= 0) && (output < 4));
-    
+    assert((output >= 0) && (output < _outputs - 1));
+
     Handshake * const h = iter->second;
     assert(h);
     assert((h->new_state >= 0 || h->drain_done || h->wakeup) && h->id >= 0);
-    
+
     _handshake_buffer[output].push(h);
   }
   _out_queue_handshakes.clear();
@@ -1678,7 +1628,7 @@ void FLOVRouter::_OutputQueuing( )
 //------------------------------------------------------------------------------
 
 /* ==== Power Gate - Begin ==== */
-void FLOVRouter::_SendHandshakes()
+void RFLOVRouter::_SendHandshakes()
 {
   //for (int output = 0; output < _outputs - 1; ++output) {
   for (int output = 0; output < 4; ++output) {
@@ -1695,12 +1645,10 @@ void FLOVRouter::_SendHandshakes()
 
 /* ==== Power Gate - Begin ==== */
 //--------------------------------
-// FLOV Facilities
+// RFLOV Facilities
 //--------------------------------
 
-
-/* ==== Power Gate - End ==== */
-void FLOVRouter::_FlovStep() {
+void RFLOVRouter::_RFlovStep() {
   assert(_power_state == power_off || _power_state == wakeup);
   assert(_route_vcs.empty());
   assert(_vc_alloc_vcs.empty());
@@ -1712,11 +1660,10 @@ void FLOVRouter::_FlovStep() {
 
   // process flits
   for (map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
-       iter != _in_queue_flits.end(); ++iter) {
+      iter != _in_queue_flits.end(); ++iter) {
 
     int const input = iter->first;
-    //assert((input >= 0) && (input < _inputs - 1));
-    assert((input >= 0) && (input < 4));
+    assert((input >= 0) && (input < _inputs - 1));
 
     Flit * const f = iter->second;
     assert(f);
@@ -1726,7 +1673,7 @@ void FLOVRouter::_FlovStep() {
 
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-      << "Bypass flit " << f->id << " to next router" << endl;
+        << "Bypass flit " << f->id << " to next router" << endl;
     }
 
     int output = input;
@@ -1734,8 +1681,7 @@ void FLOVRouter::_FlovStep() {
       --output;
     else
       ++output;
-    //assert((output >= 0) && (output < _outputs - 1));
-    assert((output >= 0) && (output < 4));
+    assert((output >= 0) && (output < _outputs - 1));
 
     BufferState * const dest_buf = _next_buf[output];
     if (f->head)
@@ -1744,8 +1690,8 @@ void FLOVRouter::_FlovStep() {
 
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-      << "Buffering flit " << f->id << " at output " << output << "."
-      << endl;
+        << "Buffering flit " << f->id << " at output " << output << "."
+        << endl;
     }
     _output_buffer[output].push(f);
 
@@ -1784,7 +1730,7 @@ void FLOVRouter::_FlovStep() {
 
     dest_buf->ProcessCredit(c);
     // relay the credit to the upstream router
-    // FLOV channel input output mapping
+    // RFLOV channel input output mapping
     // input --> output
     //	 0	 -->   1
     //	 1	 -->   0
@@ -1796,20 +1742,23 @@ void FLOVRouter::_FlovStep() {
         --input;
       else
         ++input;
-      //assert((input >= 0) && (input < _inputs - 1));
-      assert((input >= 0) && (input < 4));
-      if ((output == 0 && _id % gK == 0) || (output == 1 && _id % gK == gK-1)
-          || (output == 2 && _id / gK == 0) || (output == 3 && _id / gK == gK-1))
-        c->Free();
-      else if (_power_state == wakeup && _downstream_states[input] == power_off)
-        c->Free();
-      else if (_out_queue_credits.count(input) == 0) {
-        _out_queue_credits.insert(make_pair(input, c));
+      assert((input >= 0) && (input < _inputs - 1));
+      if (_out_queue_credits.count(input) == 0) {
+        _out_queue_credits.insert(make_pair(input, Credit::New()));
+      }
+      set<int>::iterator iter = c->vc.begin();
+      while (iter != c->vc.end()) {
+
+        int const vc = *iter;
+
+        assert((vc >= 0) && (vc < _vcs));
+        _out_queue_credits[input]->vc.insert(vc);
+
+        ++iter;
       }
     }
-    
-    if (output >= 4)
-      c->Free();
+
+    c->Free();
     _proc_credits.pop_front();
   }
 
@@ -1822,6 +1771,7 @@ void FLOVRouter::_FlovStep() {
       ++out;
     for (int vc = 0; vc < _vcs; ++vc) {
       if (_credit_counter[out][vc] > 0) {
+        assert(in >= 0 && in < _inputs -1);
         if (_out_queue_credits.count(in) == 0)
           _out_queue_credits.insert(make_pair(in, Credit::New()));
         if (_out_queue_credits[in]->vc.count(vc) == 0) {
@@ -1833,311 +1783,63 @@ void FLOVRouter::_FlovStep() {
   }
 }
 
-void FLOVRouter::_HandshakeEvaluate() {
-  // Should be evaluated before PowerStateEvaluate(), so put in ReadInputs()
-  assert(_out_queue_handshakes.empty());
-
-  vector<ePowerState> new_downstream_states = _downstream_states;
-
+void RFLOVRouter::_HandshakeEvaluate() {
   while (!_proc_handshakes.empty()) {
     pair<int, Handshake *> const & item = _proc_handshakes.front();
     int const input = item.first;
     int output = input;
-    assert((input >= 0) && (input < 4));
-    if (output % 2)
-      --output;
-    else
-      ++output;
-    assert((output >= 0) && (output < 4));
-    
+    assert((input >= 0) && (input < _inputs - 1));
+
     Handshake * h = item.second;
     assert(h);
-    int src_state = h->src_state;
-    int new_state = h->new_state;
-    
-    switch (_power_state) {
-    case power_on: {  // power on
-      if (src_state >= 0) {
-        if (src_state == power_on) { // drain->on or wakeup->on
-          assert(new_state == power_on);
-          assert(_downstream_states[input] == draining ||
-              _downstream_states[input] == wakeup);
-          if (_downstream_states[input] == wakeup) {// wakeup->on
-#ifdef DEBUG_POWERGATE
-            if (!_drain_done_sent[input]) {
-              cout << GetSimTime() << " | " << FullName()
-              << " | drain tag is not set, may be cleared by the relayed off.\n";
-            }
-#endif
-            assert(_drain_done_sent[input]);
-            _next_buf[input]->FullCredits();
-            _drain_done_sent[input] = false;
-          } else { // drain->on
-            //_drain_done_sent[input] = false;
-          }
-        } else if (src_state == draining) { // on->drain
-          assert(h->new_state == draining);
-          assert(_downstream_states[input] == power_on);
-          _drain_done_sent[input] = false;
-        } else if (src_state == wakeup) { // off->wakeup
-          assert(_downstream_states[input] != wakeup);
-          _drain_done_sent[input] = false;
-        } else if (src_state == power_off) { // drain->off
-          // it can be wakeup, since wakeup will relay power_off for flow control
-          assert(_downstream_states[input] == draining || _downstream_states[input] == wakeup);
-          // drain_tag must be sent for drain, but not received by wakeup, otherwise, it won't
-          // off sice wakeup won't relay drain tag for draining. The sent tag will be cleared
-          // by wakeup handshake
-          if (_downstream_states[input] == draining) {
-            assert(_drain_done_sent[input]);
-            _drain_done_sent[input] = false;
-          }
-          _next_buf[input]->ClearCredits();
-        }
-      }
-      //if (h->drain_done)
-      //  // I was draining previously
-      //  // Or due to draining of my leftside and it back to on,
-      //  // but I wakeup later, and use the first tag to on.
-      //  //assert(0);
-      //  ; // do nothing
-      if (!h->drain_done && src_state >= 0) {
-        _resp_hids[input] = h->hid;
-      }
-    }
-    break;
 
-    case draining: {// draining
-      if (src_state >= 0) {
-        if (src_state == power_on) { // drain->on
-          // if downstream routers are waking up, I cannot drain
-          assert(_downstream_states[input] == draining);
-          _drain_done_sent[input] = false;
-        } else if (src_state == draining) {
-          if (_downstream_states[input] != power_on) {
-            Router * neighbor_router = GetNeighborRouter(input);
-            cout << FullName() << "'s downstream_states[" << input << "] is "
-              << POWERSTATE[_downstream_states[input]]
-              << ", downstream router " << neighbor_router->FullName()
-              << "'s local state " << POWERSTATE[neighbor_router->GetPowerState()] << endl;
-          }
-          assert(_downstream_states[input] == power_on);
-          _drain_done_sent[input] = false;
-          // two routers goes to draining at similar time
-          // do nothing, PowerStateEvaluate() will take care of this case,
-          // only need to update the downstream state
-        } else if (src_state == wakeup) { // off->wakeup
-          assert(_downstream_states[input] != wakeup);
-          _drain_done_sent[input] = false;
-        } else if (src_state == power_off) {
-          // should not happen, I cannot drain if downstream is draining
-          assert(0);
-        }
+    if (h->new_state == power_off) {
+      if (_neighbor_states[output] != draining) {
+        cout << GetSimTime() << output << "'s state: " << POWERSTATE[_neighbor_states[output]] << endl;
       }
-      if (h->drain_done) {
-        // if I'm draining, off router won't wakeup if they have my state,
-        // if they wakeup at the similar time as I drain, no one will send tag to me
-        // The one send the drain tag maybe is draining and back to on since I have
-        // higher priority, and send the tag at the same time.
-        assert(_downstream_states[input] == power_on || h->new_state == power_on ||
-               (h->src_state == -1 && h->new_state == -1));
-        if (_drain_tags[input]) {
-          cout << GetSimTime() << " | " << FullName() << " | router#" << _id
-            << " has received drain tag from input " << input << endl;
-        }
-        assert(!_drain_tags[input]);
-        if (h->hid == _req_hids[input])
-          _drain_tags[input] = true;
-      } else if (src_state >= 0) {
-        _resp_hids[input] = h->hid;
-      }
-    }
-    break;
-
-    case power_off: { // power off
-      if (src_state >= 0) {
-        if (src_state == power_on) {
-          assert(_downstream_states[input] == draining ||
-              _downstream_states[input] == wakeup);
-          if (_downstream_states[input] == wakeup) { // wakeup->on
-            for (int vc = 0; vc < _vcs; ++vc)
-              _credit_counter[input][vc] = 0;
-            _next_buf[input]->FullCredits();
-          }
-        } else if (src_state == draining) {
-          assert(_downstream_states[input] == power_on);
-        } else if (src_state == wakeup) {
-          assert(_downstream_states[input] != wakeup || _downstream_states[input] != draining);
-        } else if (src_state == power_off) {
-          // if downstream is wakeup, it should send src state for flow control (clear credit counter)
-          assert(_downstream_states[input] == draining || _downstream_states[input] == wakeup);
-          for (int vc = 0; vc < _vcs; ++vc)
-            _credit_counter[input][vc] = 0;
-          _next_buf[input]->ClearCredits();
-        }
-        if (!h->drain_done) _resp_hids[input] = h->hid;
-      }
-      /* // now they can send drain_done, since the hid should be able to handle that
-      if (h->drain_done) {
-        // previous my right side are all off, so the left side routers can set tag directly,
-        // later the draining is reflected to right side if one is wakeup, a tag is sent,
-        // but the new state of left has been updated in my node but not in right side routers.
-        //assert(_downstream_states[output] != power_off); // can from drain->on
-        if (_downstream_states[output] != wakeup && _downstream_states[output] != draining)
-          h->drain_done = false;
-      }
-      */
-    }
-    break;
-
-    case wakeup: {// wake up
-      if (src_state >= 0) {
-        if (src_state == power_on) {
-          assert(_downstream_states[input] == draining ||
-              _downstream_states[input] == wakeup);
-          if (_downstream_states[input] == wakeup) { // wakeup->on
-            // wake up at similar time, drain tags are relayed to each other
-            assert(_drain_tags[output]);
-            for (int vc = 0; vc < _vcs; ++vc)
-              _credit_counter[input][vc] = 0;
-            _next_buf[input]->FullCredits();
-            //if (!h->drain_done) {
-            //	// it could be, if the just power_on don't receive my wakeup state change
-            //	// before it sent the handshake, previous the line are all off
-            //	//assert(_drain_tags[input]);
-            //}
-          }
-        } else if (src_state == draining) {
-          assert(!h->drain_done);
-          assert(_downstream_states[input] == power_on);
-        } else if (src_state == wakeup) {
-          assert(!h->drain_done);
-          assert(_downstream_states[input] != wakeup);
-          if (_drain_tags[output] && _downstream_states[output] != power_off) {  // relay the drain tag
-            if (_out_queue_handshakes.count(input) == 0) {
-              _out_queue_handshakes.insert(make_pair(input, Handshake::New()));
-              _out_queue_handshakes[input]->id = _id;
-            }
-            _out_queue_handshakes[input]->drain_done = true;
-            _resp_hids[input] = h->hid;
-            _out_queue_handshakes[input]->hid = _resp_hids[input];
-            _drain_done_sent[input] = true; // in case that when I wake up I send the tag again
-          }
-        } else if (src_state == power_off) {
-          // if downstream is wakeup, it should send src state for flow control (clear credit counter)
-          assert(_downstream_states[input] == draining || _downstream_states[input] == wakeup);
-          for (int vc = 0; vc < _vcs; ++vc)
-            _credit_counter[input][vc] = 0;
-          _next_buf[input]->ClearCredits();
-        }
-        if (!h->drain_done) _resp_hids[input] = h->hid;
-      }
-      if (h->drain_done) {
-        // FIXME: get two tags
-        // could be, one tag is for previous draining of upstream router when I am off,
-        // but later it back to on and I should wake up, then another tag may be sent
-        // due to my state change (off->wakeup), but this tag is out dated.
-        //assert(!_drain_tags[input]);
-        if (h->hid == _req_hids[input])
-          _drain_tags[input] = true;
-        assert(h->new_state == -1 || h->new_state == power_on);
-        if (_downstream_states[output] == wakeup) {
-          if (_out_queue_handshakes.count(output) == 0) {
-            _out_queue_handshakes.insert(make_pair(output, h));
-            h->hid = _resp_hids[output];
-          }
-          _drain_done_sent[output] = true;
-        }
-      }
-    }
-    break;
-
-    default:
-      ostringstream err;
-      err << "Something wrong in the handshake evaluate transition state machine";
-      Error(err.str());
-    }
-    
-    // update downstream state
-    if (h->new_state >= 0) {
-      new_downstream_states[input] = (ePowerState) h->new_state;
-      //_downstream_states[input] = (ePowerState) h->new_state;
-      if ((_id - h->id == -1) || (_id - h->id == 1) || (_id - h->id == -gK)
-          || (_id - h->id == gK)) {
-        assert(h->src_state >= 0);
-        _neighbor_states[input] = (ePowerState) h->src_state;
-      }
+      assert(_neighbor_states[output] == draining);
+      assert(_drain_done_sent[output]);
+      _drain_done_sent[output] = false;
+      BufferState * dest_buf = _next_buf[output];
+      dest_buf->ClearCredits();
+      _neighbor_states[output] = (ePowerState) h->new_state;
+    } else if (h->new_state == power_on && _neighbor_states[output] == wakeup) {
+      _drain_done_sent[output] = false;
+      BufferState * dest_buf = _next_buf[output];
+      dest_buf->FullCredits();
+      _neighbor_states[output] = (ePowerState) h->new_state;
+    } else if (h->new_state == power_on && _neighbor_states[output] == draining) {
+      _drain_done_sent[output] = false;
+      _neighbor_states[output] = (ePowerState) h->new_state;
+    } else if (h->new_state == draining || h->new_state == wakeup) {
+      _drain_done_sent[output] = false;
+      _neighbor_states[output] = (ePowerState) h->new_state;
     }
 
-    // update logical neighbor
-    if (h->logical_neighbor >= 0) {
-      _logical_neighbors[input] = h->logical_neighbor;
-    } else if (new_downstream_states[input] == power_off) {
-      _logical_neighbors[input] = -1;
-    }
-    
-    // free or relaying handshake
-    if (_power_state == power_on || _power_state == draining)
-      h->Free();
-    else if (_power_state == wakeup) {
-      if ((output == 0 && _id % gK == gK-1) || (output == 1 && _id % gK == 0) ||
-          (output == 2 && _id / gK == gK-1) || (output == 3 && _id / gK == 0)) {
-        h->Free();
-      } else if (_out_queue_handshakes.count(output) == 0) {  // don't need to relay drain tag
-        if (h->src_state == power_off) { // need to relay power_off change for credit correctness
-          h->new_state = -1;
-          _out_queue_handshakes.insert(make_pair(output, h));
-        } else {
-          h->Free();
-        }
-      } else if (_out_queue_handshakes[output]->id != h->id) {
-          assert(_out_queue_handshakes[output]->id == _id);
-          assert(_out_queue_handshakes[output]->drain_done);
-          if (h->src_state == power_off)
-            _out_queue_handshakes[output]->src_state = power_off;
-          h->Free();
-      } else {
-        assert(h->drain_done);
-        // should not relay the state transition, since mine has been sent
-        _out_queue_handshakes[output]->new_state = -1; // don't relay downstream state
-        if (h->src_state == power_off)
-          _out_queue_handshakes[output]->src_state = power_off;
-        else
-          _out_queue_handshakes[output]->src_state = -1;
-        _out_queue_handshakes[output]->hid = _resp_hids[output];
+    if (h->drain_done) {
+      assert(_power_state == draining || _power_state == wakeup || _power_state == power_on);
+      if (h->hid == _req_hids[input] && (_power_state == draining || _power_state == wakeup)) {
+        _drain_tags[input] = true;
       }
+      /*if (_power_state == draining || _power_state == wakeup) {
+        _drain_tags[input] = true;
+      }*/
     } else {
-      assert(_power_state == power_off);
-      assert(_out_queue_handshakes.count(output) == 0);
-      if ((output == 0 && _id % gK == gK-1) || (output == 1 && _id % gK == 0) ||
-          (output == 2 && _id / gK == gK-1) || (output == 3 && _id / gK == 0)) {
-        h->Free();
-      } else {
-        // FIXME:
-        if (!(_downstream_states[output] == draining || _downstream_states[output] == wakeup) && h->drain_done)
-          h->drain_done = false;
-        if (h->new_state != -1 || h->src_state != -1 || h->drain_done) {
-          _out_queue_handshakes.insert(make_pair(output, h));
-          if (h->drain_done) h->hid = _resp_hids[output];
-        } else {
-          h->Free();
-        }
-      }
+      _resp_hids[output] = h->hid;
     }
-    
+
+    h->Free();
     _proc_handshakes.pop_front();
   }
-
-  _downstream_states = new_downstream_states;
 }
 
-void FLOVRouter::_HandshakeResponse() {
+void RFLOVRouter::_HandshakeResponse() {
   assert(_power_state == power_on || _power_state == draining);
 
   //for (int out_port = 0; out_port < _outputs - 1; ++out_port) {
   for (int out_port = 0; out_port < 4; ++out_port) {
-    if (_downstream_states[out_port] == draining
-        || _downstream_states[out_port] == wakeup) {
+    if ((_neighbor_states[out_port] == draining || _neighbor_states[out_port] == wakeup) &&
+        (_power_state != draining || _power_state != wakeup)) {
       if (_drain_done_sent[out_port])
         continue;
       bool drain_done = true;
@@ -2174,14 +1876,13 @@ void FLOVRouter::_HandshakeResponse() {
       // don't need to check link, because handshake has same delay as links
 
       if (drain_done) {
-        assert(
-               _downstream_states[out_port] == draining
-               || _downstream_states[out_port] == wakeup);
+        const FlitChannel * channel = _output_channels[out_port];
+        Router * router = channel->GetSink();
+        assert(router);
+        assert(_neighbor_states[out_port] == draining || _neighbor_states[out_port] == wakeup);
         assert(!_drain_done_sent[out_port]);
         if (_out_queue_handshakes.count(out_port) == 0) {
           _out_queue_handshakes.insert(make_pair(out_port, Handshake::New()));
-        } else {
-          assert(_out_queue_handshakes[out_port]->new_state == _power_state);
         }
         _out_queue_handshakes[out_port]->drain_done = true;
         _out_queue_handshakes[out_port]->id = _id;
@@ -2192,3 +1893,4 @@ void FLOVRouter::_HandshakeResponse() {
   }
 }
 
+/* ==== Power Gate - End ==== */

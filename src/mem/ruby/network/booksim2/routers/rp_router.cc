@@ -62,6 +62,73 @@ RPRouter::~RPRouter( )
 }
 
 
+void RPRouter::PowerStateEvaluate( )
+{
+  if (_power_state == power_off) {
+    ++_power_off_cycles;
+    ++_total_power_off_cycles;
+  }
+}
+
+void RPRouter::_InternalStep( )
+{
+  if(!_active) {
+    return;
+  }
+
+  _InputQueuing( );
+  bool activity = !_proc_credits.empty();
+
+  if(!_route_vcs.empty())
+    _RouteEvaluate( );
+  if(_vc_allocator) {
+    _vc_allocator->Clear();
+    if(!_vc_alloc_vcs.empty())
+      _VCAllocEvaluate( );
+  }
+  if(_hold_switch_for_packet) {
+    if(!_sw_hold_vcs.empty())
+      _SWHoldEvaluate( );
+  }
+  _sw_allocator->Clear();
+  if(_spec_sw_allocator)
+    _spec_sw_allocator->Clear();
+  if(!_sw_alloc_vcs.empty())
+    _SWAllocEvaluate( );
+  if(!_crossbar_flits.empty())
+    _SwitchEvaluate( );
+
+  if(!_route_vcs.empty()) {
+    _RouteUpdate( );
+    activity = activity || !_route_vcs.empty();
+  }
+  if(!_vc_alloc_vcs.empty()) {
+    _VCAllocUpdate( );
+    activity = activity || !_vc_alloc_vcs.empty();
+  }
+  if(_hold_switch_for_packet) {
+    if(!_sw_hold_vcs.empty()) {
+      _SWHoldUpdate( );
+      activity = activity || !_sw_hold_vcs.empty();
+    }
+  }
+  if(!_sw_alloc_vcs.empty()) {
+    _SWAllocUpdate( );
+    activity = activity || !_sw_alloc_vcs.empty();
+  }
+  if(!_crossbar_flits.empty()) {
+    _SwitchUpdate( );
+    activity = activity || !_crossbar_flits.empty();
+  }
+
+  _active = activity || !_route_vcs.empty();
+
+  _OutputQueuing( );
+
+  _bufferMonitor->cycle( );
+  _switchMonitor->cycle( );
+}
+
 
 //------------------------------------------------------------------------------
 // input queuing
@@ -872,12 +939,13 @@ void RPRouter::_SWAllocUpdate( )
 
       /* ==== Power Gate - Begin ==== */
       // timeout, recompute routing and VA
-      if (GetSimTime() - f->rtime == 300 && f->head) {
-        int const input = item.second.first.first;
-        assert((input >= 0) && (input < _inputs));
-        int const vc = item.second.first.second;
-        assert((vc >= 0) && (vc < _vcs));
-        Buffer * const cur_buf = _buf[input];
+      int const input = item.second.first.first;
+      assert((input >= 0) && (input < _inputs));
+      int const vc = item.second.first.second;
+      assert((vc >= 0) && (vc < _vcs));
+      Buffer * const cur_buf = _buf[input];
+      int const escape_vc = 0;
+      if (GetSimTime() - f->rtime == 300 && f->head && cur_buf->GetOutputVC(vc) != escape_vc) {
         if (cur_buf->GetState(vc) == VC::active) {
           int const dest_output = cur_buf->GetOutputPort(vc);
           assert((dest_output >= 0) && (dest_output < _outputs));
@@ -887,6 +955,10 @@ void RPRouter::_SWAllocUpdate( )
           dest_buf->ReturnBuffer(dest_vc);
           _route_vcs.push_back(make_pair(-1, item.second.first));
           cur_buf->SetState(vc, VC::routing);
+          if (f->watch) {
+            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+              << " flit " << f->id << " time out, reroute from " << VC::VCSTATE[VC::active] << endl;
+          }
         } else { // should have recomputed routing in VC evaluate
           assert(cur_buf->GetState(vc) == VC::vc_alloc);
           int const dest_output = cur_buf->GetOutputPort(vc);
@@ -899,6 +971,11 @@ void RPRouter::_SWAllocUpdate( )
             if (item.second.first == input_vc) {
               _vc_alloc_vcs.erase(_vc_alloc_vcs.begin()+i);
             }
+          }
+          if (f->watch) {
+            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+              << " flit " << f->id << " time out, reroute from "
+              << VC::VCSTATE[cur_buf->GetState(vc)] << endl;
           }
           _route_vcs.push_back(make_pair(-1, item.second.first));
           cur_buf->SetState(vc, VC::routing);

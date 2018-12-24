@@ -48,6 +48,7 @@
 #include "mem/ruby/network/booksim2/routers/event_router.hh"
 #include "mem/ruby/network/booksim2/routers/chaos_router.hh"
 /* ==== Power Gate - Begin ==== */
+#include "mem/ruby/network/booksim2/routers/rflov_router.hh"
 #include "mem/ruby/network/booksim2/routers/flov_router.hh"
 #include "mem/ruby/network/booksim2/routers/rp_router.hh"
 /* ==== Power Gate - End ==== */
@@ -115,22 +116,36 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   // FIXME: only support mesh now
   _neighbor_states.resize(4, power_on);
   _downstream_states.resize(4, power_on);
+  _logical_neighbors.resize(4, -1);
+  _logical_neighbors[0] = _id + 1;
+  _logical_neighbors[1] = _id - 1;
+  _logical_neighbors[2] = _id + gK;
+  _logical_neighbors[3] = _id - gK;
   // for edge routers
   if (_id / gK == 0) {
     _neighbor_states[3] = power_off;
     _downstream_states[3] = power_off;
-  } else if (_id / gK == 7) {
+    _logical_neighbors[3] = -1;
+  }
+  if (_id / gK == gK-1) {
     _neighbor_states[2] = power_off;
     _downstream_states[2] = power_off;
-  } else if (_id % gK == 0) {
+    _logical_neighbors[2] = -1;
+  }
+  if (_id % gK == 0) {
     _neighbor_states[1] = power_off;
     _downstream_states[1] = power_off;
-  } else if (_id % gK == 7) {
+    _logical_neighbors[1] = -1;
+  }
+  if (_id % gK == gK-1) {
     _neighbor_states[0] = power_off;
     _downstream_states[0] = power_off;
+    _logical_neighbors[0] = -1;
   }
   _outstanding_requests = 0;
   _router_state = true;
+  _req_hids.resize(4, -1);
+  _resp_hids.resize(4, -1);
   /* ==== Power Gate - End ==== */
 }
 
@@ -197,8 +212,10 @@ Router *Router::NewRouter( const Configuration& config,
     r = new EventRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "chaos" ) {
     r = new ChaosRouter( config, parent, name, id, inputs, outputs );
-  } else if ( type == "flov" ) {
     /* ==== Power Gate - Begin ==== */
+  } else if ( type == "rflov" ) {
+    r = new RFLOVRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "flov" ) {
     r = new FLOVRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "rp" ) {
     r = new RPRouter( config, parent, name, id, inputs, outputs );
@@ -215,12 +232,6 @@ Router *Router::NewRouter( const Configuration& config,
 }
 
 /* ==== Power Gate - Begin ==== */
-Router::ePowerState Router::GetNeighborPowerState( int out_port ) const
-{
-  assert(out_port >= 0);
-  return _neighbor_states[out_port];
-}
-
 void Router::IdleDetected()
 {
   if (_power_state == power_on)
@@ -229,6 +240,14 @@ void Router::IdleDetected()
     ++_drain_timer;
   else if (_power_state == power_off)
     ++_off_timer;
+}
+
+Router * Router::GetNeighborRouter(int out_port)
+{
+  const FlitChannel * channel = _output_channels[out_port];
+  Router * router = channel->GetSink();
+
+  return router;
 }
 /* ==== Power Gate - End ==== */
 

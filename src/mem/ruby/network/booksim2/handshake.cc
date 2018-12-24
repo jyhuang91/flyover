@@ -48,6 +48,8 @@ void Handshake::Reset()
   drain_done = false;
   wakeup = -1;
   id = -1;
+  hid = -1;
+  logical_neighbor = -1;
 }
 
 Handshake * Handshake::New() {

@@ -132,13 +132,17 @@ protected:
   int _min_drain_time;
   vector<ePowerState> _neighbor_states;
   vector<ePowerState> _downstream_states;
-  double _outstanding_requests;
+  vector<int> _logical_neighbors;
+  double _outstanding_requests; // for request/response traffic and xy_yx routing
   vector<bool> _drain_done_sent;
   vector<bool> _drain_tags;
   bool _router_state; // set by trafficmanager, on is true, off is false
   // routing tables
   vector<int> _rt_tbl;
   vector<int> _esc_rt_tbl;
+  // asyncrhonous handshaking
+  vector<int> _req_hids;
+  vector<int> _resp_hids;
   /* ==== Power Gate - End ==== */
 
 public:
@@ -260,6 +264,7 @@ public:
   inline void SetPowerState( ePowerState s ) {_power_state = s;}
   inline Router::ePowerState GetPowerState() const {return _power_state;}
   inline void SetRouterState(bool state) {_router_state = state;}
+  inline string GetRouterState() const {return _router_state ? "On" : "Off";}
   
   inline uint64_t GetPowerOffCycles() const {return _power_off_cycles;}
   inline void ResetPowerOffCycles() {_power_off_cycles = 0;}  // _power_off_cycles is reset when each kernel is finished (GPGPU)
@@ -279,8 +284,12 @@ public:
   inline const vector<int> & GetRouteTable() const {return _rt_tbl;}
   inline const vector<int> & GetEscRouteTable() const {return _esc_rt_tbl;}
 
+  inline Router::ePowerState GetNeighborPowerState(int out_port) const {return _neighbor_states[out_port];}
+  inline void SetLogicalNeighbor(int out_port, int id) {_logical_neighbors[out_port] = id;}
+  inline int GetLogicalNeighbor(int out_port) const {return _logical_neighbors[out_port];}
+
   void IdleDetected();
-  Router::ePowerState GetNeighborPowerState(int out_port) const;
+  Router * GetNeighborRouter(int out_port);
   /* ==== Power Gate - End ==== */
 
 };

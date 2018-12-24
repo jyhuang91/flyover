@@ -312,6 +312,34 @@ BookSimConfig::BookSimConfig( )
   _int_map["channel_width"] = 128;
   _int_map["channel_sweep"] = 0;
 
+  /* ==== DSENT power model - Begin ==== */
+  // use dsent, set dsent_model = 1 in config file
+  _int_map["dsent_model"] = 0;
+  // energy/power parameters, default 32 nm HVT library with FLOV router architecture
+  // dynamic
+  _float_map["energy_per_buffwrite"] = 3.38124e-12;
+  _float_map["energy_per_buffread"] = 3.1597e-12;
+  _float_map["energy_traverse_xbar"] = 1.17159e-12;
+  _float_map["energy_per_arbitratestage1"] = 4.48458e-14;
+  _float_map["energy_per_arbitratestage2"] = 7.3377e-14;
+  _float_map["energy_distribute_clk"] = 5.55204e-13;
+  _float_map["energy_rr_link_traversal"] = 4.14666e-12;
+  _float_map["energy_rs_link_traversal"] = 7.9628124e-14;
+  // static
+  _float_map["input_leak"] = 0.00154895;
+  _float_map["switch_leak"] = 8.49619e-05;
+  _float_map["xbar_leak"] = 0.000349489;
+  _float_map["xbar_sel_dff_leak"] = 5.27226e-06;
+  _float_map["clk_tree_leak"] = 4.72843e-06;
+  _float_map["pipeline_reg0_leak"] = 3.51484e-07;       // per bit
+  _float_map["pipeline_reg1_leak"] = 3.51484e-07;       // per bit
+  _float_map["pipeline_reg2_part_leak"] = 3.51484e-07;  // per bit
+  _float_map["rr_link_leak"] = 1.09052e-05;             // per link
+  _float_map["rs_link_leak"] = 1.09052e-05;             // per link
+  // frequency
+  _float_map["frequency"] = 2.0e+9;
+  /* ==== DSENT power model - End ==== */
+
   /* ==== Power Gate - Begin ==== */
   _int_map["fabric_manager"] = -1;  // Router Parking: fabric manager
   AddStrField("off_cores", "");
