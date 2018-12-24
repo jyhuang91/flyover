@@ -918,7 +918,7 @@ def makeEnv(env, label, objsfx, strip = False, **kwargs):
 
     # Add additional warnings here that should not be applied to
     # the SWIG generated code
-    new_env.Append(CXXFLAGS='-Wmissing-declarations')
+    #new_env.Append(CXXFLAGS='-Wmissing-declarations') # Jiayi commented out
 
     if env['GCC']:
         # Depending on the SWIG version, we also need to supress

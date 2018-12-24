@@ -41,7 +41,7 @@
 class TechParameter;
 class OrionConfig;
 class Arbiter;
-class Buffer;
+class OrionBuffer;
 
 class VCAllocator
 {
@@ -107,7 +107,7 @@ class VCAllocator
 
     Arbiter* m_local_arb_ptr;
     Arbiter* m_global_arb_ptr;
-    Buffer* m_vc_select_ptr;
+    OrionBuffer* m_vc_select_ptr;
 
   public:
     static VCAllocator* create_vcallocator(

@@ -548,6 +548,9 @@ if main['GCC'] or main['CLANG']:
     # Add selected sanity checks from -Wextra
     main.Append(CXXFLAGS=['-Wmissing-field-initializers',
                           '-Woverloaded-virtual'])
+    # Jiayi: Add the flag to get rid of the error for building
+    main.Append(CXXFLAGS=['-DPROTOBUF_INLINE_NOT_IN_HEADERS=0']);
+    main.Append(CCFLAGS=['-DPROTOBUF_INLINE_NOT_IN_HEADERS=0']);
 else:
     print termcap.Yellow + termcap.Bold + 'Error' + termcap.Normal,
     print "Don't know what compiler options to use for your compiler."

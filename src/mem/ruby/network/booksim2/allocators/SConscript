@@ -1,0 +1,19 @@
+# -*- mode:python -*-
+
+# Authors: Jiayi Huang
+
+Import('*')
+
+if env['PROTOCOL'] == 'None':
+    Return()
+
+Source('allocator.cc')
+Source('islip.cc')
+Source('loa.cc')
+Source('maxsize.cc')
+Source('pim.cc')
+Source('selalloc.cc')
+Source('separable.cc')
+Source('separable_input_first.cc')
+Source('separable_output_first.cc')
+Source('wavefront.cc')

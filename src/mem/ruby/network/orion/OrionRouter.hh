@@ -41,7 +41,7 @@
 #include "mem/ruby/network/orion/Type.hh"
 
 class OrionConfig;
-class Buffer;
+class OrionBuffer;
 class Crossbar;
 class VCAllocator;
 class SWAllocator;
@@ -107,7 +107,7 @@ class OrionRouter
     bool m_is_in_shared_switch;
     bool m_is_out_shared_switch;
 
-    Buffer** m_in_buf_ary_ptr;
+    OrionBuffer** m_in_buf_ary_ptr;
     Crossbar* m_xbar_ptr;
     VCAllocator** m_va_ary_ptr;
     //VCAllocator** m_vc_select_ary_ptr;

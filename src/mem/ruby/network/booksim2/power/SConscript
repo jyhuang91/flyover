@@ -1,0 +1,12 @@
+# -*- mode:python -*-
+
+# Authors: Jiayi Huang
+
+Import('*')
+
+if env['PROTOCOL'] == 'None':
+    Return()
+
+Source('buffer_monitor.cc')
+Source('power_module.cc')
+Source('switch_monitor.cc')

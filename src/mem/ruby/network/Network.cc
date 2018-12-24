@@ -47,8 +47,12 @@ Network::Network(const Params *p)
     assert(m_nodes != 0);
     assert(m_virtual_networks != 0);
 
-    m_topology_ptr = new Topology(p->routers.size(), p->ext_links,
-                                  p->int_links);
+    // Jiayi, use booksim2 or not , 10/18/16
+    m_use_booksim = p->use_booksim;
+
+    if (!m_use_booksim)
+        m_topology_ptr = new Topology(p->routers.size(), p->ext_links,
+                                      p->int_links);
 
     // Allocate to and from queues
     // Queues that are getting messages from protocol
@@ -68,11 +72,23 @@ Network::Network(const Params *p)
     p->ruby_system->registerNetwork(this);
 
     // Initialize the controller's network pointers
-    for (std::vector<BasicExtLink*>::const_iterator i = p->ext_links.begin();
-         i != p->ext_links.end(); ++i) {
-        BasicExtLink *ext_link = (*i);
-        AbstractController *abs_cntrl = ext_link->params()->ext_node;
-        abs_cntrl->initNetworkPtr(this);
+    if (m_use_booksim) {
+        for (int n = 0; n < m_nodes; n++) {
+            m_toNetQueues[n].resize(m_virtual_networks, nullptr);
+            m_fromNetQueues[n].resize(m_virtual_networks, nullptr);
+        }
+        for (std::vector<AbstractController*>::const_iterator i =
+                p->ext_nodes.begin(); i != p->ext_nodes.end(); ++i) {
+            AbstractController *abs_cntrl = (*i);
+            abs_cntrl->initNetworkPtr(this);
+        }
+    } else {
+        for (std::vector<BasicExtLink*>::const_iterator i = p->ext_links.begin();
+             i != p->ext_links.end(); ++i) {
+            BasicExtLink *ext_link = (*i);
+            AbstractController *abs_cntrl = ext_link->params()->ext_node;
+            abs_cntrl->initNetworkPtr(this);
+        }
     }
 
     // Register a callback function for combining the statistics
@@ -93,7 +109,9 @@ Network::~Network()
         }
     }
 
-    delete m_topology_ptr;
+    // Jiayi, booksim2 has its own topology, 10/18/16
+    if (m_topology_ptr)
+        delete m_topology_ptr;
 }
 
 void

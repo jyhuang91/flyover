@@ -44,7 +44,7 @@
 
 using namespace std;
 
-Buffer::Buffer(
+OrionBuffer::OrionBuffer(
         const string& buffer_model_str_,
         bool is_fifo_,
         bool is_outdrv_,
@@ -89,12 +89,12 @@ Buffer::Buffer(
     }
 }
 
-Buffer::~Buffer()
+OrionBuffer::~OrionBuffer()
 {
     delete m_sram_ptr;
 }
 
-double Buffer::get_dynamic_energy(
+double OrionBuffer::get_dynamic_energy(
         bool is_read_,
         bool is_max_
         ) const
@@ -127,7 +127,7 @@ double Buffer::get_dynamic_energy(
     }
 }
 
-double Buffer::get_static_power() const
+double OrionBuffer::get_static_power() const
 {
     double vdd = m_tech_param_ptr->get_vdd();
     double SCALE_S = m_tech_param_ptr->get_SCALE_S();
@@ -145,7 +145,7 @@ double Buffer::get_static_power() const
     }
 }
 
-void Buffer::print_all() const
+void OrionBuffer::print_all() const
 {
     cout << "Buffer" << endl;
     cout << "\t" << "Read = " << get_dynamic_energy(true, false) << endl;
@@ -154,7 +154,7 @@ void Buffer::print_all() const
     return;
 }
 
-void Buffer::init()
+void OrionBuffer::init()
 {
     if(m_buffer_model == BUF_SRAM)
     {

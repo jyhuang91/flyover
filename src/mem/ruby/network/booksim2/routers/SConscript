@@ -1,0 +1,16 @@
+# -*- mode:python -*-
+
+# Authors: Jiayi Huang
+
+Import('*')
+
+if env['PROTOCOL'] == 'None':
+    Return()
+
+Source('chaos_router.cc')
+Source('event_router.cc')
+Source('iq_router.cc')
+Source('router.cc')
+Source('rflov_router.cc')
+Source('flov_router.cc')
+Source('rp_router.cc')
