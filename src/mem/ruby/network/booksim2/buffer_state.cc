@@ -722,9 +722,9 @@ void BufferState::ReturnBuffer( int vc)
 
 void BufferState::ClearCredits()
 {
-    _occupancy = _size;
+    _occupancy += _size;
     for (int vc = 0; vc < _vcs; ++vc) {
-        _vc_occupancy[vc] = _size / _vcs;
+        _vc_occupancy[vc] += _size / _vcs;
         _in_use_by[vc] = -1;
         _tail_sent[vc] = false;
     }
