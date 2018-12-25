@@ -1822,8 +1822,9 @@ void FLOVRouter::_FlovStep() {
       ++out;
     for (int vc = 0; vc < _vcs; ++vc) {
       if (_credit_counter[out][vc] > 0) {
-        if (_out_queue_credits.count(in) == 0)
+        if (_out_queue_credits.count(in) == 0) {
           _out_queue_credits.insert(make_pair(in, Credit::New()));
+        }
         if (_out_queue_credits[in]->vc.count(vc) == 0) {
           --_credit_counter[out][vc];
           _out_queue_credits[in]->vc.insert(vc);
@@ -2159,7 +2160,7 @@ void FLOVRouter::_HandshakeResponse() {
         for (deque<pair<uint64_t, pair<Flit *, pair<int, int> > > >::iterator iter =
              _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
           uint64_t const time = iter->first;
-          assert(time <= GetSimTime());
+          assert(time == -1 || time < GetSimTime());
           int const expanded_output = iter->second.second.second;
           int const output = expanded_output / _output_speedup;
           assert((output >= 0) && (output < _outputs));
