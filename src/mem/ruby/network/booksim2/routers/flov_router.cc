@@ -1699,7 +1699,6 @@ void FLOVRouter::_SendHandshakes()
 //--------------------------------
 
 
-/* ==== Power Gate - End ==== */
 void FLOVRouter::_FlovStep() {
   assert(_power_state == power_off || _power_state == wakeup);
   assert(_route_vcs.empty());
@@ -2192,4 +2191,6 @@ void FLOVRouter::_HandshakeResponse() {
     }
   }
 }
+
+/* ==== Power Gate - End ==== */
 

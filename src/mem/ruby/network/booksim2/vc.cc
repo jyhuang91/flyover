@@ -241,6 +241,8 @@ void VC::Display( ostream & os ) const
     if(!_buffer.empty()) {
       os << " front: " << _buffer.front()->id;
       /* ==== Power Gate - Begin ==== */
+      os << " src_router: " << _buffer.front()->src_router;
+      os << " dest_router: " << _buffer.front()->dest_router;
       os << " src: " << _buffer.front()->src;
       os << " dest: " << _buffer.front()->dest;
       /* ==== Power Gate - End ==== */

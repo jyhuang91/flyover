@@ -112,7 +112,8 @@ void RFLOVRouter::PowerStateEvaluate()
       assert(_outstanding_requests == 0);
       bool neighbor_draining = false;
       bool neighbor_off = false;
-      for (int out = 0; out < _outputs - 1; ++out) {
+      //for (int out = 0; out < _outputs - 1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if (_neighbor_states[out] == draining) {
           neighbor_draining = true;
           break;
@@ -197,7 +198,8 @@ void RFLOVRouter::PowerStateEvaluate()
       _idle_timer = 0;
       _drain_timer = 0;
       assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < _outputs - 1; ++out) {
+      //for (int out = 0; out < _outputs - 1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
             (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
           continue;
@@ -212,7 +214,8 @@ void RFLOVRouter::PowerStateEvaluate()
       _drain_tags.clear();
       _drain_tags.resize(_inputs - 1, false);
       assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < _outputs - 1; ++out) {// may not needed due to the priority
+      //for (int out = 0; out < _outputs - 1; ++out) {// may not needed due to the priority
+      for (int out = 0; out < 4; ++out) {// may not needed due to the priority
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
         _out_queue_handshakes[out]->id = _id;
@@ -238,7 +241,8 @@ void RFLOVRouter::PowerStateEvaluate()
       //_drain_tags.resize(_inputs - 1, false);
       _off_timer = 0;
       assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < _outputs - 1; ++out) {
+      //for (int out = 0; out < _outputs - 1; ++out) {
+      for (int out = 0; out < 4; ++out) {
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
             (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
           continue;
@@ -646,7 +650,7 @@ void RFLOVRouter::_RouteUpdate( )
     cur_buf->SetState(vc, VC::vc_alloc);
     /* ==== Power Gate - Begin ==== */
     // avoid rerouting by VCAlloc again and again
-    //f->rtime = GetSimTime();
+    f->rtime = GetSimTime();
 
     if (f->dest_router != _id) {
       OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
@@ -785,7 +789,7 @@ void RFLOVRouter::_VCAllocUpdate( )
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
             << " Sink router " << router->GetID() << " is "
             << POWERSTATE[_neighbor_states[match_output]]
-            << ", back to RC stage." << endl;
+            << ", back to RC stage for flit " << f->id << endl;
 
           cur_buf->Display(*gWatchOut);
 
@@ -1022,8 +1026,10 @@ void RFLOVRouter::_SWHoldUpdate( )
       assert(input >= 0 && input < _inputs);
       if(_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
+        // TODO: Debug purpose, remove me
+        _out_queue_credits[input]->id = _id;
       }
-      _out_queue_credits.find(input)->second->vc.insert(vc);
+      _out_queue_credits[input]->vc.insert(vc);
 
       if(cur_buf->Empty(vc)) {
         if(f->watch) {
@@ -1272,7 +1278,7 @@ void RFLOVRouter::_SWAllocUpdate( )
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                 << " SA: Sink router " << router->GetID() << " is "
                 << POWERSTATE[_neighbor_states[output]]
-                << ", back to RC stage." << endl;
+                << ", back to RC stage for flit " << f->id << endl;
             }
             if (cur_buf->GetState(vc) == VC::vc_alloc) {
               assert(_speculative);
@@ -1366,8 +1372,10 @@ void RFLOVRouter::_SWAllocUpdate( )
       assert(input >= 0 && input < _inputs);
       if(_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
+        // TODO: Debug purpose, remove me
+        _out_queue_credits[input]->id = _id;
       }
-      _out_queue_credits.find(input)->second->vc.insert(vc);
+      _out_queue_credits[input]->vc.insert(vc);
 
       if(cur_buf->Empty(vc)) {
         if(f->tail) {
@@ -1611,7 +1619,7 @@ void RFLOVRouter::_OutputQueuing( )
       ++iter) {
 
     int const output = iter->first;
-    assert((output >= 0) && (output < _outputs - 1));
+    assert((output >= 0) && (output < 4));
 
     Handshake * const h = iter->second;
     assert(h);
@@ -1663,7 +1671,8 @@ void RFLOVRouter::_RFlovStep() {
       iter != _in_queue_flits.end(); ++iter) {
 
     int const input = iter->first;
-    assert((input >= 0) && (input < _inputs - 1));
+    //assert((input >= 0) && (input < _inputs - 1));
+    assert((input >= 0) && (input < 4));
 
     Flit * const f = iter->second;
     assert(f);
@@ -1681,7 +1690,8 @@ void RFLOVRouter::_RFlovStep() {
       --output;
     else
       ++output;
-    assert((output >= 0) && (output < _outputs - 1));
+    //assert((output >= 0) && (output < _outputs - 1));
+    assert((output >= 0) && (output < 4));
 
     BufferState * const dest_buf = _next_buf[output];
     if (f->head)
@@ -1742,9 +1752,12 @@ void RFLOVRouter::_RFlovStep() {
         --input;
       else
         ++input;
-      assert((input >= 0) && (input < _inputs - 1));
+      //assert((input >= 0) && (input < _inputs - 1));
+      assert((input >= 0) && (input < 4));
       if (_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
+        // TODO: Debug purpose, remove me
+        _out_queue_credits[input]->id = _id;
       }
       set<int>::iterator iter = c->vc.begin();
       while (iter != c->vc.end()) {
@@ -1771,9 +1784,10 @@ void RFLOVRouter::_RFlovStep() {
       ++out;
     for (int vc = 0; vc < _vcs; ++vc) {
       if (_credit_counter[out][vc] > 0) {
-        assert(in >= 0 && in < _inputs -1);
-        if (_out_queue_credits.count(in) == 0)
+        if (_out_queue_credits.count(in) == 0) {
           _out_queue_credits.insert(make_pair(in, Credit::New()));
+          _out_queue_credits[in]->id = _id;
+        }
         if (_out_queue_credits[in]->vc.count(vc) == 0) {
           --_credit_counter[out][vc];
           _out_queue_credits[in]->vc.insert(vc);
@@ -1788,7 +1802,7 @@ void RFLOVRouter::_HandshakeEvaluate() {
     pair<int, Handshake *> const & item = _proc_handshakes.front();
     int const input = item.first;
     int output = input;
-    assert((input >= 0) && (input < _inputs - 1));
+    assert((input >= 0) && (input < 4));
 
     Handshake * h = item.second;
     assert(h);
@@ -1861,7 +1875,7 @@ void RFLOVRouter::_HandshakeResponse() {
         for (deque<pair<uint64_t, pair<Flit *, pair<int, int> > > >::iterator iter =
              _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
           uint64_t const time = iter->first;
-          assert(time <= GetSimTime());
+          assert(time == -1 || time < GetSimTime());
           int const expanded_output = iter->second.second.second;
           int const output = expanded_output / _output_speedup;
           assert((output >= 0) && (output < _outputs));
@@ -1894,3 +1908,4 @@ void RFLOVRouter::_HandshakeResponse() {
 }
 
 /* ==== Power Gate - End ==== */
+

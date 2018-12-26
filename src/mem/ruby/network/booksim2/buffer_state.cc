@@ -622,6 +622,10 @@ void BufferState::ProcessCredit( Credit const * const c )
 
     assert( ( vc >= 0 ) && ( vc < _vcs ) );
 
+    // TODO: Debug
+    //*gWatchOut << GetSimTime() << " | " << FullName() << " | "
+    //  << "process credit for vc " << vc << " from router " << c->id << endl;
+
     if ( ( _wait_for_tail_credit ) && 
 	 ( _in_use_by[vc] < 0 ) ) {
       ostringstream err;
@@ -664,6 +668,10 @@ void BufferState::SendingFlit( Flit const * const f )
   int const vc = f->vc;
 
   assert( f && ( vc >= 0 ) && ( vc < _vcs ) );
+
+  // TODO: Debug
+  //*gWatchOut << GetSimTime() << " | " << FullName() << " | "
+  //  << "sending flit to vc " << vc << endl;
 
   ++_occupancy;
   if(_occupancy > _size) {
@@ -722,6 +730,10 @@ void BufferState::ReturnBuffer( int vc)
 
 void BufferState::ClearCredits()
 {
+    // TODO: Debug
+    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+      << "clear credits, original occupancy " << _occupancy << endl;
+
     _occupancy += _size;
     for (int vc = 0; vc < _vcs; ++vc) {
         _vc_occupancy[vc] += _size / _vcs;
