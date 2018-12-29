@@ -264,6 +264,7 @@ public:
   inline void SetPowerState( ePowerState s ) {_power_state = s;}
   inline Router::ePowerState GetPowerState() const {return _power_state;}
   inline void SetRouterState(bool state) {_router_state = state;}
+  inline string GetRouterState() const {return _router_state ? "On" : "Off";}
   
   inline uint64_t GetPowerOffCycles() const {return _power_off_cycles;}
   inline void ResetPowerOffCycles() {_power_off_cycles = 0;}  // _power_off_cycles is reset when each kernel is finished (GPGPU)
@@ -288,6 +289,7 @@ public:
   inline int GetLogicalNeighbor(int out_port) const {return _logical_neighbors[out_port];}
 
   void IdleDetected();
+  Router * GetNeighborRouter(int out_port);
   /* ==== Power Gate - End ==== */
 
 };

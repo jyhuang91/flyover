@@ -241,6 +241,14 @@ void Router::IdleDetected()
   else if (_power_state == power_off)
     ++_off_timer;
 }
+
+Router * Router::GetNeighborRouter(int out_port)
+{
+  const FlitChannel * channel = _output_channels[out_port];
+  Router * router = channel->GetSink();
+
+  return router;
+}
 /* ==== Power Gate - End ==== */
 
 
