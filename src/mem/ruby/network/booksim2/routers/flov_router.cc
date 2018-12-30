@@ -112,7 +112,7 @@ void FLOVRouter::PowerStateEvaluate()
     //_drain_tags.resize(_inputs - 1, false);
     _drain_tags.resize(4, false);
     if (_outstanding_requests)
-        _idle_timer = 0;
+      _idle_timer = 0;
     if (_wakeup_signal == true) {
       _wakeup_signal = false;
       _idle_timer = 0;
@@ -1914,13 +1914,6 @@ void FLOVRouter::_HandshakeEvaluate() {
           assert(_downstream_states[input] == draining);
           _drain_done_sent[input] = false;
         } else if (src_state == draining) {
-          if (_downstream_states[input] != power_on) {
-            Router * neighbor_router = GetNeighborRouter(input);
-            cout << FullName() << "'s downstream_states[" << input << "] is "
-              << POWERSTATE[_downstream_states[input]]
-              << ", downstream router " << neighbor_router->FullName()
-              << "'s local state " << POWERSTATE[neighbor_router->GetPowerState()] << endl;
-          }
           assert(_downstream_states[input] == power_on);
           _drain_done_sent[input] = false;
           // two routers goes to draining at similar time

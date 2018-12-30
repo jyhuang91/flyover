@@ -2506,91 +2506,90 @@ void opt_flov_gem5net( const Router *r, const Flit *f, int in_channel,
   int dest_router = Gem5Net::NodeToRouter(f->dest);
   int out_port = -1;
 
-  outputs->Clear();
-
   if (inject) {
-    outputs->AddRange(-1, vcBegin, vcEnd);
-    return;
+    out_port = -1;
   } else if (cur_router == dest_router) {
     out_port = Gem5Net::NodeToPort(f->dest);
-    outputs->AddRange(out_port, vcBegin, vcEnd);
-    return;
-  }
-
-  assert(!inject && cur_router != dest_router);
-
-  int in_vc;
-
-  if (in_channel >= 2 * gN) {
-    in_vc = vcEnd; // ignore the injection VC
   } else {
-    in_vc = f->vc;
-  }
+    assert(!inject && cur_router != dest_router);
 
-  bool escape = false;
-  if (in_vc == vcBegin)
-    escape = true;
+    int in_vc;
 
-  int dest_x = dest_router % gK;
-  int dest_y = dest_router / gK;
-
-  vector<int> logical_neighbors_x(4, -1);
-  vector<int> logical_neighbors_y(4, -1);
-  for (int i = 0; i < 4; ++i) {
-    int logical_neighbor = r->GetLogicalNeighbor(i);
-    if (logical_neighbor != -1) {
-      logical_neighbors_x[i] = logical_neighbor % gK;
-      logical_neighbors_y[i] = logical_neighbor / gK;
-    }
-  }
-
-  out_port = dor_next_mesh(cur_router, dest_router); // XY
-
-  if (r->GetNeighborPowerState(out_port) != Router::power_on)
-    out_port = dor_next_mesh(cur_router, dest_router, true); // YX
-
-  if (GetSimTime() - f->rtime > 300)
-    escape = true;
-
-  if ((cur_router % gK != dest_router % gK) && (cur_router / gK != dest_router / gK) &&
-      r->GetNeighborPowerState(out_port) != Router::power_on) { // not in same row/col
-    if (logical_neighbors_x[0] != -1 && dest_x >= logical_neighbors_x[0]) {
-      out_port = 0;
-    } else if (logical_neighbors_x[1] != -1 && dest_x <= logical_neighbors_x[1]) {
-      out_port = 1;
-    } else if (logical_neighbors_y[3] != -1 && dest_y <= logical_neighbors_y[3] && escape == false) {
-      out_port = 3;
+    if (in_channel >= 2 * gN) {
+      in_vc = vcEnd; // ignore the injection VC
     } else {
-      out_port = 2;
+      in_vc = f->vc;
     }
 
-    if (in_channel == 2 && out_port == 2) // u-turn
+    bool escape = false;
+    if ((in_vc == vcBegin) || (GetSimTime() - f->rtime > 300))
       escape = true;
-  }
 
-  if (escape == true) {
-    // deadlock-free by turn-model, can go x dimension to reduce load in bottom
-    // active row
-    if (cur_router < gNodes - gK && (cur_router % gK != dest_router % gK) &&
-        (cur_router / gK != dest_router / gK) && out_port == 3) {
-      out_port = 2;
+    int dest_x = dest_router % gK;
+    int dest_y = dest_router / gK;
+
+    vector<int> logical_neighbors_x(4, -1);
+    vector<int> logical_neighbors_y(4, -1);
+    for (int i = 0; i < 4; ++i) {
+      int logical_neighbor = r->GetLogicalNeighbor(i);
+      if (logical_neighbor != -1) {
+        logical_neighbors_x[i] = logical_neighbor % gK;
+        logical_neighbors_y[i] = logical_neighbor / gK;
+      }
     }
-    vcEnd = vcBegin;
-  } else {
-    ++vcBegin;
+
+    out_port = dor_next_mesh(cur_router, dest_router); // XY
+
+    //if (r->GetNeighborPowerState(out_port) != Router::power_on)
+    //  out_port = dor_next_mesh(cur_router, dest_router, true); // YX
+
+    if ((cur_router % gK != dest_router % gK) && (cur_router / gK != dest_router / gK) &&
+        r->GetNeighborPowerState(out_port) != Router::power_on) { // not in same row/col
+      if (logical_neighbors_x[0] != -1 && dest_x >= logical_neighbors_x[0]) {
+        out_port = 0;
+      } else if (logical_neighbors_x[1] != -1 && dest_x <= logical_neighbors_x[1]) {
+        out_port = 1;
+      } else if (logical_neighbors_y[3] != -1 && dest_y <= logical_neighbors_y[3] && escape == false) {
+        out_port = 3;
+      } else {
+        out_port = 2;
+      }
+
+      if (in_channel == 2 && out_port == 2) // u-turn
+        escape = true;
+    }
+
+    if (escape == true) {
+      // deadlock-free by turn-model, can go x dimension to reduce load in bottom
+      // active row
+      if (cur_router < gNodes - gK && (cur_router % gK != dest_router % gK) &&
+          (cur_router / gK != dest_router / gK) && out_port == 3) {
+        out_port = 2;
+      }
+      vcEnd = vcBegin;
+    } else {
+      ++vcBegin;
+    }
   }
 
-  if (!inject && f->watch) {
-    *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
-      << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-      << " at output port " << out_port << " for flit " << f->id
-      << " (input port " << in_channel << ", destination " << f->dest_router << ")"
-      << "." << endl;
+  if (f->watch) {
+    if (inject) {
+      *gWatchOut << GetSimTime() << " | "
+        << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+        << " at injection port for flit " << f->id
+        << " (destination " << f->dest << " attached to router "
+        << dest_router << ")." << endl;
+    } else {
+      *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+        << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+        << " at output port " << out_port << " for flit " << f->id
+        << " (input port " << in_channel << ", destination " << f->dest
+        << " attached to router " << dest_router
+        << ")." << endl;
+    }
   }
 
-  assert(out_port >= 0);
-  assert(!inject);
-
+  outputs->Clear();
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
