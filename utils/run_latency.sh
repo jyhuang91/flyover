@@ -15,7 +15,7 @@ do
         count=`ps aux | grep booksim | wc -l`
         while [ $count -eq 5 ]; do
           count=`ps aux | grep booksim | wc -l`
-          sleep 2
+          sleep 1
         done
         ../src/booksim ../runfiles/${scheme}/meshcmp_${off_percent}off.cfg powergate_auto_config=${powergate_auto_config} traffic=${traffic} powergate_percentile=${off_percent} k=${dim} injection_rate=${inj} > ../results/latency/${scheme}/${traffic}_${inj}inj_${off_percent}off.log &
       done
