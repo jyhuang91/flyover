@@ -2148,7 +2148,7 @@ void opt_flov_mesh( const Router *r, const Flit *f, int in_channel,
       }
     }
 
-    int out_port = dor_next_mesh(r->GetID(), f->dest); // XY
+    out_port = dor_next_mesh(r->GetID(), f->dest); // XY
 
     //if(r->GetNeighborPowerState(out_port) != Router::power_on)
     //  out_port = dor_next_mesh(r->GetID(), f->dest, true); // YX
