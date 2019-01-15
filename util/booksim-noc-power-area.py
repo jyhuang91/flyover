@@ -120,7 +120,7 @@ def computeRouterPowerAndArea(router, stats_file, config, number_of_virtual_netw
                               vcs_per_vnet, buffers_per_vc, attached_router_id,
                               flit_size_bits, inj_rate):
     cycle_time_in_ps = getClock("system.ruby.clk_domain", config)
-    frequency = 100000000000 / cycle_time_in_ps
+    frequency = 1000000000000 / cycle_time_in_ps
     num_ports = 4 # consider mesh
 
     for r in attached_router_id:
@@ -140,7 +140,7 @@ def computeRouterPowerAndArea(router, stats_file, config, number_of_virtual_netw
 ## Compute the power consumed by the given link
 def computeLinkPower(link, stats_file, config, sim_seconds, num_bits, act_factor):
     cycle_time_in_ps = getClock("system.ruby.clk_domain", config)
-    frequency = 100000000000 / cycle_time_in_ps
+    frequency = 1000000000000 / cycle_time_in_ps
     power = dsent.computeLinkPower(frequency, num_bits, act_factor)
     dyn = power[0][1] * 2
     static = power[1][1] * 2
