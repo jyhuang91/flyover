@@ -1746,7 +1746,9 @@ void RFLOVRouter::_RFlovStep() {
     //	 1	 -->   0
     //	 2	 -->   3
     //	 3	 -->   2
-    if (output < 4) {
+    bool boundary = ((output == 1 && _id % gK == gK-1) || (output == 0 && _id % gK == 0) ||
+        (output == 3 && _id / gK == gK-1) || (output == 2 && _id / gK == 0));
+    if (output < 4 && !boundary) {
       int input = output;
       if (output % 2)
         --input;
