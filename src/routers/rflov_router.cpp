@@ -1716,7 +1716,9 @@ void RFLOVRouter::_RFlovStep() {
     //	 1	 -->   0
     //	 2	 -->   3
     //	 3	 -->   2
-    if (output < 4) {
+    bool boundary = ((output == 1 && _id % gK == gK-1) || (output == 0 && _id % gK == 0) ||
+        (output == 3 && _id / gK == gK-1) || (output == 2 && _id / gK == 0));
+    if (output < 4 && !boundary) {
       int input = output;
       if (output % 2)
         --input;
@@ -1751,8 +1753,9 @@ void RFLOVRouter::_RFlovStep() {
     for (int vc = 0; vc < _vcs; ++vc) {
       if (_credit_counter[out][vc] > 0) {
         assert(in >= 0 && in < 4);
-        if (_out_queue_credits.count(in) == 0)
+        if (_out_queue_credits.count(in) == 0) {
           _out_queue_credits.insert(make_pair(in, Credit::New()));
+        }
         if (_out_queue_credits[in]->vc.count(vc) == 0) {
           --_credit_counter[out][vc];
           _out_queue_credits[in]->vc.insert(vc);
