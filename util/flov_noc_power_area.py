@@ -226,6 +226,18 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
         l1 = re.findall('\d+', lines)
         off_routers = map(int, l1)
     #print off_routers
+    pattern = "network.flov_hops"
+    lines = string.split(
+        subprocess.check_output(["grep", pattern, stats_file]), '\n', -1)
+    flov_hops = [int(s) for s in lines[0].split() if s.isdigit()]
+    flov_hops = sum(flov_hops)
+    print flov_hops
+    pattern = "network.hops"
+    lines = string.split(
+        subprocess.check_output(["grep", pattern, stats_file]), '\n', -1)
+    hops = [int(s) for s in lines[0].split() if s.isdigit()]
+    hops = sum(hops)
+    print hops
 
     # Initialize DSENT with a configuration file
     dsent.initialize(router_config_file)
@@ -234,6 +246,10 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
     router_dynamic_power = 0.0
     router_static_power = 0.0
     for (r, inj) in enumerate(inject_rate):
+        if r == 0:
+            inj = flov_hops / cycles + hops / cycles
+        else:
+            inj = 0
         rpower = computeRouterPowerAndArea(
             r, stats_file, config, number_of_virtual_networks, vcs_per_vnet,
             buffers_per_vc, attached_router_id, flit_size_bits, inj)
@@ -300,11 +316,13 @@ def getPowerAndEnergy(sim_directory, router_config_file, link_config_file):
     stats_file = sim_directory + "/stats.txt"
 
     (config, number_of_virtual_networks, vcs_per_vnet, buffers_per_vc,
-     flit_size_bits, attached_router_id, booksim_config) = parseConfig(config_file)
+     flit_size_bits, attached_router_id,
+     booksim_config) = parseConfig(config_file)
 
-    (dynamic_power, static_power, dynamic_energy, static_energy) = parseStats(stats_file,
-            config, router_config_file, link_config_file, attached_router_id, number_of_virtual_networks, vcs_per_vnet,
-            buffers_per_vc, flit_size_bits, booksim_config)
+    (dynamic_power, static_power, dynamic_energy, static_energy) = parseStats(
+        stats_file, config, router_config_file, link_config_file,
+        attached_router_id, number_of_virtual_networks, vcs_per_vnet,
+        buffers_per_vc, flit_size_bits, booksim_config)
 
     return dynamic_power, static_power, dynamic_energy, static_energy
 
