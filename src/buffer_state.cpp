@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -28,7 +28,7 @@
 /*buffer_state.cpp
  *
  * This class is the buffere state of the next router down the channel
- * tracks the credit and how much of the buffer is in use 
+ * tracks the credit and how much of the buffer is in use
  */
 
 #include <iostream>
@@ -62,7 +62,11 @@ void BufferState::BufferPolicy::FreeSlotFor(int vc) {
 /* ==== Power Gate - Begin ==== */
 void BufferState::BufferPolicy::ReturnBuffer(int vc) {
 }
+
+void BufferState::BufferPolicy::SetVCBufferSize(int vc_buf_size) {
+}
 /* ==== Power Gate - End ==== */
+
 BufferState::BufferPolicy * BufferState::BufferPolicy::New(Configuration const & config, BufferState * parent, const string & name)
 {
   BufferPolicy * sp = NULL;
@@ -125,6 +129,13 @@ int BufferState::PrivateBufferPolicy::LimitFor(int vc) const
   return _vc_buf_size;
 }
 
+/* ==== Power Gate - Begin ==== */
+void BufferState::PrivateBufferPolicy::SetVCBufferSize(int vc_buf_size)
+{
+  _vc_buf_size = vc_buf_size;
+}
+/* ==== Power Gate - End ==== */
+
 BufferState::SharedBufferPolicy::SharedBufferPolicy(Configuration const & config, BufferState * parent, const string & name)
   : BufferPolicy(config, parent, name), _shared_buf_occupancy(0)
 {
@@ -135,7 +146,7 @@ BufferState::SharedBufferPolicy::SharedBufferPolicy(Configuration const & config
   } else if(num_private_bufs == 0) {
     num_private_bufs = 1;
   }
-  
+
   _private_buf_occupancy.resize(num_private_bufs, 0);
 
   _buf_size = config.GetInt("buf_size");
@@ -153,27 +164,27 @@ BufferState::SharedBufferPolicy::SharedBufferPolicy(Configuration const & config
     }
   }
   _private_buf_size.resize(num_private_bufs, _private_buf_size.back());
-  
+
   vector<int> start_vc = config.GetIntArray("private_buf_start_vc");
   if(start_vc.empty()) {
     int const sv = config.GetInt("private_buf_start_vc");
     if(sv < 0) {
       start_vc.resize(num_private_bufs);
       for(int i = 0; i < num_private_bufs; ++i) {
-	start_vc[i] = i * vcs / num_private_bufs;
+        start_vc[i] = i * vcs / num_private_bufs;
       }
     } else {
       start_vc.push_back(sv);
     }
   }
-  
+
   vector<int> end_vc = config.GetIntArray("private_buf_end_vc");
   if(end_vc.empty()) {
     int const ev = config.GetInt("private_buf_end_vc");
     if(ev < 0) {
       end_vc.resize(num_private_bufs);
       for(int i = 0; i < num_private_bufs; ++i) {
-	end_vc[i] = (i + 1) * vcs / num_private_bufs - 1;
+        end_vc[i] = (i + 1) * vcs / num_private_bufs - 1;
       }
     } else {
       end_vc.push_back(ev);
@@ -222,7 +233,7 @@ void BufferState::SharedBufferPolicy::SendingFlit(Flit const * const f)
     if(_private_buf_occupancy[i] > _private_buf_size[i]) {
       ++_shared_buf_occupancy;
       if(_shared_buf_occupancy > _shared_buf_size) {
-	Error("Shared buffer overflow.");
+        Error("Shared buffer overflow.");
       }
     }
   }
@@ -247,16 +258,16 @@ bool BufferState::SharedBufferPolicy::IsFullFor(int vc) const
 {
   int i = _private_buf_vc_map[vc];
   return ((_reserved_slots[vc] == 0) &&
-	  (_private_buf_occupancy[i] >= _private_buf_size[i]) &&
-	  (_shared_buf_occupancy >= _shared_buf_size));
+      (_private_buf_occupancy[i] >= _private_buf_size[i]) &&
+      (_shared_buf_occupancy >= _shared_buf_size));
 }
 
 int BufferState::SharedBufferPolicy::AvailableFor(int vc) const
 {
   int i = _private_buf_vc_map[vc];
-  return (_reserved_slots[vc] + 
-	  max(_private_buf_size[i] - _private_buf_occupancy[i], 0) +
-	  (_shared_buf_size - _shared_buf_occupancy));
+  return (_reserved_slots[vc] +
+      max(_private_buf_size[i] - _private_buf_occupancy[i], 0) +
+      (_shared_buf_size - _shared_buf_occupancy));
 }
 
 int BufferState::SharedBufferPolicy::LimitFor(int vc) const
@@ -297,13 +308,13 @@ void BufferState::LimitedSharedBufferPolicy::SendingFlit(Flit const * const f)
 bool BufferState::LimitedSharedBufferPolicy::IsFullFor(int vc) const
 {
   return (SharedBufferPolicy::IsFullFor(vc) ||
-	  (_buffer_state->OccupancyFor(vc) >= _max_held_slots));
+      (_buffer_state->OccupancyFor(vc) >= _max_held_slots));
 }
 
 int BufferState::LimitedSharedBufferPolicy::AvailableFor(int vc) const
 {
-  return min(SharedBufferPolicy::AvailableFor(vc), 
-	     _max_held_slots - _buffer_state->OccupancyFor(vc));
+  return min(SharedBufferPolicy::AvailableFor(vc),
+      _max_held_slots - _buffer_state->OccupancyFor(vc));
 }
 
 int BufferState::LimitedSharedBufferPolicy::LimitFor(int vc) const
@@ -312,7 +323,6 @@ int BufferState::LimitedSharedBufferPolicy::LimitFor(int vc) const
 }
 
 /* ==== Power Gate - Begin ==== */
-/* ==== Power Gate - End ==== */
 void BufferState::LimitedSharedBufferPolicy::ReturnBuffer(int vc)
 {
   --_active_vcs;
@@ -446,7 +456,7 @@ int BufferState::FeedbackSharedBufferPolicy::_ComputeRTT(int vc, int last_rtt) c
 
 int BufferState::FeedbackSharedBufferPolicy::_ComputeLimit(int rtt) const
 {
-  // for every cycle that the measured average round trip time exceeded the 
+  // for every cycle that the measured average round trip time exceeded the
   // observed minimum round trip time, reduce buffer occupancy limit by one
   assert(_min_latency >= 0);
   return max((_min_latency << 1) - rtt + _offset, 1);
@@ -476,16 +486,16 @@ void BufferState::FeedbackSharedBufferPolicy::FreeSlotFor(int vc)
        << endl;
 #endif
   _flit_sent_time[vc].pop();
-  
+
   int rtt = _ComputeRTT(vc, last_rtt);
 #ifdef DEBUG_FEEDBACK
   int old_rtt = _round_trip_time[vc];
   if(rtt != old_rtt) {
     cerr << FullName() << ": Updating RTT estimate for VC "
-	 << vc << " from "
-	 << old_rtt << " to "
-	 << rtt << " cycles."
-	 << endl;
+      << vc << " from "
+      << old_rtt << " to "
+      << rtt << " cycles."
+      << endl;
   }
 #endif
   _round_trip_time[vc] = rtt;
@@ -500,14 +510,14 @@ void BufferState::FeedbackSharedBufferPolicy::FreeSlotFor(int vc)
 #ifdef DEBUG_FEEDBACK
   if(limit != old_limit) {
     cerr << FullName() << ": Occupancy limit for VC "
-	 << vc << " changed from "
-	 << old_limit << " to "
-	 << limit << " slots."
-	 << endl;
+      << vc << " changed from "
+      << old_limit << " to "
+      << limit << " slots."
+      << endl;
     cerr << FullName() << ": Total mapped buffer space changed from "
-	 << old_mapped_size << " to "
-	 << _total_mapped_size << " slots."
-	 << endl;
+      << old_mapped_size << " to "
+      << _total_mapped_size << " slots."
+      << endl;
   }
 #endif
 }
@@ -522,8 +532,8 @@ bool BufferState::FeedbackSharedBufferPolicy::IsFullFor(int vc) const
 
 int BufferState::FeedbackSharedBufferPolicy::AvailableFor(int vc) const
 {
-  return min(SharedBufferPolicy::AvailableFor(vc), 
-	     _ComputeMaxSlots(vc) - _buffer_state->OccupancyFor(vc));
+  return min(SharedBufferPolicy::AvailableFor(vc),
+      _ComputeMaxSlots(vc) - _buffer_state->OccupancyFor(vc));
 }
 
 int BufferState::FeedbackSharedBufferPolicy::LimitFor(int vc) const
@@ -545,9 +555,9 @@ void BufferState::SimpleFeedbackSharedBufferPolicy::SendingFlit(Flit const * con
     _pending_credits[vc] = _buffer_state->OccupancyFor(vc) - 1;
 #ifdef DEBUG_SIMPLEFEEDBACK
     cerr << FullName() << ": Sending probe flit for VC "
-	 << vc << "; "
-	 << _pending_credits[vc] << " non-probe flits in flight."
-	 << endl;
+      << vc << "; "
+      << _pending_credits[vc] << " non-probe flits in flight."
+      << endl;
 #endif
     FeedbackSharedBufferPolicy::SendingFlit(f);
     return;
@@ -560,7 +570,7 @@ void BufferState::SimpleFeedbackSharedBufferPolicy::FreeSlotFor(int vc)
   if(!_flit_sent_time[vc].empty() && _pending_credits[vc] == 0) {
 #ifdef DEBUG_SIMPLEFEEDBACK
     cerr << FullName() << ": Probe credit for VC "
-	 << vc << " came back." << endl;
+      << vc << " came back." << endl;
 #endif
     FeedbackSharedBufferPolicy::FreeSlotFor(vc);
     return;
@@ -570,15 +580,15 @@ void BufferState::SimpleFeedbackSharedBufferPolicy::FreeSlotFor(int vc)
     --_pending_credits[vc];
 #ifdef DEBUG_SIMPLEFEEDBACK
     cerr << FullName() << ": Ignoring non-probe credit for VC "
-	 << vc << "; "
-	 << _pending_credits[vc] << " remaining."
-	 << endl;
+      << vc << "; "
+      << _pending_credits[vc] << " remaining."
+      << endl;
 #endif
   }
   SharedBufferPolicy::FreeSlotFor(vc);
 }
 
-BufferState::BufferState( const Configuration& config, Module *parent, const string& name ) : 
+BufferState::BufferState( const Configuration& config, Module *parent, const string& name ) :
   Module( parent, name ), _occupancy(0)
 {
   _vcs = config.GetInt( "num_vcs" );
@@ -622,8 +632,8 @@ void BufferState::ProcessCredit( Credit const * const c )
 
     assert( ( vc >= 0 ) && ( vc < _vcs ) );
 
-    if ( ( _wait_for_tail_credit ) && 
-	 ( _in_use_by[vc] < 0 ) ) {
+    if ( ( _wait_for_tail_credit ) &&
+        ( _in_use_by[vc] < 0 ) ) {
       ostringstream err;
       err << "Received credit for idle VC " << vc;
       Error( err.str() );
@@ -671,9 +681,9 @@ void BufferState::SendingFlit( Flit const * const f )
   }
 
   ++_vc_occupancy[vc];
-  
+
   _buffer_policy->SendingFlit(f);
-  
+
 #ifdef TRACK_BUFFERS
   _outstanding_classes[vc].push(f->cl);
   ++_class_occupancy[f->cl];
@@ -681,7 +691,7 @@ void BufferState::SendingFlit( Flit const * const f )
 
   if ( f->tail ) {
     _tail_sent[vc] = true;
-    
+
     if ( !_wait_for_tail_credit ) {
       assert(_in_use_by[vc] >= 0);
       _in_use_by[vc] = -1;
@@ -722,22 +732,27 @@ void BufferState::ReturnBuffer( int vc)
 
 void BufferState::ClearCredits()
 {
-	_occupancy += _size;
-	for (int vc = 0; vc < _vcs; ++vc) {
-		_vc_occupancy[vc] += _size / _vcs;
-		_in_use_by[vc] = -1;
-		_tail_sent[vc] = false;
-	}
+  _occupancy += _size;
+  for (int vc = 0; vc < _vcs; ++vc) {
+    _vc_occupancy[vc] += _size / _vcs;
+    _in_use_by[vc] = -1;
+    _tail_sent[vc] = false;
+  }
 }
 
 void BufferState::FullCredits()
 {
-	_occupancy = 0;
-	for (int vc = 0; vc < _vcs; ++vc) {
-		_vc_occupancy[vc] = 0;
-		_in_use_by[vc] = -1;
-		_tail_sent[vc] = false;
-	}
+  _occupancy = 0;
+  for (int vc = 0; vc < _vcs; ++vc) {
+    _vc_occupancy[vc] = 0;
+    _in_use_by[vc] = -1;
+    _tail_sent[vc] = false;
+  }
+}
+
+void BufferState::SetVCBufferSize(int vc_buf_size)
+{
+  _buffer_policy->SetVCBufferSize(vc_buf_size);
 }
 /* ==== Power Gate - End ==== */
 
@@ -747,8 +762,8 @@ void BufferState::Display( ostream & os ) const
   os << " occupied = " << _occupancy << endl;
   for ( int v = 0; v < _vcs; ++v ) {
     os << "  VC " << v << ": ";
-    os << "in_use_by = " << _in_use_by[v] 
-       << ", tail_sent = " << _tail_sent[v]
-       << ", occupied = " << _vc_occupancy[v] << endl;
+    os << "in_use_by = " << _in_use_by[v]
+      << ", tail_sent = " << _tail_sent[v]
+      << ", occupied = " << _vc_occupancy[v] << endl;
   }
 }

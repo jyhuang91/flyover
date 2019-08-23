@@ -369,7 +369,7 @@ BookSimConfig::BookSimConfig() {
   _int_map["powergate_auto_config"] = 0;  // config power-gate map automatically
   _int_map["powergate_seed"] = 0; // permute power-gated core ids
   _int_map["powergate_percentile"] = 0; // percentile of power-gated cores
-  AddStrField("powergate_type", "no_pg"); // can be {no_pg, flov = rflov, rpa, rpc}
+  AddStrField("powergate_type", "no_pg"); // can be {no_pg, flov, rflov, rpa, rpc, nord}
 
   _int_map["idle_threshold"] = 5;
   _int_map["drain_threshold"] = 100;

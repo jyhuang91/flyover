@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -37,13 +37,13 @@
 #include "config_utils.hpp"
 
 class BufferState : public Module {
-  
+
   class BufferPolicy : public Module {
   protected:
     BufferState const * const _buffer_state;
   public:
-    BufferPolicy(Configuration const & config, BufferState * parent, 
-		 const string & name);
+    BufferPolicy(Configuration const & config, BufferState * parent,
+        const string & name);
     virtual void SetMinLatency(int min_latency) {}
     virtual void TakeBuffer(int vc = 0);
     virtual void SendingFlit(Flit const * const f);
@@ -52,26 +52,30 @@ class BufferState : public Module {
     virtual int AvailableFor(int vc = 0) const = 0;
     virtual int LimitFor(int vc = 0) const = 0;
 
-    static BufferPolicy * New(Configuration const & config, 
-			      BufferState * parent, const string & name);
+    static BufferPolicy * New(Configuration const & config,
+        BufferState * parent, const string & name);
 
     /* ==== Power Gate - Begin ==== */
     virtual void ReturnBuffer(int vc = 0);  // for push back SA to RC
+    virtual void SetVCBufferSize(int vc_buf_size);
     /* ==== Power Gate - End ==== */
   };
-  
+
   class PrivateBufferPolicy : public BufferPolicy {
   protected:
     int _vc_buf_size;
   public:
-    PrivateBufferPolicy(Configuration const & config, BufferState * parent, 
-			const string & name);
+    PrivateBufferPolicy(Configuration const & config, BufferState * parent,
+        const string & name);
     virtual void SendingFlit(Flit const * const f);
     virtual bool IsFullFor(int vc = 0) const;
     virtual int AvailableFor(int vc = 0) const;
     virtual int LimitFor(int vc = 0) const;
+    /* ==== Power Gate - Begin ==== */
+    virtual void SetVCBufferSize(int vc_buf_size);
+    /* ==== Power Gate - End ==== */
   };
-  
+
   class SharedBufferPolicy : public BufferPolicy {
   protected:
     int _buf_size;
@@ -83,8 +87,8 @@ class BufferState : public Module {
     vector<int> _reserved_slots;
     void ProcessFreeSlot(int vc = 0);
   public:
-    SharedBufferPolicy(Configuration const & config, BufferState * parent, 
-		       const string & name);
+    SharedBufferPolicy(Configuration const & config, BufferState * parent,
+        const string & name);
     virtual void SendingFlit(Flit const * const f);
     virtual void FreeSlotFor(int vc = 0);
     virtual bool IsFullFor(int vc = 0) const;
@@ -98,9 +102,9 @@ class BufferState : public Module {
     int _active_vcs;
     int _max_held_slots;
   public:
-    LimitedSharedBufferPolicy(Configuration const & config, 
-			      BufferState * parent,
-			      const string & name);
+    LimitedSharedBufferPolicy(Configuration const & config,
+        BufferState * parent,
+        const string & name);
     virtual void TakeBuffer(int vc = 0);
     virtual void SendingFlit(Flit const * const f);
     virtual bool IsFullFor(int vc = 0) const;
@@ -110,31 +114,31 @@ class BufferState : public Module {
     virtual void ReturnBuffer(int vc = 0);
     /* ==== Power Gate - End ==== */
   };
-    
+
   class DynamicLimitedSharedBufferPolicy : public LimitedSharedBufferPolicy {
   public:
-    DynamicLimitedSharedBufferPolicy(Configuration const & config, 
-				     BufferState * parent,
-				     const string & name);
+    DynamicLimitedSharedBufferPolicy(Configuration const & config,
+        BufferState * parent,
+        const string & name);
     virtual void TakeBuffer(int vc = 0);
     virtual void SendingFlit(Flit const * const f);
     /* ==== Power Gate - Begin ==== */
     virtual void ReturnBuffer(int vc = 0);
     /* ==== Power Gate - End ==== */
   };
-  
+
   class ShiftingDynamicLimitedSharedBufferPolicy : public DynamicLimitedSharedBufferPolicy {
   public:
-    ShiftingDynamicLimitedSharedBufferPolicy(Configuration const & config, 
-					     BufferState * parent,
-					     const string & name);
+    ShiftingDynamicLimitedSharedBufferPolicy(Configuration const & config,
+        BufferState * parent,
+        const string & name);
     virtual void TakeBuffer(int vc = 0);
     virtual void SendingFlit(Flit const * const f);
     /* ==== Power Gate - Begin ==== */
     virtual void ReturnBuffer(int vc = 0);
     /* ==== Power Gate - End ==== */
   };
-  
+
   class FeedbackSharedBufferPolicy : public SharedBufferPolicy {
   protected:
     int _ComputeRTT(int vc, int last_rtt) const;
@@ -149,8 +153,8 @@ class BufferState : public Module {
     int _aging_scale;
     int _offset;
   public:
-    FeedbackSharedBufferPolicy(Configuration const & config, 
-			       BufferState * parent, const string & name);
+    FeedbackSharedBufferPolicy(Configuration const & config,
+        BufferState * parent, const string & name);
     virtual void SetMinLatency(int min_latency);
     virtual void SendingFlit(Flit const * const f);
     virtual void FreeSlotFor(int vc = 0);
@@ -158,25 +162,25 @@ class BufferState : public Module {
     virtual int AvailableFor(int vc = 0) const;
     virtual int LimitFor(int vc = 0) const;
   };
-  
+
   class SimpleFeedbackSharedBufferPolicy : public FeedbackSharedBufferPolicy {
   protected:
     vector<int> _pending_credits;
   public:
-    SimpleFeedbackSharedBufferPolicy(Configuration const & config, 
-				     BufferState * parent, const string & name);
+    SimpleFeedbackSharedBufferPolicy(Configuration const & config,
+        BufferState * parent, const string & name);
     virtual void SendingFlit(Flit const * const f);
     virtual void FreeSlotFor(int vc = 0);
   };
-  
+
   bool _wait_for_tail_credit;
   int  _size;
   int  _occupancy;
   vector<int> _vc_occupancy;
   int  _vcs;
-  
+
   BufferPolicy * _buffer_policy;
-  
+
   vector<int> _in_use_by;
   vector<bool> _tail_sent;
   vector<int> _last_id;
@@ -190,8 +194,8 @@ class BufferState : public Module {
 
 public:
 
-  BufferState( const Configuration& config, 
-	       Module *parent, const string& name );
+  BufferState( const Configuration& config,
+      Module *parent, const string& name );
 
   ~BufferState();
 
@@ -208,6 +212,7 @@ public:
   void ReturnBuffer( int vc = 0 );
   void ClearCredits();
   void FullCredits();
+  virtual void SetVCBufferSize(int vc_buf_size);
   /* ==== Power Gate - End ==== */
 
   inline bool IsFull() const {
@@ -235,7 +240,7 @@ public:
     assert( ( vc >= 0 ) && ( vc < _vcs ) );
     return _in_use_by[vc];
   }
-    
+
   inline int Occupancy() const {
     return _occupancy;
   }
@@ -244,7 +249,7 @@ public:
     assert((vc >= 0) && (vc < _vcs));
     return _vc_occupancy[vc];
   }
-  
+
 #ifdef TRACK_BUFFERS
   inline int OccupancyForClass(int c) const {
     assert((c >= 0) && (c < _classes));
@@ -255,4 +260,4 @@ public:
   void Display( ostream & os = cout ) const;
 };
 
-#endif 
+#endif

@@ -25,65 +25,64 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/*module.cpp
- *
- *The basic class that is extended by all other components of the network
- *Provides the basic hierarchy structure and basic fuctions
- *
- */
+#ifndef _NORD_ROUTER_HPP_
+#define _NORD_ROUTER_HPP_
 
-#include <iostream>
-#include <cstdlib>
+#include "iq_router.hpp"
 
-#include "booksim.hpp"
-#include "module.hpp"
-#include "globals.hpp"
+/* ==== Power Gate - Begin ==== */
+class Handshake;
+/* ==== Power Gate - End ==== */
 
-Module::Module( Module *parent, const string& name )
-{
-  _name = name;
+class NordRouter : public IQRouter {
 
-  if ( parent ) {
-    parent->_AddChild( this );
-    _fullname = parent->_fullname + "/" + name;
-  } else {
-    _fullname = name;
-  }
-}
+protected:
 
-void Module::_AddChild( Module *child )
-{
-  _children.push_back( child );
-}
+  /* ==== Power Gate - Begin ==== */
+  deque<pair<int, Handshake *> > _proc_handshakes;
 
-void Module::DisplayHierarchy( int level, ostream & os ) const
-{
-  vector<Module *>::const_iterator mod_iter;
+  map<int, Handshake *> _out_queue_handshakes;
 
-  for ( int l = 0; l < level; l++ ) {
-    os << "  ";
-  }
+  vector<queue<Handshake *> > _handshake_buffer;
 
-  os << _name << endl;
+  void _ReceiveHandshakes( );
+  /* ==== Power Gate - End ==== */
 
-  for ( mod_iter = _children.begin( );
-      mod_iter != _children.end( ); mod_iter++ ) {
-    (*mod_iter)->DisplayHierarchy( level + 1 );
-  }
-}
+  virtual void _InternalStep( );
 
-void Module::Error( const string& msg ) const
-{
-  cout << GetSimTime() << " | Error in " << _fullname << " : " << msg << endl;
-  exit( -1 );
-}
+  virtual void _InputQueuing( );
 
-void Module::Debug( const string& msg ) const
-{
-  cout << "Debug (" << _fullname << ") : " << msg << endl;
-}
+  virtual void _RouteUpdate( );
+  virtual void _VCAllocUpdate( );
+  virtual void _SWHoldUpdate( );
+  virtual void _SWAllocUpdate( );
 
-void Module::Display( ostream & os ) const
-{
-  os << "Display method not implemented for " << _fullname << endl;
-}
+  virtual void _OutputQueuing( );
+
+  /* ==== Power Gate - Begin ==== */
+  void _SendHandshakes( );
+
+  void _NordStep( );  // fly-over operations
+  void _HandshakeEvaluate();
+  void _HandshakeResponse();
+  /* ==== Power Gate - End ==== */
+
+public:
+
+  NordRouter( Configuration const & config,
+          Module *parent, string const & name, int id,
+          int inputs, int outputs );
+
+  virtual ~NordRouter( );
+
+  /* ==== Power Gate - Begin ==== */
+  virtual void PowerStateEvaluate( );
+  virtual void SetRingOutputVCBufferSize(int vc_buf_size);
+  /* ==== Power Gate - End ==== */
+
+  virtual void ReadInputs( );
+  virtual void WriteOutputs( );
+
+};
+
+#endif

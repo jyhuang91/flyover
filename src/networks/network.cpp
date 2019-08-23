@@ -267,7 +267,8 @@ void Network::_Alloc( )
     cout << endl;
 #endif
     // router power states
-    if (_powergate_type == "flov" || _powergate_type == "rflov") {
+    if (_powergate_type == "flov" || _powergate_type == "rflov" ||
+        _powergate_type == "nord") {
       _router_states = _core_states;
     } else if (_powergate_type == "rpa") {  // aggressive RP
       _router_states = _core_states;
