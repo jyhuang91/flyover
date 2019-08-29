@@ -44,6 +44,10 @@ private:
   vector<vector<unordered_map<int, list<Flit *> > > > _bypass_partial_packets;
   vector<map<int, int> > _bypass_packets_assigned_vc;
   vector<vector<bool> > _during_bypassing;
+
+  int _wakeup_threshold;
+  int _wakeup_monitor_epoch;
+  vector<int> _wakeup_monitor_vc_requests;
   // ============ Internal methods ============
 protected:
 

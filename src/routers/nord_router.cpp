@@ -86,6 +86,12 @@ NordRouter::NordRouter( Configuration const & config, Module *parent,
     _ring_out_port = DIR_SOUTH;
   }
 
+  // for flow control
+  _credit_counter.resize(_outputs);
+  for (int k = 0; k < _outputs; ++k) {
+    _credit_counter[k].resize(_vcs, 0);
+  }
+
   // Redefine next VCs' buffer state and size
   if (_power_state == power_off)
     _next_buf[_ring_out_port]->SetVCBufferSize(1);
@@ -96,6 +102,11 @@ NordRouter::NordRouter( Configuration const & config, Module *parent,
 
 NordRouter::~NordRouter( )
 {
+  for (int output = 0; output < _outputs; output++) {
+    for (int vc = 0; vc < _vcs; vc++) {
+      assert(_credit_counter[output][vc] == 0);
+    }
+  }
 }
 
 void NordRouter::ReadInputs( )
@@ -114,6 +125,47 @@ void NordRouter::ReadInputs( )
 /* ==== Power Gate - Begin ==== */
 void NordRouter::PowerStateEvaluate()
 {
+  // bottom row routers are always on
+  if (_id >= gNodes - gK)
+    assert(_power_state == power_on);
+
+  switch (_power_state) {
+    case power_on:
+      break;
+
+    case power_off:
+      ++_power_off_cycles;
+      ++_total_power_off_cycles;
+      if (_wakeup_signal) {
+        _power_state = wakeup;
+        assert(_wakeup_timer == 0);
+      }
+      break;
+
+    case wakeup:
+      ++_wakeup_timer;
+      if (_wakeup_timer >= _wakeup_threshold) {
+        _wakeup_signal = false;
+        _wakeup_timer = 0;
+        _power_state = power_on;
+        for (int out = 0; out < _outputs; out++) {
+          _next_buf[out]->ResetVCBufferSize();
+        }
+        assert(_out_queue_handshakes.empty());
+        for (int out = 0; out < 4; ++out) {
+          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+          _out_queue_handshakes[out]->new_state = power_on;
+          _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
+        }
+      }
+      break;
+
+    default: // Must be something wrong
+      ostringstream err;
+      err << "Something wrong in the power state transition state machine";
+      Error(err.str());
+  }
 }
 /* ==== Power Gate - End ==== */
 
@@ -350,6 +402,34 @@ void NordRouter::_InputQueuing( )
       --_outstanding_credits[cl][output];
     }
 #endif
+
+    /* ==== Power Gate - Begin ==== */
+    int input = -1;
+    if (output == DIR_NI) {
+      input = _ring_in_port;
+    } else if (output == _ring_out_port) {
+      input = DIR_NI;
+    }
+
+    if (input != -1) {
+      set<int>::iterator iter = c->vc.begin();
+      while (iter != c->vc.end()) {
+
+        int const vc = *iter;
+        assert(vc >= 0 && vc < _vcs);
+
+        if (_credit_counter[output][vc] > 0) {
+          if (_out_queue_credits.count(input) == 0) {
+            _out_queue_credits.insert(make_pair(input, Credit::New()));
+          }
+          _out_queue_credits[input]->vc.insert(vc);
+          _credit_counter[output][vc]--;
+        }
+
+        ++iter;
+      }
+    }
+    /* ==== Power Gate - End ==== */
 
     dest_buf->ProcessCredit(c);
     c->Free();
@@ -1437,6 +1517,8 @@ void NordRouter::_NordStep() {
     int const vc = f->vc;
     assert((vc >= 0) && (vc < _vcs));
 
+    Buffer * const cur_buf = _buf[input];
+
     int output;
     if (input == _ring_in_port) {
       output = DIR_NI;
@@ -1454,14 +1536,22 @@ void NordRouter::_NordStep() {
     }
 
     BufferState * const dest_buf = _next_buf[output];
-    if (f->head)
-        dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
+    if (f->head) {
+      cur_buf->SetOutput(vc, output, vc);
+      cur_buf->SetState(vc, VC::active);
+      dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
+    }
+    if (f->tail) {
+      cur_buf->SetState(vc, VC::idle);
+    }
     dest_buf->SendingFlit(f);
+
+    _credit_counter[output][vc]++;
 
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-      << "Buffering flit " << f->id << " at output " << output << "."
-      << endl;
+        << "Buffering flit " << f->id << " at output " << output << "."
+        << endl;
     }
     _output_buffer[output].push(f);
 
@@ -1521,6 +1611,7 @@ void NordRouter::_NordStep() {
 
         assert(vc >= 0 && vc < _vcs);
         _out_queue_credits[input]->vc.insert(vc);
+        _credit_counter[output][vc]--;
 
         ++iter;
       }
@@ -1541,39 +1632,20 @@ void NordRouter::_HandshakeEvaluate() {
     Handshake * h = item.second;
     assert(h);
 
-    if (h->new_state == power_off) {
-      if (_neighbor_states[output] != draining) {
-        cout << GetSimTime() << output << "'s state: " << POWERSTATE[_neighbor_states[output]] << endl;
-      }
-      assert(_neighbor_states[output] == draining);
-      assert(_drain_done_sent[output]);
-      _drain_done_sent[output] = false;
-      BufferState * dest_buf = _next_buf[output];
-      dest_buf->ClearCredits();
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    } else if (h->new_state == power_on && _neighbor_states[output] == wakeup) {
-      _drain_done_sent[output] = false;
-      BufferState * dest_buf = _next_buf[output];
-      dest_buf->FullCredits();
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    } else if (h->new_state == power_on && _neighbor_states[output] == draining) {
-      _drain_done_sent[output] = false;
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    } else if (h->new_state == draining || h->new_state == wakeup) {
-      _drain_done_sent[output] = false;
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    }
+    switch (h->new_state) {
+      case power_off:
+        assert(0);
+        break;
 
-    if (h->drain_done) {
-      assert(_power_state == draining || _power_state == wakeup || _power_state == power_on);
-      if (h->hid == _req_hids[input] && (_power_state == draining || _power_state == wakeup)) {
-        _drain_tags[input] = true;
-      }
-      /*if (_power_state == draining || _power_state == wakeup) {
-        _drain_tags[input] = true;
-      }*/
-    } else {
-      _resp_hids[output] = h->hid;
+      case power_on:
+        _neighbor_states[output] = power_on;
+        _next_buf[output]->ResetVCBufferSize();
+        break;
+
+      default:
+        ostringstream err;
+        err << "Something wrong in the handshake state machine";
+        Error(err.str());
     }
 
     h->Free();

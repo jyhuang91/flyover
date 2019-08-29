@@ -116,10 +116,10 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
         if (router_states[ring_next_router] == false) {
           routers[s]->SetRingOutputVCBufferSize(1);
         }
-      }
-
-      for (int subnet = 0; subnet < _subnets; ++subnet) {
-        _buf_states[s][subnet]->SetVCBufferSize(1);
+      } else {
+        for (int subnet = 0; subnet < _subnets; ++subnet) {
+          _buf_states[s][subnet]->SetVCBufferSize(1);
+        }
       }
     }
 
@@ -146,6 +146,10 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
       _bypass_partial_packets[s].resize(_classes);
       _during_bypassing[s].resize(_classes, false);
     }
+
+    _wakeup_threshold = config.GetInt("nord_wakeup_threshold");
+    _wakeup_monitor_epoch = config.GetInt("nord_wakeup_monitor_epoch");
+    _wakeup_monitor_vc_requests.resize(_nodes, 0);
     /* ==== Power Gate - End ==== */
 }
 
@@ -390,6 +394,21 @@ void NordTrafficManager::_Step( )
     }
     cout << endl << endl;
     /* ==== Power Gate Debug - End ==== */
+  }
+
+  const vector<Router *> routers = _net[0]->GetRouters();
+  const vector<bool> router_states = _net[0]->GetRouterStates();
+  if (_wakeup_threshold > 0) {
+    for (int n = 0; n < _nodes; ++n) {
+      if (_wakeup_monitor_vc_requests[n] > _wakeup_threshold &&
+          routers[n]->GetPowerState() == Router::power_on) {
+        assert(router_states[n] == false);
+        _wakeup_monitor_vc_requests[n] = 0;
+        for (int subnet = 0; subnet < _subnets; ++subnet) {
+          _buf_states[n][subnet]->ResetVCBufferSize();
+        }
+      }
+    }
   }
 
   vector<map<int, Flit *> > flits(_subnets);
@@ -687,6 +706,16 @@ void NordTrafficManager::_Step( )
             }
 
             if(cf->head && cf->vc == -1) { // Find first available VC
+
+              if (_wakeup_threshold > 0) {
+                ++_wakeup_monitor_vc_requests[n];
+                if (_time % _wakeup_monitor_epoch == 0) {
+                  if (_wakeup_monitor_vc_requests[n] > _wakeup_threshold) {
+                    const vector<Router *> routers = _net[0]->GetRouters();
+                    routers[n]->WakeUp();
+                  }
+                }
+              }
 
               OutputSet route_set;
               _rf(nullptr, cf, -1, &route_set, true);

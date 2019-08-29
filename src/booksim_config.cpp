@@ -375,6 +375,8 @@ BookSimConfig::BookSimConfig() {
   _int_map["drain_threshold"] = 100;
   _int_map["bet_threshold"] = 10;
   _int_map["wakeup_threshold"] = 3;
+  _int_map["nord_wakeup_threshold"] = 10; // number of VC requests at NI within monitor epoch
+  _int_map["nord_wakeup_monitor_epoch"] = 10; // report every 10 cycles
   /* ==== Power Gate - End ==== */
 
   //==================Network file===========================

@@ -58,12 +58,16 @@ class BufferState : public Module {
     /* ==== Power Gate - Begin ==== */
     virtual void ReturnBuffer(int vc = 0);  // for push back SA to RC
     virtual void SetVCBufferSize(int vc_buf_size);
+    virtual void ResetVCBufferSize();
     /* ==== Power Gate - End ==== */
   };
 
   class PrivateBufferPolicy : public BufferPolicy {
   protected:
     int _vc_buf_size;
+    /* ==== Power Gate - Begin ==== */
+    int _full_vc_buf_size;
+    /* ==== Power Gate - End ==== */
   public:
     PrivateBufferPolicy(Configuration const & config, BufferState * parent,
         const string & name);
@@ -72,6 +76,7 @@ class BufferState : public Module {
     virtual int AvailableFor(int vc = 0) const;
     virtual int LimitFor(int vc = 0) const;
     /* ==== Power Gate - Begin ==== */
+    virtual void ResetVCBufferSize();
     virtual void SetVCBufferSize(int vc_buf_size);
     /* ==== Power Gate - End ==== */
   };
@@ -212,6 +217,8 @@ public:
   void ReturnBuffer( int vc = 0 );
   void ClearCredits();
   void FullCredits();
+  void FillCredits();
+  virtual void ResetVCBufferSize();
   virtual void SetVCBufferSize(int vc_buf_size);
   /* ==== Power Gate - End ==== */
 

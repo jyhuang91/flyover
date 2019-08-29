@@ -65,6 +65,8 @@ void BufferState::BufferPolicy::ReturnBuffer(int vc) {
 
 void BufferState::BufferPolicy::SetVCBufferSize(int vc_buf_size) {
 }
+
+void BufferState::BufferPolicy::ResetVCBufferSize() {}
 /* ==== Power Gate - End ==== */
 
 BufferState::BufferPolicy * BufferState::BufferPolicy::New(Configuration const & config, BufferState * parent, const string & name)
@@ -101,6 +103,9 @@ BufferState::PrivateBufferPolicy::PrivateBufferPolicy(Configuration const & conf
   } else {
     _vc_buf_size = buf_size / vcs;
   }
+  /* ==== Power Gate - Begin ==== */
+  _full_vc_buf_size = _vc_buf_size;
+  /* ==== Power Gate - End ==== */
   assert(_vc_buf_size > 0);
 }
 
@@ -133,6 +138,11 @@ int BufferState::PrivateBufferPolicy::LimitFor(int vc) const
 void BufferState::PrivateBufferPolicy::SetVCBufferSize(int vc_buf_size)
 {
   _vc_buf_size = vc_buf_size;
+}
+
+void BufferState::PrivateBufferPolicy::ResetVCBufferSize()
+{
+  _vc_buf_size = _full_vc_buf_size;
 }
 /* ==== Power Gate - End ==== */
 
@@ -748,6 +758,20 @@ void BufferState::FullCredits()
     _in_use_by[vc] = -1;
     _tail_sent[vc] = false;
   }
+  _buffer_policy->ResetVCBufferSize();
+}
+
+void BufferState::FillCredits()
+{
+  _occupancy = 0;
+  for (int vc = 0; vc < _vcs; ++vc) {
+    _vc_occupancy[vc] = 0;
+  }
+  _buffer_policy->ResetVCBufferSize();
+}
+
+void BufferState::ResetVCBufferSize() {
+  _buffer_policy->ResetVCBufferSize();
 }
 
 void BufferState::SetVCBufferSize(int vc_buf_size)
