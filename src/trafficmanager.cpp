@@ -650,6 +650,7 @@ TrafficManager::~TrafficManager( )
     PacketReplyInfo::FreeAll();
     Flit::FreeAll();
     Credit::FreeAll();
+    Handshake::FreeAll();
 }
 
 
@@ -1709,6 +1710,10 @@ bool TrafficManager::Run( )
         //wait until all the credits are drained as well
         while(Credit::OutStanding()!=0){
             _Step();
+        }
+
+        while (Handshake::OutStanding() != 0) {
+          _Step();
         }
         _empty_network = false;
 
