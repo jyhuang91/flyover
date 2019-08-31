@@ -2383,12 +2383,13 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
 
     bool timeout = (GetSimTime() - f->rtime > 300);
 
-    out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
+    int xy_out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
+    int yx_out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
 
-    if(r->GetNeighborPowerState(out_port) != Router::power_on)
-      out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
-
-    if (r->GetNeighborPowerState(out_port) != Router::power_on)
+    out_port = xy_out_port;
+    if(r->GetNeighborPowerState(xy_out_port) != Router::power_on)
+      out_port = yx_out_port;
+    if (r->GetNeighborPowerState(yx_out_port) != Router::power_on)
       out_port = r->GetRingOutput();
 
     bool uturn = (in_channel == out_port);

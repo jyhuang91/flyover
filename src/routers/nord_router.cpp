@@ -126,8 +126,12 @@ void NordRouter::ReadInputs( )
 void NordRouter::PowerStateEvaluate()
 {
   // bottom row routers are always on
-  if (_id >= gNodes - gK)
+  if (_id >= gNodes - gK) {
+    if (_power_state != power_on) {
+      cout << GetSimTime() << " | " << FullName() << " | is not power on " << endl;
+    }
     assert(_power_state == power_on);
+  }
 
   switch (_power_state) {
     case power_on:
@@ -149,7 +153,9 @@ void NordRouter::PowerStateEvaluate()
         _wakeup_timer = 0;
         _power_state = power_on;
         for (int out = 0; out < _outputs; out++) {
-          _next_buf[out]->ResetVCBufferSize();
+          if (_neighbor_states[out] != power_off) {
+            _next_buf[out]->ResetVCBufferSize();
+          }
         }
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < 4; ++out) {
@@ -583,8 +589,15 @@ void NordRouter::_VCAllocUpdate( )
         if (!is_mc && (_neighbor_states[match_output] == draining ||
               _neighbor_states[match_output] == wakeup))
           back_to_route = true;
-        if (_neighbor_states[match_output] == power_off)
+        if (_neighbor_states[match_output] == power_off) {
+          if (match_output != _ring_out_port) {
+            cout << GetSimTime() << " | " << FullName() << " | "
+              << "match_output " << match_output
+              << ", ring output " << _ring_out_port
+              << *f << endl;
+          }
           assert(match_output == _ring_out_port);
+        }
       }
       if (!back_to_route) {
         if(f->watch) {
@@ -1539,7 +1552,8 @@ void NordRouter::_NordStep() {
     if (f->head) {
       cur_buf->SetOutput(vc, output, vc);
       cur_buf->SetState(vc, VC::active);
-      dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
+      //dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
+      dest_buf->TakeBuffer(vc, vc * _inputs + vc); // indicate its taken by nord
     }
     if (f->tail) {
       cur_buf->SetState(vc, VC::idle);
@@ -1651,6 +1665,7 @@ void NordRouter::_HandshakeEvaluate() {
     h->Free();
     _proc_handshakes.pop_front();
   }
+  assert(_proc_handshakes.empty());
 }
 
 void NordRouter::_HandshakeResponse() {

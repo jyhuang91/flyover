@@ -110,20 +110,27 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
     // reset VC buffer depth for bypass latches
     vector<bool> const & router_states = _net[0]->GetRouterStates();
     for (int s = 0; s < _nodes; ++s) {
-      if (router_states[s] == true) {
-        FlitChannel *ring_output_channel = routers[s]->GetRingOutputChannel();
-        int ring_next_router = ring_output_channel->GetSink()->GetID();
-        if (router_states[ring_next_router] == false) {
-          routers[s]->SetRingOutputVCBufferSize(1);
-        }
-      } else {
+      FlitChannel *ring_output_channel = routers[s]->GetRingOutputChannel();
+      int ring_next_router = ring_output_channel->GetSink()->GetID();
+      if (router_states[ring_next_router] == false) {
+        routers[s]->SetRingOutputVCBufferSize(1);
+      }
+      if (router_states[s] == false) {
         for (int subnet = 0; subnet < _subnets; ++subnet) {
           _buf_states[s][subnet]->SetVCBufferSize(1);
         }
       }
     }
 
-    _bypass_packets_assigned_vc.resize(_nodes);
+    _buffers.resize(_nodes);
+    for (int n = 0; n < _nodes; ++n) {
+      _buffers[n].resize(_subnets);
+      for (int subnet = 0; subnet < _subnets; ++subnet) {
+        ostringstream tmp_name;
+        tmp_name << "terminal_buf_" << n << "_" << subnet;
+        _buffers[n][subnet] = new Buffer(config, 1, this, tmp_name.str());
+      }
+    }
 
     // initialize neighbor power states
     for (int s = 0; s < _nodes; ++s) {
@@ -141,9 +148,7 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
     }
 
     _during_bypassing.resize(_nodes);
-    _bypass_partial_packets.resize(_nodes);
     for (int s = 0; s < _nodes; ++s) {
-      _bypass_partial_packets[s].resize(_classes);
       _during_bypassing[s].resize(_classes, false);
     }
 
@@ -375,16 +380,7 @@ void NordTrafficManager::_Step( )
         if (routers[n]->GetPowerState() == Router::power_off) {
           // TODO
           cout << "node " << n << " | Bypassing flit lists:" << endl;
-          for (unordered_map<int, list<Flit *> >::iterator iter = _bypass_partial_packets[n][c].begin();
-              iter != _bypass_partial_packets[n][c].end(); iter++) {
-            int bypass_pid = iter->first;
-            cout << " - packet " << bypass_pid << ":"<< endl;
-            list<Flit *> const & pp = _bypass_partial_packets[n][c][bypass_pid];
-            for (list<Flit *>::const_iterator fiter = pp.begin();
-                fiter != pp.end(); fiter++) {
-              cout << *(*fiter);
-            }
-          }
+          _buffers[n][0]->Display(cout);
         }
       }
       routers[n]->Display(cout);
@@ -470,6 +466,12 @@ void NordTrafficManager::_Step( )
       int const last_class = _last_class[n][subnet];
 
       int class_limit = _classes;
+
+      /* ==== Power Gate - Begin ==== */
+      int const last_vc = _last_vc[n][subnet][last_class];
+      int vc_limit = _vcs;
+      int bypass_vc = -1;
+      /* ==== Power Gate - End ==== */
 
       if (!_during_bypassing[n][last_class]) {
         if(_hold_switch_for_packet) {
@@ -605,222 +607,144 @@ void NordTrafficManager::_Step( )
 
       } else {
         /* ==== Power Gate - Begin ==== */
-        assert(_partial_packets[n][last_class].empty() ||
-            _partial_packets[n][last_class].front()->head);
-
         if(_hold_switch_for_packet) {
-          int bypass_pid = -1;
-          int bypass_assigned_vc = -1;
-          for (unordered_map<int, list<Flit *> >::iterator iter = _bypass_partial_packets[n][last_class].begin();
-              iter != _bypass_partial_packets[n][last_class].end(); iter++) {
-            if ((iter->second).empty())
-              continue;
-            int pid = iter->second.front()->pid;
-            if (_bypass_packets_assigned_vc[n][pid] == _last_vc[n][subnet][last_class]) {
-              bypass_pid = pid;
-              bypass_assigned_vc = _bypass_packets_assigned_vc[n][pid];
-              break;
-            }
-          }
-          if (bypass_pid != -1) {
-
-            list<Flit *> & pp = _bypass_partial_packets[n][last_class][bypass_pid];
-
-            if(!pp.empty() && !pp.front()->head &&
-                !dest_buf->IsFullFor(bypass_assigned_vc)) {
-              f = pp.front();
-              assert(bypass_assigned_vc == _last_vc[n][subnet][last_class]);
-
-              // if we're holding the connection, we don't need to check that class
-              // again in the for loop
-              --class_limit;
+          for (int vc = 0; vc < _vcs; vc++) {
+            if (_buffers[n][subnet]->GetState(vc) == VC::active &&
+                vc == last_vc) {
+              f = _buffers[n][subnet]->FrontFlit(vc);
+              if (f && f->cl == last_class) {
+                bypass_vc = vc;
+                vc_limit--;
+                break;
+              } else {
+                f = nullptr;
+              }
             }
           }
         }
 
-        for(int i = 1; i <= class_limit; ++i) {
+        for(int i = 1; i <= vc_limit; ++i) {
 
-          int const c = (last_class + i) % _classes;
+          int const vc = (last_vc + i) % _vcs;
 
-          assert(_partial_packets[n][c].empty() ||
-              _partial_packets[n][c].front()->head);
-
-          int bypass_pid = -1;
-          if (f)
-            bypass_pid = f->pid;
-
-          vector<int> bypass_queue_pids;
-          int bypass_queue_id = -1;
-          int num_bypassing_packets = _bypass_partial_packets[n][last_class].size();
-          for (unordered_map<int, list<Flit *> >::iterator iter = _bypass_partial_packets[n][last_class].begin();
-              iter != _bypass_partial_packets[n][last_class].end(); iter++) {
-            if (bypass_pid != -1 && bypass_queue_id == -1 &&
-                !iter->second.empty() && iter->second.front()->pid == bypass_pid) {
-              bypass_queue_id = bypass_queue_pids.size();
-            }
-            bypass_queue_pids.push_back(iter->first);
+          if (_buffers[n][subnet]->GetState(vc) == VC::idle) {
+            continue;
           }
-          if (bypass_queue_id == -1) bypass_queue_id = 0;
 
-          for (int i = 0; i < num_bypassing_packets; i++) {
-            int id = (i + bypass_queue_id) % num_bypassing_packets;
+          Flit * const cf = _buffers[n][subnet]->FrontFlit(vc);
+          if (cf == nullptr) {
+            continue;
+          }
 
-            bypass_pid = bypass_queue_pids[id];
-            list<Flit *> & pp = _bypass_partial_packets[n][c][bypass_pid];
-
-            if(pp.empty()) {
-              continue;
-            }
-
-            Flit * const cf = pp.front();
-            assert(cf);
-            assert(cf->cl == c);
-
-            if(cf->subnetwork != subnet) {
-              continue;
-            }
-
-            if(f && (f->pri >= cf->pri)) {
-              assert(!f->head);
+          if(f && (f->pri >= cf->pri)) {
+            assert(!f->head);
               if (f->vc == -1) {
                 assert(f->src != n);
-                assert(_bypass_packets_assigned_vc[n].count(f->pid) > 0);
-                f->vc = _bypass_packets_assigned_vc[n][f->pid];
-                if (f->tail) {
-                  _bypass_packets_assigned_vc[n].erase(f->pid);
-                }
+                assert(_buffers[n][subnet]->GetState(vc) == VC::active);
+                f->vc = _buffers[n][subnet]->GetOutputVC(vc);
               }
 
-              if (dest_buf->IsFullFor(f->vc)) {
-                if (f->watch) {
-                  *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                    << "Selected output VC " << f->vc
-                    << " is full for flit " << f->id
-                    << "." << endl;
-                }
-              } else {
-                assert(f->src != n);
-                assert(_bypass_packets_assigned_vc[n].count(f->pid) == 0);
-                continue;
-              }
-            }
-
-            if(cf->head && cf->vc == -1) { // Find first available VC
-
-              if (_wakeup_threshold > 0) {
-                ++_wakeup_monitor_vc_requests[n];
-                if (_time % _wakeup_monitor_epoch == 0) {
-                  if (_wakeup_monitor_vc_requests[n] > _wakeup_threshold) {
-                    const vector<Router *> routers = _net[0]->GetRouters();
-                    routers[n]->WakeUp();
-                  }
-                }
-              }
-
-              OutputSet route_set;
-              _rf(nullptr, cf, -1, &route_set, true);
-              set<OutputSet::sSetElement> const & os = route_set.GetSet();
-              assert(os.size() == 1);
-              OutputSet::sSetElement const & se = *os.begin();
-              assert(se.output_port == -1);
-              int vc_start = se.vc_start;
-              int vc_end = se.vc_end;
-              int vc_count = vc_end - vc_start + 1;
-              if(_noq) {
-                assert(_lookahead_routing);
-                const FlitChannel * inject = _net[subnet]->GetInject(n);
-                const Router * router = inject->GetSink();
-                assert(router);
-                int in_channel = inject->GetSinkPort();
-
-                // NOTE: Because the lookahead is not for injection, but for the
-                // first hop, we have to temporarily set cf's VC to be non-negative
-                // in order to avoid seting of an assertion in the routing function.
-                cf->vc = vc_start;
-                _rf(router, cf, in_channel, &cf->la_route_set, false);
-                cf->vc = -1;
-
-                if(cf->watch) {
-                  *gWatchOut << GetSimTime() << " | "
-                    << "node" << n << " | "
-                    << "Generating lookahead routing info for flit " << cf->id
-                    << " (NOQ)." << endl;
-                }
-                set<OutputSet::sSetElement> const sl = cf->la_route_set.GetSet();
-                assert(sl.size() == 1);
-                int next_output = sl.begin()->output_port;
-                vc_count /= router->NumOutputs();
-                vc_start += next_output * vc_count;
-                vc_end = vc_start + vc_count - 1;
-                assert(vc_start >= se.vc_start && vc_start <= se.vc_end);
-                assert(vc_end >= se.vc_start && vc_end <= se.vc_end);
-                assert(vc_start <= vc_end);
-              }
-              if(cf->watch) {
+            if (dest_buf->IsFullFor(f->vc)) {
+              if (f->watch) {
                 *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                  << "Finding output VC for flit " << cf->id
-                  << ":" << endl;
-              }
-              for(int i = 1; i <= vc_count; ++i) {
-                int const lvc = _last_vc[n][subnet][c];
-                int const vc =
-                  (lvc < vc_start || lvc > vc_end) ?
-                  vc_start :
-                  (vc_start + (lvc - vc_start + i) % vc_count);
-                assert((vc >= vc_start) && (vc <= vc_end));
-                if(!dest_buf->IsAvailableFor(vc)) {
-                  if(cf->watch) {
-                    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                      << "  Output VC " << vc << " is busy." << endl;
-                  }
-                } else {
-                  if(dest_buf->IsFullFor(vc)) {
-                    if(cf->watch) {
-                      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                        << "  Output VC " << vc << " is full." << endl;
-                    }
-                  } else {
-                    if(cf->watch) {
-                      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                        << "  Selected output VC " << vc << "." << endl;
-                    }
-                    cf->vc = vc;
-                    break;
-                  }
-                }
-              }
-            } else if (!cf->head && cf->vc == -1) {
-              assert(cf->src != n);
-              assert(_bypass_packets_assigned_vc[n].count(cf->pid) > 0);
-              cf->vc = _bypass_packets_assigned_vc[n][cf->pid];
-              if (cf->tail) {
-                _bypass_packets_assigned_vc[n].erase(cf->pid);
-              }
-            }
-
-            if(cf->vc == -1) {
-              if(cf->watch) {
-                *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                  << "No output VC found for flit " << cf->id
+                  << "Selected output VC " << f->vc
+                  << " is full for flit " << f->id
                   << "." << endl;
               }
             } else {
-              if(dest_buf->IsFullFor(cf->vc)) {
+              assert(f->src != n);
+              f = nullptr;
+              continue;
+            }
+          }
+
+          if (_buffers[n][subnet]->GetState(vc) == VC::vc_alloc) { // Find first available VC
+
+            assert(cf->head);
+
+            if (_wakeup_threshold > 0) {
+              ++_wakeup_monitor_vc_requests[n];
+              if (_time % _wakeup_monitor_epoch == 0) {
+                if (_wakeup_monitor_vc_requests[n] > _wakeup_threshold) {
+                  const vector<Router *> routers = _net[0]->GetRouters();
+                  routers[n]->WakeUp();
+                }
+              }
+            }
+
+            OutputSet route_set;
+            _rf(nullptr, cf, -1, &route_set, true);
+            set<OutputSet::sSetElement> const & os = route_set.GetSet();
+            assert(os.size() == 1);
+            OutputSet::sSetElement const & se = *os.begin();
+            assert(se.output_port == -1);
+            int vc_start = se.vc_start;
+            int vc_end = se.vc_end;
+            int vc_count = vc_end - vc_start + 1;
+            assert(!_noq);
+            if(cf->watch) {
+              *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                << "Finding output VC for flit " << cf->id
+                << ":" << endl;
+            }
+            for(int i = 1; i <= vc_count; ++i) {
+              int const lvc = last_vc;
+              int const out_vc =
+                (lvc < vc_start || lvc > vc_end) ?
+                vc_start :
+                (vc_start + (lvc - vc_start + i) % vc_count);
+              assert((out_vc >= vc_start) && (out_vc <= vc_end));
+              if(!dest_buf->IsAvailableFor(out_vc)) {
                 if(cf->watch) {
                   *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                    << "Selected output VC " << cf->vc
-                    << " is full for flit " << cf->id
-                    << "." << endl;
+                    << "  Output VC " << out_vc << " is busy." << endl;
                 }
               } else {
-                f = cf;
-                if (f->head) {
-                  assert(f->src != n);
-                  assert(_bypass_packets_assigned_vc[n].count(f->pid) == 0);
-                  _bypass_packets_assigned_vc[n][f->pid] = f->vc;
+                if(dest_buf->IsFullFor(out_vc)) {
+                  if(cf->watch) {
+                    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                      << "  Output VC " << out_vc << " is full." << endl;
+                  }
+                } else {
+                  if(cf->watch) {
+                    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                      << "  Selected output VC " << out_vc << "." << endl;
+                  }
+                  _buffers[n][subnet]->SetOutput(vc, -1, out_vc);
+                  _buffers[n][subnet]->SetState(vc, VC::active);
+                  cf->vc = out_vc;
+                  break;
                 }
-                break;
               }
+            }
+          } else if (!cf->head && cf->vc == -1) {
+            assert(cf->src != n);
+            assert(_buffers[n][subnet]->GetState(vc) == VC::active);
+            cf->vc = _buffers[n][subnet]->GetOutputVC(vc);
+          }
+
+          if(cf->vc == -1) {
+            if(cf->watch) {
+              *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                << "No output VC found for flit " << cf->id
+                << "." << endl;
+            }
+          } else {
+            assert(_buffers[n][subnet]->GetState(vc) == VC::active);
+            if(dest_buf->IsFullFor(cf->vc)) {
+              if(cf->watch) {
+                *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                  << "Selected output VC " << cf->vc
+                  << " is full for flit " << cf->id
+                  << "." << endl;
+              }
+            } else {
+              f = cf;
+              bypass_vc = vc;
+              if (f->head) {
+                assert(f->src != n);
+              }
+              break;
             }
           }
         }
@@ -835,19 +759,8 @@ void NordTrafficManager::_Step( )
         if(f->head) {
 
           if (_lookahead_routing) {
-            if(!_noq) {
-              const FlitChannel * inject = _net[subnet]->GetInject(n);
-              const Router * router = inject->GetSink();
-              assert(router);
-              int in_channel = inject->GetSinkPort();
-              _rf(router, f, in_channel, &f->la_route_set, false);
-              if(f->watch) {
-                *gWatchOut << GetSimTime() << " | "
-                  << "node" << n << " | "
-                  << "Generating lookahead routing info for flit " << f->id
-                  << "." << endl;
-              }
-            } else if(f->watch) {
+            assert(!_noq);
+            if(f->watch) {
               *gWatchOut << GetSimTime() << " | "
                 << "node" << n << " | "
                 << "Already generated lookahead routing info for flit " << f->id
@@ -863,17 +776,16 @@ void NordTrafficManager::_Step( )
 
         _last_class[n][subnet] = c;
 
+        list<Flit *> & pp = _partial_packets[n][c];
         /* ==== Power Gate - Begin ==== */
         if (_during_bypassing[n][c]) {
-          assert((_partial_packets[n][c].empty() ||
-                _partial_packets[n][c].front()->head) &&
-              !_bypass_partial_packets[n][c][f->pid].empty());
+          assert(_partial_packets[n][c].empty() ||
+              _partial_packets[n][c].front()->head);
+          _buffers[n][subnet]->RemoveFlit(bypass_vc);
+        } else {
+          pp.pop_front();
         }
-
-        list<Flit *> & pp = _during_bypassing[n][c] ?
-          _bypass_partial_packets[n][c][f->pid] : _partial_packets[n][c];
         /* ==== Power Gate - End ==== */
-        pp.pop_front();
 
 #ifdef TRACK_FLOWS
         ++_outstanding_credits[c][subnet][n];
@@ -926,7 +838,7 @@ void NordTrafficManager::_Step( )
           if(f->watch) {
             *gWatchOut << GetSimTime() << " | "
               << "node" << n << " | "
-              << "Injecting credit for (bypas) VC " << f->bypass_vc
+              << "Injecting credit for (bypass) VC " << f->bypass_vc
               << " into subnet " << subnet
               << "." << endl;
           }
@@ -938,12 +850,15 @@ void NordTrafficManager::_Step( )
         /* ==== Power Gate - Begin ==== */
         if (f->tail) {
           if (_during_bypassing[n][c]) {
-            assert(pp.empty());
-            _bypass_partial_packets[n][c].erase(f->pid);
-            _during_bypassing[n][c] = false;
+            _buffers[n][subnet]->SetState(bypass_vc, VC::idle);
+          } else {
+            assert(f->src == n);
           }
-          if (!_bypass_partial_packets[n][c].empty()) {
-            _during_bypassing[n][c] = true;
+          for (int vc = 0; vc < _vcs; ++vc) {
+            if (_buffers[n][subnet]->GetState(vc) != VC::idle) {
+              _during_bypassing[n][c] = true;
+              break;
+            }
           }
           // TODO: handle starvation of normal injection
         }
@@ -1011,17 +926,15 @@ void NordTrafficManager::_Step( )
               << "." << endl;
           }
 
+          int vc = f->vc;
           f->bypass_vc = f->vc;
           f->vc = -1;
+          _buffers[n][subnet]->AddFlit(vc, f);
           if (f->head) {
-            if (_bypass_partial_packets[n][f->cl].count(f->pid) != 0) {
-              cout << GetSimTime() << " | node " << n << " | " << *f;
-            }
-            assert(_bypass_partial_packets[n][f->cl].count(f->pid) == 0);
-            _bypass_partial_packets[n][f->cl][f->pid] = list<Flit *>();
+            // XXX: a packet can be reroute back to this node
+            assert(_buffers[n][subnet]->GetState(vc) == VC::idle);
+            _buffers[n][subnet]->SetState(vc, VC::vc_alloc);
           }
-          _bypass_partial_packets[n][f->cl][f->pid].push_back(f);
-          //_bypass_partial_packets[n][f->cl].push_back(f);
           if (_partial_packets[n][f->cl].empty() ||
               (_partial_packets[n][f->cl].front()->head &&
                _partial_packets[n][f->cl].front()->vc == -1)) {

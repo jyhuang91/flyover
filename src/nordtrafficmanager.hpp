@@ -32,6 +32,7 @@
 #include <unordered_map>
 
 #include "trafficmanager.hpp"
+#include "buffer.hpp"
 
 class NordTrafficManager : public TrafficManager {
 
@@ -41,8 +42,6 @@ private:
   vector<vector<int> > _packet_size_rate;
   vector<int> _packet_size_max_val;
 
-  vector<vector<unordered_map<int, list<Flit *> > > > _bypass_partial_packets;
-  vector<map<int, int> > _bypass_packets_assigned_vc;
   vector<vector<bool> > _during_bypassing;
 
   int _wakeup_threshold;
@@ -50,6 +49,8 @@ private:
   vector<int> _wakeup_monitor_vc_requests;
   // ============ Internal methods ============
 protected:
+
+  vector<vector<Buffer *> > _buffers;
 
   virtual void _Inject();
   virtual void _Step( );
