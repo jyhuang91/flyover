@@ -87,8 +87,9 @@ NordRouter::NordRouter( Configuration const & config, Module *parent,
   }
 
   // for flow control
-  _credit_counter.resize(_outputs);
-  for (int k = 0; k < _outputs; ++k) {
+  _pending_credits = 0;
+  _credit_counter.resize(_inputs);
+  for (int k = 0; k < _inputs; ++k) {
     _credit_counter[k].resize(_vcs, 0);
   }
 
@@ -102,9 +103,10 @@ NordRouter::NordRouter( Configuration const & config, Module *parent,
 
 NordRouter::~NordRouter( )
 {
-  for (int output = 0; output < _outputs; output++) {
+  assert(_pending_credits == 0);
+  for (int input = 0; input < _inputs; input++) {
     for (int vc = 0; vc < _vcs; vc++) {
-      assert(_credit_counter[output][vc] == 0);
+      assert(_credit_counter[input][vc] == 0);
     }
   }
 }
@@ -409,34 +411,6 @@ void NordRouter::_InputQueuing( )
     }
 #endif
 
-    /* ==== Power Gate - Begin ==== */
-    int input = -1;
-    if (output == DIR_NI) {
-      input = _ring_in_port;
-    } else if (output == _ring_out_port) {
-      input = DIR_NI;
-    }
-
-    if (input != -1) {
-      set<int>::iterator iter = c->vc.begin();
-      while (iter != c->vc.end()) {
-
-        int const vc = *iter;
-        assert(vc >= 0 && vc < _vcs);
-
-        if (_credit_counter[output][vc] > 0) {
-          if (_out_queue_credits.count(input) == 0) {
-            _out_queue_credits.insert(make_pair(input, Credit::New()));
-          }
-          _out_queue_credits[input]->vc.insert(vc);
-          _credit_counter[output][vc]--;
-        }
-
-        ++iter;
-      }
-    }
-    /* ==== Power Gate - End ==== */
-
     dest_buf->ProcessCredit(c);
     c->Free();
     _proc_credits.pop_front();
@@ -501,7 +475,7 @@ void NordRouter::_RouteUpdate( )
         const FlitChannel * channel = _output_channels[out_port];
         Router * router = channel->GetSink();
         assert(router);
-        if (f->dest == router->GetID()) {
+        /*if (f->dest == router->GetID()) {
           if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
             cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
               << router->GetID() << " is "
@@ -513,7 +487,7 @@ void NordRouter::_RouteUpdate( )
           }
           assert(_neighbor_states[out_port] == power_on ||
               _neighbor_states[out_port] == draining);
-        }
+        }*/
       }
     }
     /* ==== Power Gate - End ==== */
@@ -1466,6 +1440,23 @@ void NordRouter::_OutputQueuing( )
   _out_queue_credits.clear();
 
   /* ==== Power Gate - Begin ==== */
+  if (_power_state == power_on && _pending_credits > 0) {
+    for (int input = 0; input < _inputs; input++) {
+      for (int vc = 0; vc < _vcs; vc++) {
+        if (_credit_counter[input][vc] > 0) {
+          if (_out_queue_credits.count(input) == 0) {
+            _out_queue_credits.insert(make_pair(input, Credit::New()));
+          }
+          if (_out_queue_credits[input]->vc.count(vc) == 0) {
+            _out_queue_credits[input]->vc.insert(vc);
+            _credit_counter[input][vc]--;
+            _pending_credits--;
+          }
+        }
+      }
+    }
+  }
+
   for (map<int, Handshake *>::const_iterator iter =
        _out_queue_handshakes.begin(); iter != _out_queue_handshakes.end();
        ++iter) {
@@ -1560,7 +1551,8 @@ void NordRouter::_NordStep() {
     }
     dest_buf->SendingFlit(f);
 
-    _credit_counter[output][vc]++;
+    _pending_credits++;
+    _credit_counter[input][vc]++;
 
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -1625,7 +1617,8 @@ void NordRouter::_NordStep() {
 
         assert(vc >= 0 && vc < _vcs);
         _out_queue_credits[input]->vc.insert(vc);
-        _credit_counter[output][vc]--;
+        _credit_counter[input][vc]--;
+        _pending_credits--;
 
         ++iter;
       }

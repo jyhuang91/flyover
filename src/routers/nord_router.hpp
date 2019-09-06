@@ -46,6 +46,7 @@ protected:
   vector<queue<Handshake *> > _handshake_buffer;
 
   vector<vector<int> > _credit_counter;
+  int _pending_credits;
 
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */
