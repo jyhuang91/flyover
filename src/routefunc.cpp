@@ -2353,7 +2353,7 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
     vcBegin = gWriteReplyBeginVC;
     vcEnd = gWriteReplyEndVC;
   }
-  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || ((inject || r == nullptr) && (f->vc < 0)));
   assert(vcEnd - vcBegin + 1 > 2 && "2 VCs should use ring_dateline_mesh routing instead");
 
   // dateline algorithm
@@ -2362,11 +2362,18 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
   outputs->Clear( );
 
   int out_port = -1;
+  bool timeout = (GetSimTime() - f->rtime > 300);
   if(inject) {
-    // injection can use all VCs
+    // injection can use all VCs ?
+    vcBegin++;
+    vcEnd--;
+    out_port = -1;
+  } else if (r == nullptr && !inject) { // bypass
     if (f->bypass_vc == vcBegin || f->bypass_vc == vcEnd) { // escape
       vcBegin = f->bypass_vc;
       vcEnd = f->bypass_vc;
+    } else if (timeout) {
+      vcEnd = vcBegin;
     } else {
       vcBegin++;
       vcEnd--;
@@ -2379,22 +2386,32 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
     assert(r);
     int in_vc = f->vc;
 
-    bool escape = (in_vc == vcBegin || in_vc == vcEnd);
+    bool in_escape = (in_vc == vcBegin || in_vc == vcEnd);
 
-    bool timeout = (GetSimTime() - f->rtime > 300);
 
     int xy_out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
     int yx_out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
 
     out_port = xy_out_port;
-    if(r->GetNeighborPowerState(xy_out_port) != Router::power_on)
+    if(r->GetNeighborPowerState(xy_out_port) != Router::power_on) {
       out_port = yx_out_port;
-    if (r->GetNeighborPowerState(yx_out_port) != Router::power_on)
-      out_port = r->GetRingOutput();
+      if (r->GetNeighborPowerState(yx_out_port) != Router::power_on)
+        out_port = r->GetRingOutput();
+    }
+
+    bool go_to_escape = false;
+    if (in_escape == false) {
+      int src_x = f->src / gK;
+      int src_y = f->src % gK;
+      int dest_x = f->dest / gK;
+      int dest_y = f->dest % gK;
+      int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
+      go_to_escape = (f->hops > shortest_hops + gK);
+    }
 
     bool uturn = (in_channel == out_port);
 
-    if (escape == true) {
+    if (in_escape == true) {
       out_port = r->GetRingOutput();
       if (r->GetID() == gNodes - 1) { // dateline
         vcBegin = vcEnd;
@@ -2402,27 +2419,42 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
         vcBegin = in_vc;
         vcEnd = in_vc;
       }
-    } else if (uturn == true || timeout == true) {
-      // route to escape
+    } else if (go_to_escape) {
+      out_port = r->GetRingOutput();
       if (r->GetID() == gNodes - 1) { // dateline
         vcBegin = vcEnd;
       } else {
         vcEnd = vcBegin;
       }
+    } else if (timeout) {
+      out_port = r->GetRingOutput();
+      if (r->GetID() == gNodes - 1) { // dateline
+        vcBegin = vcEnd;
+      } else {
+        vcEnd = vcBegin;
+      }
+    } else if (uturn) {
+      out_port = r->GetRingOutput();
+      ++vcBegin;
+      --vcEnd;
     } else {
       ++vcBegin;
       --vcEnd;
     }
+    if (f->watch)
+      *gWatchOut << " -- in_escape " << in_escape << " go_to_escape " << go_to_escape << " uturn " << uturn << " timeout " << timeout
+        << " xy_out_port " << xy_out_port << " power_state " << r->GetNeighborPowerState(xy_out_port)
+        << " yx_out_port " << yx_out_port << " power_state " << r->GetNeighborPowerState(yx_out_port) << endl;
   }
 
   if (f->watch) {
-    if (!inject) {
+    if (r != nullptr) {
       *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
         << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
         << " at output port " << out_port << " for flit " << f->id
         << " (input port " << in_channel << ", destination " << f->dest << ")"
         << "." << endl;
-    } else if (f->bypass_vc == -1) {
+    } else if (inject) {
       *gWatchOut << GetSimTime() << " | node " << f->src << " | "
         << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
         << " at injection port for flit " << f->id
