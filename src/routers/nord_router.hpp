@@ -39,6 +39,8 @@ class NordRouter : public IQRouter {
 protected:
 
   /* ==== Power Gate - Begin ==== */
+  int _routing_deadlock_timeout_threshold;
+
   deque<pair<int, Handshake *> > _proc_handshakes;
 
   map<int, Handshake *> _out_queue_handshakes;

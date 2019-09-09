@@ -98,6 +98,8 @@ NordRouter::NordRouter( Configuration const & config, Module *parent,
     _next_buf[_ring_out_port]->SetVCBufferSize(1);
 
   _handshake_buffer.resize(4);
+
+  _routing_deadlock_timeout_threshold = config.GetInt("routing_deadlock_timeout_threshold");
   /* ==== Power Gate - End ==== */
 }
 
@@ -698,7 +700,30 @@ void NordRouter::_VCAllocUpdate( )
         continue;
       }
 
-      if (GetSimTime() - f->rtime == 300) { // timeout
+      bool escape = true;
+      iset = setlist.begin();
+      while (iset != setlist.end()) {
+        int const out_port = iset->output_port;
+        assert((out_port >= 0) && (out_port < _outputs));
+        if (out_port != _ring_out_port) {
+          escape = false;
+          break;
+        }
+        int vc_start = iset->vc_start;
+        int vc_end = iset->vc_end;
+        if (!(vc_start == 0 && vc_end == 0) &&
+            !(vc_start == _vcs - 1 && vc_end == _vcs - 1)) {
+          escape = false;
+          break;
+        }
+        iset++;
+      }
+      if (GetSimTime() - f->rtime >= _routing_deadlock_timeout_threshold && escape == false) { // timeout
+        if (f->watch) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "flit " << f->id << " (pid " << f->pid << ") times out,"
+            << " back to route from VCAllocUpdate" << endl;
+        }
         _buf[input]->SetState(vc, VC::routing);
         _route_vcs.push_back(make_pair(-1, make_pair(input, vc)));
         if (_speculative) {
@@ -1378,8 +1403,38 @@ void NordRouter::_SWAllocUpdate( )
       int const vc = item.second.first.second;
       assert((vc >= 0) && (vc < _vcs));
       Buffer * const cur_buf = _buf[input];
-      int const escape_vc = 0;
-      if (GetSimTime() - f->rtime == 300 && f->head && cur_buf->GetOutputVC(vc) != escape_vc) { // timeout
+      bool escape = true;
+      if (cur_buf->GetState(vc) == VC::active) {
+        int output = cur_buf->GetOutputPort(vc);
+        int match_vc = cur_buf->GetOutputVC(vc);
+        if (output != _ring_out_port && (match_vc != 0 && match_vc != _vcs - 1))
+          escape = false;
+      } else {
+        assert(cur_buf->GetState(vc) == VC::vc_alloc);
+        OutputSet const * route_set = cur_buf->GetRouteSet(vc);
+        assert(route_set);
+
+        set<OutputSet::sSetElement> setlist = route_set->GetSet();
+
+        set<OutputSet::sSetElement>::iterator iset = setlist.begin();
+        while (iset != setlist.end()) {
+          int const out_port = iset->output_port;
+          assert((out_port >= 0) && (out_port < _outputs));
+          if (out_port != _ring_out_port) {
+            escape = false;
+            break;
+          }
+          int vc_start = iset->vc_start;
+          int vc_end = iset->vc_end;
+          if (!(vc_start == 0 && vc_end == 0) &&
+              !(vc_start == _vcs - 1 && vc_end == _vcs - 1)) {
+            escape = false;
+            break;
+          }
+          iset++;
+        }
+      }
+      if (GetSimTime() - f->rtime >= _routing_deadlock_timeout_threshold && f->head && escape == false) { // timeout
         if (cur_buf->GetState(vc) == VC::active) {
           int const dest_output = cur_buf->GetOutputPort(vc);
           assert((dest_output >= 0) && (dest_output < _outputs));
@@ -1406,6 +1461,11 @@ void NordRouter::_SWAllocUpdate( )
           _route_vcs.push_back(make_pair(-1, item.second.first));
           cur_buf->SetState(vc, VC::routing);
         }
+        if (f->watch) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "flit " << f->id << " (pid " << f->pid << ") times out,"
+            << " back to route from SWAllocUpdate" << endl;
+        }
       } else {
         _sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
       }
@@ -1424,22 +1484,7 @@ void NordRouter::_SWAllocUpdate( )
 
 void NordRouter::_OutputQueuing( )
 {
-  for(map<int, Credit *>::const_iterator iter = _out_queue_credits.begin();
-      iter != _out_queue_credits.end();
-      ++iter) {
-
-    int const input = iter->first;
-    assert((input >= 0) && (input < _inputs));
-
-    Credit * const c = iter->second;
-    assert(c);
-    assert(!c->vc.empty());
-
-    _credit_buffer[input].push(c);
-  }
-  _out_queue_credits.clear();
-
-  /* ==== Power Gate - Begin ==== */
+  /* ==== power gate - begin ==== */
   if (_power_state == power_on && _pending_credits > 0) {
     for (int input = 0; input < _inputs; input++) {
       for (int vc = 0; vc < _vcs; vc++) {
@@ -1456,7 +1501,24 @@ void NordRouter::_OutputQueuing( )
       }
     }
   }
+  /* ==== power gate - end ==== */
 
+  for(map<int, Credit *>::const_iterator iter = _out_queue_credits.begin();
+      iter != _out_queue_credits.end();
+      ++iter) {
+
+    int const input = iter->first;
+    assert((input >= 0) && (input < _inputs));
+
+    Credit * const c = iter->second;
+    assert(c);
+    assert(!c->vc.empty());
+
+    _credit_buffer[input].push(c);
+  }
+  _out_queue_credits.clear();
+
+  /* ==== power gate - begin ==== */
   for (map<int, Handshake *>::const_iterator iter =
        _out_queue_handshakes.begin(); iter != _out_queue_handshakes.end();
        ++iter) {
@@ -1544,7 +1606,7 @@ void NordRouter::_NordStep() {
       cur_buf->SetOutput(vc, output, vc);
       cur_buf->SetState(vc, VC::active);
       //dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
-      dest_buf->TakeBuffer(vc, vc * _inputs + vc); // indicate its taken by nord
+      dest_buf->TakeBuffer(vc, input * _vcs + vc); // indicate its taken by nord
     }
     if (f->tail) {
       cur_buf->SetState(vc, VC::idle);

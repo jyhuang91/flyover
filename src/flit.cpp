@@ -101,6 +101,7 @@ Flit * Flit::New() {
 }
 
 void Flit::Free() {
+  Reset();
   _free.push(this);
 }
 

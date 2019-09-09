@@ -37,6 +37,7 @@ typedef void (*tRoutingFunction)( const Router *, const Flit *, int in_channel, 
 
 void InitializeRoutingMap( const Configuration & config );
 
+/* ==== Power Gate - Begin ==== */
 enum Direction {
     DIR_EAST = 0,
     DIR_WEST,
@@ -45,6 +46,9 @@ enum Direction {
     DIR_NI,
     DIR_INVALID,
 };
+
+extern int gRoutingDeadlockTimeoutThreshold;
+/* ==== Power Gate - End ==== */
 
 extern map<string, tRoutingFunction> gRoutingFunctionMap;
 

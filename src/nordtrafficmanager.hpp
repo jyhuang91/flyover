@@ -44,9 +44,12 @@ private:
 
   vector<vector<bool> > _during_bypassing;
 
-  int _wakeup_threshold;
+  int _routing_deadlock_timeout_threshold;
+  int _performance_centric_wakeup_threshold;
+  int _power_centric_wakeup_threshold;
   int _wakeup_monitor_epoch;
   vector<int> _wakeup_monitor_vc_requests;
+  vector<bool> _performance_centric_routers;
   // ============ Internal methods ============
 protected:
 

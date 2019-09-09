@@ -56,6 +56,10 @@ map<string, tRoutingFunction> gRoutingFunctionMap;
 
 /* Global information used by routing functions */
 
+/* ==== Power Gate - Begin ==== */
+int gRoutingDeadlockTimeoutThreshold;
+/* ==== Power Gate - End ==== */
+
 int gNumVCs;
 
 /* Add more functions here
@@ -2362,7 +2366,7 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
   outputs->Clear( );
 
   int out_port = -1;
-  bool timeout = (GetSimTime() - f->rtime > 300);
+  bool timeout = (GetSimTime() - f->rtime > gRoutingDeadlockTimeoutThreshold);
   if(inject) {
     // injection can use all VCs ?
     vcBegin++;
@@ -2441,10 +2445,6 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
       ++vcBegin;
       --vcEnd;
     }
-    if (f->watch)
-      *gWatchOut << " -- in_escape " << in_escape << " go_to_escape " << go_to_escape << " uturn " << uturn << " timeout " << timeout
-        << " xy_out_port " << xy_out_port << " power_state " << r->GetNeighborPowerState(xy_out_port)
-        << " yx_out_port " << yx_out_port << " power_state " << r->GetNeighborPowerState(yx_out_port) << endl;
   }
 
   if (f->watch) {
@@ -2477,6 +2477,10 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
 
 void InitializeRoutingMap( const Configuration & config )
 {
+
+  /* ==== Power Gate - Begin ==== */
+  gRoutingDeadlockTimeoutThreshold = config.GetInt("routing_deadlock_timeout_threshold");
+  /* ==== Power Gate - End ==== */
 
   gNumVCs = config.GetInt( "num_vcs" );
 

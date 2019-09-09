@@ -327,6 +327,8 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _max_samples    = config.GetInt( "max_samples" );
     _warmup_periods = config.GetInt( "warmup_periods" );
 
+    _converged_threshold = config.GetInt("converged_threshold");
+
     _measure_stats = config.GetIntArray( "measure_stats" );
     if(_measure_stats.empty()) {
         _measure_stats.push_back(config.GetInt("measure_stats"));
@@ -1461,7 +1463,7 @@ bool TrafficManager::_SingleSim( )
     int total_phases = 0;
     while( ( total_phases < _max_samples ) &&
            ( ( _sim_state != running ) ||
-             ( converged < 3 ) ) ) {
+             ( _converged_threshold == -1 || converged < _converged_threshold ) ) ) {
 
         if ( clear_last || (( ( _sim_state == warming_up ) && ( ( total_phases % 2 ) == 0 ) )) ) {
             clear_last = false;

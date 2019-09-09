@@ -104,10 +104,10 @@ void KNCube::_BuildNet( const Configuration &config )
     /* ==== Power Gate - Begin ==== */
     string type = config.GetStr("router");
     bool is_rp = (type == "rp");
-    bool is_rp_nord = (type == "rp" || type == "nord");
+    bool is_nord = (type == "nord");
     if (_router_states[node] == false) {
       _routers[node]->SetRouterState(false);
-      if (is_rp_nord) { // TODO: make all dynamic
+      if (is_nord || is_rp) { // TODO: make all dynamic
         _routers[node]->SetPowerState(Router::power_off);
       }
     } else if (is_rp) {

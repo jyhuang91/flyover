@@ -152,9 +152,20 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
       _during_bypassing[s].resize(_classes, false);
     }
 
-    _wakeup_threshold = config.GetInt("nord_wakeup_threshold");
+    _routing_deadlock_timeout_threshold = config.GetInt("routing_deadlock_timeout_threshold");
+
+    _performance_centric_wakeup_threshold = config.GetInt("nord_performance_centric_wakeup_threshold");
+    _power_centric_wakeup_threshold = config.GetInt("nord_power_centric_wakeup_threshold");
     _wakeup_monitor_epoch = config.GetInt("nord_wakeup_monitor_epoch");
     _wakeup_monitor_vc_requests.resize(_nodes, 0);
+    _performance_centric_routers.resize(_nodes, false);
+    for (int n = 0; n < _nodes; ++n) {
+      int row = n / gK;
+      int col = n % gK;
+      if ((row == 1) || (row == gK - 1 && col > 0 && col < gK - 1) || (gK > 4 && row == gK / 2)) {
+        _performance_centric_routers[n] = true;
+      }
+    }
     /* ==== Power Gate - End ==== */
 }
 
@@ -380,13 +391,11 @@ void NordTrafficManager::_Step( )
         if (routers[n]->GetPowerState() == Router::power_off) {
           // TODO
           cout << "node " << n << " | Bypassing flit lists:" << endl;
-          _buffers[n][0]->Display(cout);
         }
       }
+      _buffers[n][0]->Display(cout);
       routers[n]->Display(cout);
-      if (routers[n]->GetPowerState() == Router::power_off) {
-        _buf_states[n][0]->Display(cout);
-      }
+      _buf_states[n][0]->Display(cout);
     }
     cout << endl << endl;
     /* ==== Power Gate Debug - End ==== */
@@ -394,9 +403,13 @@ void NordTrafficManager::_Step( )
 
   const vector<Router *> routers = _net[0]->GetRouters();
   const vector<bool> router_states = _net[0]->GetRouterStates();
-  if (_wakeup_threshold > 0) {
+  if (_performance_centric_wakeup_threshold > 0 &&
+      _power_centric_wakeup_threshold > 0) {
     for (int n = 0; n < _nodes; ++n) {
-      if (_wakeup_monitor_vc_requests[n] > _wakeup_threshold &&
+      int wakeup_threshold = _performance_centric_routers[n] ?
+        _performance_centric_wakeup_threshold :
+        _power_centric_wakeup_threshold;
+      if (_wakeup_monitor_vc_requests[n] > wakeup_threshold &&
           routers[n]->GetPowerState() == Router::power_on) {
         assert(router_states[n] == false);
         _wakeup_monitor_vc_requests[n] = 0;
@@ -520,36 +533,7 @@ void NordTrafficManager::_Step( )
             int vc_start = se.vc_start;
             int vc_end = se.vc_end;
             int vc_count = vc_end - vc_start + 1;
-            if(_noq) {
-              assert(_lookahead_routing);
-              const FlitChannel * inject = _net[subnet]->GetInject(n);
-              const Router * router = inject->GetSink();
-              assert(router);
-              int in_channel = inject->GetSinkPort();
-
-              // NOTE: Because the lookahead is not for injection, but for the
-              // first hop, we have to temporarily set cf's VC to be non-negative
-              // in order to avoid seting of an assertion in the routing function.
-              cf->vc = vc_start;
-              _rf(router, cf, in_channel, &cf->la_route_set, false);
-              cf->vc = -1;
-
-              if(cf->watch) {
-                *gWatchOut << GetSimTime() << " | "
-                  << "node" << n << " | "
-                  << "Generating lookahead routing info for flit " << cf->id
-                  << " (NOQ)." << endl;
-              }
-              set<OutputSet::sSetElement> const sl = cf->la_route_set.GetSet();
-              assert(sl.size() == 1);
-              int next_output = sl.begin()->output_port;
-              vc_count /= router->NumOutputs();
-              vc_start += next_output * vc_count;
-              vc_end = vc_start + vc_count - 1;
-              assert(vc_start >= se.vc_start && vc_start <= se.vc_end);
-              assert(vc_end >= se.vc_start && vc_end <= se.vc_end);
-              assert(vc_start <= vc_end);
-            }
+            assert(!_noq);
             if(cf->watch) {
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                 << "Finding output VC for flit " << cf->id
@@ -610,14 +594,24 @@ void NordTrafficManager::_Step( )
         if(_hold_switch_for_packet) {
           for (int vc = 0; vc < _vcs; vc++) {
             if (_buffers[n][subnet]->GetState(vc) == VC::active &&
-                vc == last_vc) {
-              f = _buffers[n][subnet]->FrontFlit(vc);
-              if (f && f->cl == last_class) {
-                bypass_vc = vc;
-                vc_limit--;
-                break;
-              } else {
-                f = nullptr;
+                vc == last_vc && !dest_buf->IsFullFor(vc)) {
+              int out_vc = _buffers[n][subnet]->GetOutputVC(vc);
+              assert(out_vc >= 0 && out_vc < _vcs);
+              if (!dest_buf->IsFullFor(out_vc)) {
+                f = _buffers[n][subnet]->FrontFlit(vc);
+                if (f && f->cl == last_class) {
+                  if (f->watch) {
+                    *gWatchOut << GetSimTime() << " | node " << n
+                      << " | flit " << f->id << " is selected for hold switch bypass"
+                      << endl;
+                  }
+                  f->vc = _buffers[n][subnet]->GetOutputVC(vc);
+                  bypass_vc = vc;
+                  vc_limit--;
+                  break;
+                } else {
+                  f = nullptr;
+                }
               }
             }
           }
@@ -638,34 +632,23 @@ void NordTrafficManager::_Step( )
 
           if(f && (f->pri >= cf->pri)) {
             assert(!f->head);
-              if (f->vc == -1) {
-                assert(f->src != n);
-                assert(_buffers[n][subnet]->GetState(vc) == VC::active);
-                f->vc = _buffers[n][subnet]->GetOutputVC(vc);
-              }
-
-            if (dest_buf->IsFullFor(f->vc)) {
-              if (f->watch) {
-                *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                  << "Selected output VC " << f->vc
-                  << " is full for flit " << f->id
-                  << "." << endl;
-              }
-            } else {
-              assert(f->src != n);
-              f = nullptr;
-              continue;
-            }
+            assert(f->vc != -1);
+            assert(_buffers[n][subnet]->GetState(bypass_vc) == VC::active);
+            continue;
           }
 
           if (_buffers[n][subnet]->GetState(vc) == VC::vc_alloc) { // Find first available VC
 
             assert(cf->head);
 
-            if (_wakeup_threshold > 0) {
+            if (_performance_centric_wakeup_threshold > 0 &&
+                _power_centric_wakeup_threshold > 0) {
+              int wakeup_threshold = _performance_centric_routers[n] ?
+                _performance_centric_wakeup_threshold :
+                _power_centric_wakeup_threshold;
               ++_wakeup_monitor_vc_requests[n];
               if (_time % _wakeup_monitor_epoch == 0) {
-                if (_wakeup_monitor_vc_requests[n] > _wakeup_threshold) {
+                if (_wakeup_monitor_vc_requests[n] > wakeup_threshold) {
                   const vector<Router *> routers = _net[0]->GetRouters();
                   routers[n]->WakeUp();
                 }
@@ -673,7 +656,7 @@ void NordTrafficManager::_Step( )
             }
 
             OutputSet route_set;
-            _rf(nullptr, cf, -1, &route_set, true);
+            _rf(nullptr, cf, -1, &route_set, false);
             set<OutputSet::sSetElement> const & os = route_set.GetSet();
             assert(os.size() == 1);
             OutputSet::sSetElement const & se = *os.begin();
@@ -729,6 +712,9 @@ void NordTrafficManager::_Step( )
                 << "No output VC found for flit " << cf->id
                 << "." << endl;
             }
+            if (cf->head && _time - cf->rtime > 300) {
+              _buffers[n][subnet]->SetState(vc, VC::vc_alloc);
+            }
           } else {
             assert(_buffers[n][subnet]->GetState(vc) == VC::active);
             if(dest_buf->IsFullFor(cf->vc)) {
@@ -737,6 +723,9 @@ void NordTrafficManager::_Step( )
                   << "Selected output VC " << cf->vc
                   << " is full for flit " << cf->id
                   << "." << endl;
+              }
+              if (cf->head && _time - cf->rtime > 300) {
+                _buffers[n][subnet]->SetState(vc, VC::vc_alloc);
               }
             } else {
               f = cf;
@@ -917,6 +906,7 @@ void NordTrafficManager::_Step( )
         } else {
 
           /* ==== Power Gate - Begin ==== */
+          f->rtime = _time;
           if (f->watch) {
             *gWatchOut << GetSimTime() << " | "
               << "node" << n << " | "

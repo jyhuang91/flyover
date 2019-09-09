@@ -247,6 +247,7 @@ BookSimConfig::BookSimConfig() {
   _int_map["sample_period"] = 1000;  // how long between measurements
   _int_map["max_samples"] =
       10;  // maximum number of sample periods in a simulation
+  _int_map["converged_threshold"] = 3; // no. of phases to be considred as converged, -1 means run to max_smaples
 
   // whether or not to measure statistics for a given traffic class
   _int_map["measure_stats"] = 1;
@@ -375,8 +376,10 @@ BookSimConfig::BookSimConfig() {
   _int_map["drain_threshold"] = 100;
   _int_map["bet_threshold"] = 10;
   _int_map["wakeup_threshold"] = 3;
-  _int_map["nord_wakeup_threshold"] = 10; // number of VC requests at NI within monitor epoch
+  _int_map["nord_performance_centric_wakeup_threshold"] = 1; // number of VC requests at NI within monitor epoch
+  _int_map["nord_power_centric_wakeup_threshold"] = 3;
   _int_map["nord_wakeup_monitor_epoch"] = 10; // report every 10 cycles
+  _int_map["routing_deadlock_timeout_threshold"] = 512;
   /* ==== Power Gate - End ==== */
 
   //==================Network file===========================
