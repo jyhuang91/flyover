@@ -14,10 +14,10 @@ def main():
 
     dimensions = [6, 8, 10]
     schemes = [
-        'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov'
+        'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov', 'nord'
     ]
     paper_schemes = [
-        'Baseline', 'RPA', 'RPC', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt'
+        'Baseline', 'RPA', 'RPC', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt', 'NoRD'
     ]
     injection_rates = []
     for i in range(1, 61):
@@ -52,11 +52,11 @@ def main():
     #linestyles = ['-', '-', '-', '--', '--']
     #markers = ['o', '^', 'd', 'v', 'D']
     #colors = ['#27408b', '#000000', '#ee0000', '#cd3278', '#451900']
-    linestyles = ['-', '-.', '--', '-', '-', '--', '--']
-    markers = ['o', 's', 'p', '^', 'd', 'v', 'D']
+    linestyles = ['-', '-.', '--', '-', '-', '--', '--', '-']
+    markers = ['o', 's', 'p', '^', 'd', 'v', 'D', 'x']
     colors = [
         '#27408b', '#c39d00', '#8b5742', '#000000', '#ee0000', '#cd3278',
-        '#451900'
+        '#451900', '#66c2a4'
     ]
 
     for d, dimension in enumerate(dimensions):
