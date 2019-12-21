@@ -216,6 +216,8 @@ protected:
   int   _max_samples;
   int   _warmup_periods;
 
+  int _converged_threshold;
+
   int   _include_queuing;
 
   vector<int> _measure_stats;

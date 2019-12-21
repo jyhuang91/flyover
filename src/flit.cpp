@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -42,24 +42,24 @@ stack<Flit *> Flit::_free;
 
 ostream& operator<<( ostream& os, const Flit& f )
 {
-  os << "  Flit ID: " << f.id << " (" << &f << ")" 
+  os << "  Flit ID: " << f.id << " (" << &f << ")"
      << " Packet ID: " << f.pid
-     << " Type: " << f.type 
+     << " Type: " << f.type
      << " Head: " << f.head
      << " Tail: " << f.tail << endl;
   os << "  Source: " << f.src << "  Dest: " << f.dest << " Intm: "<<f.intm<<endl;
   os << "  Creation time: " << f.ctime << " Injection time: " << f.itime << " Arrival time: " << f.atime << " Phase: "<<f.ph<< endl;
-  os << "  VC: " << f.vc << endl;
+  os << "  VC: " << f.vc << " Bypass VC: " << f.bypass_vc << endl;
   return os;
 }
 
-Flit::Flit() 
-{  
+Flit::Flit()
+{
   Reset();
-}  
+}
 
-void Flit::Reset() 
-{  
+void Flit::Reset()
+{
   type      = ANY_TYPE ;
   vc        = -1 ;
   cl        = -1 ;
@@ -82,9 +82,10 @@ void Flit::Reset()
   data = 0;
   /* ==== Power Gate - Begin ==== */
   rtime     = -1 ;
+  bypass_vc = -1 ;
   flov_hops = 0 ;
   /* ==== Power Gate - End ==== */
-}  
+}
 
 Flit * Flit::New() {
   Flit * f;
@@ -100,6 +101,7 @@ Flit * Flit::New() {
 }
 
 void Flit::Free() {
+  Reset();
   _free.push(this);
 }
 

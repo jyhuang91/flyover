@@ -28,6 +28,7 @@
 #ifndef _HANDSHAKE_HPP_
 #define _HANDSHAKE_HPP_
 
+#include <iostream>
 #include <set>
 #include <stack>
 
@@ -58,5 +59,7 @@ private:
   ~Handshake() {}
 
 };
+
+ostream& operator<<(ostream& os, const Handshake& h);
 
 #endif

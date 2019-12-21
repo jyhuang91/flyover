@@ -240,7 +240,7 @@ void Network::_Alloc( )
       err << "percentile of power-gating is too high, should keep one row active" << endl;
       Error(err.str());
     }
-    if (_fabric_manager < 0) {
+    if (_fabric_manager < 0 || _fabric_manager >= _size) {
       _fabric_manager = gK*gK/2 - gK/2 - 1;
     }
     assert(_fabric_manager < _size);
@@ -267,7 +267,8 @@ void Network::_Alloc( )
     cout << endl;
 #endif
     // router power states
-    if (_powergate_type == "flov" || _powergate_type == "rflov") {
+    if (_powergate_type == "flov" || _powergate_type == "rflov" ||
+        _powergate_type == "nord") {
       _router_states = _core_states;
     } else if (_powergate_type == "rpa") {  // aggressive RP
       _router_states = _core_states;

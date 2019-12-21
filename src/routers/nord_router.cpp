@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -25,7 +25,7 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "rflov_router.hpp"
+#include "nord_router.hpp"
 
 #include <string>
 #include <sstream>
@@ -47,28 +47,73 @@
 #include "switch_monitor.hpp"
 #include "buffer_monitor.hpp"
 
-RFLOVRouter::RFLOVRouter( Configuration const & config, Module *parent, 
+NordRouter::NordRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
-  : IQRouter( config, parent, name, id, inputs, outputs )
+: IQRouter( config, parent, name, id, inputs, outputs )
 {
   /* ==== Power Gate - Begin ==== */
-  // Alloc credit counter for RFLOV flow contrl
-  _credit_counter.resize(_outputs);
-  for (int k = 0; k < _outputs; ++k) {
+
+  // forming Nord ring directions
+  int row = _id / gK;
+  int col = _id % gK;
+
+  if (_id == 0) {
+    _ring_in_port = DIR_SOUTH;
+    _ring_out_port = DIR_EAST;
+  } else if (_id == gK - 1) {
+    _ring_in_port = DIR_WEST;
+    _ring_out_port = DIR_SOUTH;
+  } else if (row == 1 && col % 2 == 1 && col < gK - 1) {
+    _ring_in_port = DIR_EAST;
+    _ring_out_port = DIR_SOUTH;
+  } else if (row == 1 && col % 2 == 0 && col > 0) {
+    _ring_in_port = DIR_SOUTH;
+    _ring_out_port = DIR_WEST;
+  } else if (row == gK - 1 && col % 2 == 0) {
+    _ring_in_port = DIR_EAST;
+    _ring_out_port = DIR_NORTH;
+  } else if (row == gK - 1 && col % 2 == 1) {
+    _ring_in_port = DIR_NORTH;
+    _ring_out_port = DIR_WEST;
+  } else if (row == 0) {
+    _ring_in_port = DIR_WEST;
+    _ring_out_port = DIR_EAST;
+  } else if (col % 2 == 0) {
+    _ring_in_port = DIR_SOUTH;
+    _ring_out_port = DIR_NORTH;
+  } else {
+    _ring_in_port = DIR_NORTH;
+    _ring_out_port = DIR_SOUTH;
+  }
+
+  // for flow control
+  _pending_credits = 0;
+  _credit_counter.resize(_inputs);
+  for (int k = 0; k < _inputs; ++k) {
     _credit_counter[k].resize(_vcs, 0);
   }
-  _drain_done_sent.resize(4, false);
-  _drain_tags.resize(4, false);
+
+  // Redefine next VCs' buffer state and size
+  if (_power_state == power_off)
+    _next_buf[_ring_out_port]->SetVCBufferSize(1);
 
   _handshake_buffer.resize(4);
+
+  _routing_deadlock_timeout_threshold = config.GetInt("routing_deadlock_timeout_threshold");
   /* ==== Power Gate - End ==== */
 }
 
-RFLOVRouter::~RFLOVRouter( )
+NordRouter::~NordRouter( )
 {
+  assert(_pending_credits == 0);
+  for (int input = 0; input < _inputs; input++) {
+    for (int vc = 0; vc < _vcs; vc++) {
+      assert(_credit_counter[input][vc] == 0);
+    }
+  }
 }
 
-void RFLOVRouter::ReadInputs( )
+void NordRouter::ReadInputs( )
 {
   bool have_flits = _ReceiveFlits( );
   bool have_credits = _ReceiveCredits( );
@@ -82,281 +127,69 @@ void RFLOVRouter::ReadInputs( )
 }
 
 /* ==== Power Gate - Begin ==== */
-void RFLOVRouter::PowerStateEvaluate()
+void NordRouter::PowerStateEvaluate()
 {
-  if (_outstanding_requests) {
-    assert(_power_state == power_on);
-  }
-
   // bottom row routers are always on
-  if (_id >= gNodes - gK)
+  if (_id >= gNodes - gK) {
+    if (_power_state != power_on) {
+      cout << GetSimTime() << " | " << FullName() << " | is not power on " << endl;
+    }
     assert(_power_state == power_on);
+  }
 
-  /* power transition state machine */
   switch (_power_state) {
-  case power_on: {
-    _drain_tags.clear();
-    _drain_tags.resize(4, false);
-    if (_outstanding_requests)
-      _idle_timer = 0;
-    if (_wakeup_signal == true) {
-      _wakeup_signal = false;
-      _idle_timer = 0;
-    } else if (_router_state == false) {
-      assert(_outstanding_requests == 0);
-      bool neighbor_draining = false;
-      bool neighbor_off = false;
-      for (int out = 0; out < 4; ++out) {
-        if (_neighbor_states[out] == draining) {
-          neighbor_draining = true;
-          break;
-        } else if (_neighbor_states[out] == power_off ||
-            _neighbor_states[out] == wakeup) {
-          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-            continue;
-          neighbor_off = true;
-          break;
-        }
-      }
-      if (!neighbor_draining && !neighbor_off) {
-        _power_state = draining;
-        _idle_timer = 0;
-        _drain_timer = 0;
-        ++_drain_counter;
-        _drain_tags.clear();
-        _drain_tags.resize(4, false);
-        assert(_out_queue_handshakes.empty());
-        for (int out = 0; out < 4; ++out) {
-          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0)) {
-            _drain_tags[out] = true;
-            continue;
-          }
-          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-          _out_queue_handshakes[out]->new_state = draining;
-          //_out_queue_handshakes[out]->src_state = _power_state;
-          _out_queue_handshakes[out]->id = _id;
-          _out_queue_handshakes[out]->hid = ++_req_hids[out];
-        }
-      } else {
-        _idle_timer = 0;
-      }
-    }
-    break;
-  }
+    case power_on:
+      break;
 
-  case draining: {
-    assert(_outstanding_requests == 0);
-    ++_drain_timer;
-    bool neighbor_draining = false;
-    bool neighbor_off_wakeup = false;
-    for (int out = 0; out < 4; ++out) {
-      if (_neighbor_states[out] == draining && (out == 1 || out == 3)) {
-        neighbor_draining = true;
-        break;
-      } else if (_neighbor_states[out] == wakeup) {
-        neighbor_off_wakeup = true;
-        break;
-      } else if (_neighbor_states[out] == power_off) {
-        if ( (out == 1 && (_id % gK != 0)) || (out ==3 && (_id / gK != 0)) ) {
-          neighbor_off_wakeup = true;
-          break;
-        }
-      }
-    }
-    bool drain_done = _drain_tags[0] && _drain_tags[1] &&
-      _drain_tags[2] && _drain_tags[3];
-    drain_done &= _in_queue_flits.empty();
-    drain_done &= _crossbar_flits.empty();
-    for (int in_port = 0; in_port < _inputs; ++in_port) {
-      Buffer const * const cur_buf = _buf[in_port];
-      for (int vc = 0; vc < _vcs; ++vc) {
-        if (cur_buf->GetState(vc) != VC::idle) {
-          drain_done = false;
-          break;
-        }
-      }
-      drain_done &= _output_buffer[in_port].empty();
-    }
-    if (_wakeup_signal == true) {
-      _wakeup_signal = false;
-      _power_state = power_on;
-      _drain_tags.clear();
-      _drain_tags.resize(4, false);
-      _idle_timer = 0;
-      _drain_timer = 0;
-      assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < 4; ++out) {
-        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-            (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-          continue;
-        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-        _out_queue_handshakes[out]->new_state = power_on;
-        //_out_queue_handshakes[out]->src_state = _power_state;
-        _out_queue_handshakes[out]->id = _id;
-        _out_queue_handshakes[out]->hid = ++_req_hids[out];
-      }
-    } else if (neighbor_draining || neighbor_off_wakeup) {
-      _power_state = power_on;
-      _drain_tags.clear();
-      _drain_tags.resize(_inputs - 1, false);
-      assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < 4; ++out) {// may not needed due to the priority
-        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-        _out_queue_handshakes[out]->new_state = power_on;
-        _out_queue_handshakes[out]->id = _id;
-        _out_queue_handshakes[out]->hid = ++_req_hids[out];
-      }
-      _idle_timer = 0;
-      _drain_timer = 0;
-    } else if (drain_done) {
-      for (int i = 0; i < 4; ++i) {
-        if ((i == 0 && _id % gK == 0) || (i == 1 && _id % gK == gK-1) ||
-            (i == 2 && _id / gK == 0) || (i == 3 && _id / gK == gK-1))
-          continue;
-        const BufferState * dest_buf = _next_buf[i];
-        for (int vc = 0; vc < _vcs; ++vc) {
-          int credit_count = dest_buf->AvailableFor(vc);
-          assert(credit_count >= 0);
-          _credit_counter[i][vc] = credit_count;
-        }
-      }
-      _power_state = power_off;
-      _drain_tags.clear();
-      _drain_tags.resize(4, false);
-      _off_timer = 0;
-      assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < 4; ++out) {
-        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-            (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-          continue;
-        //        int in = out;
-        //        if (out % 2)
-        //          --in;
-        //        else
-        //          ++in;
-        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-        _out_queue_handshakes[out]->new_state = power_off;
-        _out_queue_handshakes[out]->id = _id;
-        _out_queue_handshakes[out]->hid = ++_req_hids[out];
-      }
-      _drain_time_q.push_back(_drain_timer);
-      if (_max_drain_time < _drain_timer)
-        _max_drain_time = _drain_timer;
-      if (_min_drain_time > _drain_timer || _min_drain_time == -1)
-        _min_drain_time = _drain_timer;
-      _drain_timer = 0;
-    } else if (_drain_timer > _drain_threshold) {
-      _power_state = power_on;
-      _drain_tags.clear();
-      _drain_tags.resize(4, false);
-      _idle_timer = 0;
-      assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < 4; ++out) {
-        if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0)
-            || (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-          continue;	// for edge routers
-        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-        _out_queue_handshakes[out]->new_state = power_on;
-        _out_queue_handshakes[out]->id = _id;
-        _out_queue_handshakes[out]->hid = ++_req_hids[out];
-      }
-      ++_drain_timeout_counter;
-      _drain_time_q.push_back(_drain_timer);
-      if (_max_drain_time < _drain_timer)
-        _max_drain_time = _drain_timer;
-      if (_min_drain_time > _drain_timer || _min_drain_time == -1)
-        _min_drain_time = _drain_timer;
-      _drain_timer = 0;
-    }
-    break;
-  }
-
-  case power_off: {
-    _drain_tags.clear();
-    _drain_tags.resize(4, false);
-    for (int in_port = 0; in_port < _inputs; ++in_port) {
-      Buffer const * const cur_buf = _buf[in_port];
-      for (int vc = 0; vc < _vcs; ++vc) {
-        assert(cur_buf->GetState(vc) == VC::idle);
-      }
-    }
-    ++_power_off_cycles;
-    ++_total_power_off_cycles;
-    if (_router_state) {
-      ++_off_timer;
-      if (_off_timer >= _bet_threshold) {
-        _wakeup_signal = false;
+    case power_off:
+      ++_power_off_cycles;
+      ++_total_power_off_cycles;
+      if (_wakeup_signal) {
         _power_state = wakeup;
+        assert(_wakeup_timer == 0);
+      }
+      break;
+
+    case wakeup:
+      ++_wakeup_timer;
+      if (_wakeup_timer >= _wakeup_threshold) {
+        _wakeup_signal = false;
         _wakeup_timer = 0;
-        _off_timer = 0;
-        ++_off_counter; // used for poewr gating overhead
-        _drain_tags.clear();
-        _drain_tags.resize(4, false);
+        _power_state = power_on;
+        for (int out = 0; out < _outputs; out++) {
+          if (_neighbor_states[out] != power_off) {
+            _next_buf[out]->ResetVCBufferSize();
+          }
+        }
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < 4; ++out) {
-          if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
-              (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0)) {
-            _drain_tags[out] = true;
-            continue;
-          }
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-          _out_queue_handshakes[out]->new_state = wakeup;
+          _out_queue_handshakes[out]->new_state = power_on;
           _out_queue_handshakes[out]->id = _id;
           _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
       }
-    }
-    break;
-  }
+      break;
 
-  case wakeup: {
-    for (int in_port = 0; in_port < _inputs; ++in_port) {
-      Buffer const * const cur_buf = _buf[in_port];
-      for (int vc = 0; vc < _vcs; ++vc) {
-        assert(cur_buf->GetState(vc) == VC::idle);
-      }
-    }
-    bool drain_done = _drain_tags[0] && _drain_tags[1] &&
-      _drain_tags[2] && _drain_tags[3];
-    drain_done &= _in_queue_flits.empty();
-    ++_wakeup_timer;
-    if (drain_done && _wakeup_timer >= _wakeup_threshold) { 
-      _wakeup_signal = false;
-      _wakeup_timer = 0;
-      _idle_timer = 0;
-      _power_state = power_on;
-      _drain_tags.clear();
-      _drain_tags.resize(4, false);
-      assert(_out_queue_handshakes.empty());
-      for (int out = 0; out < 4; ++out) {
-        _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-        _out_queue_handshakes[out]->new_state = power_on;
-        _out_queue_handshakes[out]->id = _id;
-        _out_queue_handshakes[out]->hid = ++_req_hids[out];
-      }
-    }
-    break;
-  }
-
-  default: // Must be something wrong
-    ostringstream err;
-    err << "Something wrong in the power state transition state machine";
-    Error(err.str());
+    default: // Must be something wrong
+      ostringstream err;
+      err << "Something wrong in the power state transition state machine";
+      Error(err.str());
   }
 }
 /* ==== Power Gate - End ==== */
 
 
 
-void RFLOVRouter::_InternalStep( )
+void NordRouter::_InternalStep( )
 {
   /* ==== Power Gate - Begin ==== */
   if (_power_state == power_off || _power_state == wakeup) {
-    _RFlovStep();
+    _NordStep();
     _OutputQueuing();
     assert(_out_queue_handshakes.empty());
+    //_active = !_out_queue_handshakes.empty() || ...
+    _active = !_proc_credits.empty() || !_in_queue_flits.empty();
     return;
   }
   /* ==== Power Gate - End ==== */
@@ -431,7 +264,7 @@ void RFLOVRouter::_InternalStep( )
   _switchMonitor->cycle( );
 }
 
-void RFLOVRouter::WriteOutputs( )
+void NordRouter::WriteOutputs( )
 {
   _SendFlits( );
   _SendCredits( );
@@ -446,7 +279,7 @@ void RFLOVRouter::WriteOutputs( )
 //------------------------------------------------------------------------------
 
 /* ==== Power Gate - Begin ==== */
-void RFLOVRouter::_ReceiveHandshakes()
+void NordRouter::_ReceiveHandshakes()
 {
   for (int input = 0; input < 4; ++input) {
     Handshake * const h = _input_handshakes[input]->Receive();
@@ -461,7 +294,7 @@ void RFLOVRouter::_ReceiveHandshakes()
 // input queuing
 //------------------------------------------------------------------------------
 
-void RFLOVRouter::_InputQueuing( )
+void NordRouter::_InputQueuing( )
 {
   for(map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
       iter != _in_queue_flits.end();
@@ -508,6 +341,10 @@ void RFLOVRouter::_InputQueuing( )
     if(cur_buf->GetState(vc) == VC::idle) {
       assert(cur_buf->FrontFlit(vc) == f);
       assert(cur_buf->GetOccupancy(vc) == 1);
+      if (!f->head) {
+        cout << GetSimTime() << " | " << FullName() << " | "
+          << *f << endl;
+      }
       assert(f->head);
       assert(_switch_hold_vc[input*_input_speedup + vc%_input_speedup] != vc);
       if(_routing_delay) {
@@ -528,7 +365,7 @@ void RFLOVRouter::_InputQueuing( )
                   -1)));
         }
         if(_vc_allocator) {
-          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                   -1)));
         }
         if(_noq) {
@@ -541,7 +378,7 @@ void RFLOVRouter::_InputQueuing( )
         _sw_hold_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       } else {
-        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       }
     }
@@ -587,7 +424,7 @@ void RFLOVRouter::_InputQueuing( )
 // routing
 //------------------------------------------------------------------------------
 
-void RFLOVRouter::_RouteUpdate( )
+void NordRouter::_RouteUpdate( )
 {
   assert(_routing_delay);
 
@@ -640,7 +477,7 @@ void RFLOVRouter::_RouteUpdate( )
         const FlitChannel * channel = _output_channels[out_port];
         Router * router = channel->GetSink();
         assert(router);
-        if (f->dest == router->GetID()) {
+        /*if (f->dest == router->GetID()) {
           if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
             cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
               << router->GetID() << " is "
@@ -652,7 +489,7 @@ void RFLOVRouter::_RouteUpdate( )
           }
           assert(_neighbor_states[out_port] == power_on ||
               _neighbor_states[out_port] == draining);
-        }
+        }*/
       }
     }
     /* ==== Power Gate - End ==== */
@@ -672,7 +509,7 @@ void RFLOVRouter::_RouteUpdate( )
 // VC allocation
 //------------------------------------------------------------------------------
 
-void RFLOVRouter::_VCAllocUpdate( )
+void NordRouter::_VCAllocUpdate( )
 {
   assert(_vc_allocator);
 
@@ -728,6 +565,15 @@ void RFLOVRouter::_VCAllocUpdate( )
         if (!is_mc && (_neighbor_states[match_output] == draining ||
               _neighbor_states[match_output] == wakeup))
           back_to_route = true;
+        if (_neighbor_states[match_output] == power_off) {
+          if (match_output != _ring_out_port) {
+            cout << GetSimTime() << " | " << FullName() << " | "
+              << "match_output " << match_output
+              << ", ring output " << _ring_out_port
+              << *f << endl;
+          }
+          assert(match_output == _ring_out_port);
+        }
       }
       if (!back_to_route) {
         if(f->watch) {
@@ -766,7 +612,7 @@ void RFLOVRouter::_VCAllocUpdate( )
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
             << " Sink router " << router->GetID() << " is "
             << POWERSTATE[_neighbor_states[match_output]]
-            << ", back to RC stage for flit " << f->id << endl;
+            << ", back to RC stage." << endl;
 
           cur_buf->Display(*gWatchOut);
 
@@ -819,6 +665,8 @@ void RFLOVRouter::_VCAllocUpdate( )
           if (!is_mc && (_neighbor_states[out_port] == draining ||
                 _neighbor_states[out_port] == wakeup))
             delete_route = true;
+          if (_neighbor_states[out_port] == power_off)
+            assert(out_port == _ring_out_port);
         }
 
         if (delete_route) {
@@ -852,7 +700,30 @@ void RFLOVRouter::_VCAllocUpdate( )
         continue;
       }
 
-      if (GetSimTime() - f->rtime == 300) { // timeout
+      bool escape = true;
+      iset = setlist.begin();
+      while (iset != setlist.end()) {
+        int const out_port = iset->output_port;
+        assert((out_port >= 0) && (out_port < _outputs));
+        if (out_port != _ring_out_port) {
+          escape = false;
+          break;
+        }
+        int vc_start = iset->vc_start;
+        int vc_end = iset->vc_end;
+        if (!(vc_start == 0 && vc_end == 0) &&
+            !(vc_start == _vcs - 1 && vc_end == _vcs - 1)) {
+          escape = false;
+          break;
+        }
+        iset++;
+      }
+      if (GetSimTime() - f->rtime >= _routing_deadlock_timeout_threshold && escape == false) { // timeout
+        if (f->watch) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "flit " << f->id << " (pid " << f->pid << ") times out,"
+            << " back to route from VCAllocUpdate" << endl;
+        }
         _buf[input]->SetState(vc, VC::routing);
         _route_vcs.push_back(make_pair(-1, make_pair(input, vc)));
         if (_speculative) {
@@ -879,7 +750,7 @@ void RFLOVRouter::_VCAllocUpdate( )
 // switch holding
 //------------------------------------------------------------------------------
 
-void RFLOVRouter::_SWHoldUpdate( )
+void NordRouter::_SWHoldUpdate( )
 {
   assert(_hold_switch_for_packet);
 
@@ -1000,7 +871,6 @@ void RFLOVRouter::_SWHoldUpdate( )
 
       _crossbar_flits.push_back(make_pair(-1, make_pair(f, make_pair(expanded_input, expanded_output))));
 
-      assert(input >= 0 && input < _inputs);
       if(_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
       }
@@ -1102,7 +972,7 @@ void RFLOVRouter::_SWHoldUpdate( )
 // switch allocation
 //------------------------------------------------------------------------------
 
-void RFLOVRouter::_SWAllocUpdate( )
+void NordRouter::_SWAllocUpdate( )
 {
   while(!_sw_alloc_vcs.empty()) {
 
@@ -1198,19 +1068,19 @@ void RFLOVRouter::_SWAllocUpdate( )
                 vc_prio += numeric_limits<int>::min();
               }
 
-              // FIXME: This check should probably be performed in Evaluate(), 
-              // not Update(), as the latter can cause the outcome to depend on 
+              // FIXME: This check should probably be performed in Evaluate(),
+              // not Update(), as the latter can cause the outcome to depend on
               // the order of evaluation!
-              if(dest_buf->IsAvailableFor(out_vc) && 
+              if(dest_buf->IsAvailableFor(out_vc) &&
                   !dest_buf->IsFullFor(out_vc) &&
-                  ((match_vc < 0) || 
-                   RoundRobinArbiter::Supersedes(out_vc, vc_prio, 
-                     match_vc, match_prio, 
+                  ((match_vc < 0) ||
+                   RoundRobinArbiter::Supersedes(out_vc, vc_prio,
+                     match_vc, match_prio,
                      vc_offset, _vcs))) {
                 match_vc = out_vc;
                 match_prio = vc_prio;
               }
-            }	
+            }
           }
         }
         assert(match_vc >= 0);
@@ -1246,14 +1116,16 @@ void RFLOVRouter::_SWAllocUpdate( )
                   _neighbor_states[output] == wakeup)) {
               back_to_route = true;
             }
+            if (_downstream_states[output] == power_off)
+              assert(output == _ring_out_port);
           }
-          // donwstream is not power on
+          // donwstream is during power state transistion
           if (back_to_route) {
             if (f->watch) {
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                 << " SA: Sink router " << router->GetID() << " is "
                 << POWERSTATE[_neighbor_states[output]]
-                << ", back to RC stage for flit " << f->id << endl;
+                << ", back to RC stage." << endl;
             }
             if (cur_buf->GetState(vc) == VC::vc_alloc) {
               assert(_speculative);
@@ -1266,6 +1138,8 @@ void RFLOVRouter::_SWAllocUpdate( )
                 }
               }
             } else {
+              assert(f->head);
+              assert(cur_buf->GetState(vc) == VC::active);
               dest_buf->ReturnBuffer(match_vc);
             }
             cur_buf->ClearRouteSet(vc);
@@ -1344,7 +1218,6 @@ void RFLOVRouter::_SWAllocUpdate( )
 
       _crossbar_flits.push_back(make_pair(-1, make_pair(f, make_pair(expanded_input, expanded_output))));
 
-      assert(input >= 0 && input < _inputs);
       if(_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
       }
@@ -1443,6 +1316,8 @@ void RFLOVRouter::_SWAllocUpdate( )
               if (!is_mc && (_neighbor_states[out_port] == draining ||
                     _neighbor_states[out_port] == wakeup))
                 delete_route = true;
+              if (_neighbor_states[out_port] == power_off)
+                assert(out_port == _ring_out_port);
             }
 
             if (delete_route) {
@@ -1474,9 +1349,11 @@ void RFLOVRouter::_SWAllocUpdate( )
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_neighbor_states[output] == draining ||
-                  _neighbor_states[output] == wakeup) && !is_mc) {
+                  _neighbor_states[output] == wakeup)) {
               back_to_route = true;
             }
+            if (_neighbor_states[output] == power_off)
+              assert(output == _ring_out_port);
           }
           if (back_to_route) {
             BufferState * dest_buf = _next_buf[output];
@@ -1521,12 +1398,43 @@ void RFLOVRouter::_SWAllocUpdate( )
 #endif
 
       /* ==== Power Gate - Begin ==== */
-      if (GetSimTime() - f->rtime == 300 && f->head) { // timeout
-        int const input = item.second.first.first;
-        assert((input >= 0) && (input < _inputs));
-        int const vc = item.second.first.second;
-        assert((vc >= 0) && (vc < _vcs));
-        Buffer * const cur_buf = _buf[input];
+      int const input = item.second.first.first;
+      assert((input >= 0) && (input < _inputs));
+      int const vc = item.second.first.second;
+      assert((vc >= 0) && (vc < _vcs));
+      Buffer * const cur_buf = _buf[input];
+      bool escape = true;
+      if (cur_buf->GetState(vc) == VC::active) {
+        int output = cur_buf->GetOutputPort(vc);
+        int match_vc = cur_buf->GetOutputVC(vc);
+        if (output != _ring_out_port && (match_vc != 0 && match_vc != _vcs - 1))
+          escape = false;
+      } else {
+        assert(cur_buf->GetState(vc) == VC::vc_alloc);
+        OutputSet const * route_set = cur_buf->GetRouteSet(vc);
+        assert(route_set);
+
+        set<OutputSet::sSetElement> setlist = route_set->GetSet();
+
+        set<OutputSet::sSetElement>::iterator iset = setlist.begin();
+        while (iset != setlist.end()) {
+          int const out_port = iset->output_port;
+          assert((out_port >= 0) && (out_port < _outputs));
+          if (out_port != _ring_out_port) {
+            escape = false;
+            break;
+          }
+          int vc_start = iset->vc_start;
+          int vc_end = iset->vc_end;
+          if (!(vc_start == 0 && vc_end == 0) &&
+              !(vc_start == _vcs - 1 && vc_end == _vcs - 1)) {
+            escape = false;
+            break;
+          }
+          iset++;
+        }
+      }
+      if (GetSimTime() - f->rtime >= _routing_deadlock_timeout_threshold && f->head && escape == false) { // timeout
         if (cur_buf->GetState(vc) == VC::active) {
           int const dest_output = cur_buf->GetOutputPort(vc);
           assert((dest_output >= 0) && (dest_output < _outputs));
@@ -1553,6 +1461,11 @@ void RFLOVRouter::_SWAllocUpdate( )
           _route_vcs.push_back(make_pair(-1, item.second.first));
           cur_buf->SetState(vc, VC::routing);
         }
+        if (f->watch) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "flit " << f->id << " (pid " << f->pid << ") times out,"
+            << " back to route from SWAllocUpdate" << endl;
+        }
       } else {
         _sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
       }
@@ -1569,8 +1482,27 @@ void RFLOVRouter::_SWAllocUpdate( )
 // output queuing
 //------------------------------------------------------------------------------
 
-void RFLOVRouter::_OutputQueuing( )
+void NordRouter::_OutputQueuing( )
 {
+  /* ==== power gate - begin ==== */
+  if (_power_state == power_on && _pending_credits > 0) {
+    for (int input = 0; input < _inputs; input++) {
+      for (int vc = 0; vc < _vcs; vc++) {
+        if (_credit_counter[input][vc] > 0) {
+          if (_out_queue_credits.count(input) == 0) {
+            _out_queue_credits.insert(make_pair(input, Credit::New()));
+          }
+          if (_out_queue_credits[input]->vc.count(vc) == 0) {
+            _out_queue_credits[input]->vc.insert(vc);
+            _credit_counter[input][vc]--;
+            _pending_credits--;
+          }
+        }
+      }
+    }
+  }
+  /* ==== power gate - end ==== */
+
   for(map<int, Credit *>::const_iterator iter = _out_queue_credits.begin();
       iter != _out_queue_credits.end();
       ++iter) {
@@ -1586,10 +1518,10 @@ void RFLOVRouter::_OutputQueuing( )
   }
   _out_queue_credits.clear();
 
-  /* ==== Power Gate - Begin ==== */
+  /* ==== power gate - begin ==== */
   for (map<int, Handshake *>::const_iterator iter =
-      _out_queue_handshakes.begin(); iter != _out_queue_handshakes.end();
-      ++iter) {
+       _out_queue_handshakes.begin(); iter != _out_queue_handshakes.end();
+       ++iter) {
 
     int const output = iter->first;
     assert((output >= 0) && (output < 4));
@@ -1609,7 +1541,7 @@ void RFLOVRouter::_OutputQueuing( )
 //------------------------------------------------------------------------------
 
 /* ==== Power Gate - Begin ==== */
-void RFLOVRouter::_SendHandshakes()
+void NordRouter::_SendHandshakes()
 {
   for (int output = 0; output < 4; ++output) {
     if (!_handshake_buffer[output].empty()) {
@@ -1625,10 +1557,11 @@ void RFLOVRouter::_SendHandshakes()
 
 /* ==== Power Gate - Begin ==== */
 //--------------------------------
-// RFLOV Facilities
+// Nord Facilities
 //--------------------------------
 
-void RFLOVRouter::_RFlovStep() {
+
+void NordRouter::_NordStep() {
   assert(_power_state == power_off || _power_state == wakeup);
   assert(_route_vcs.empty());
   assert(_vc_alloc_vcs.empty());
@@ -1640,10 +1573,9 @@ void RFLOVRouter::_RFlovStep() {
 
   // process flits
   for (map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
-      iter != _in_queue_flits.end(); ++iter) {
+       iter != _in_queue_flits.end(); ++iter) {
 
     int const input = iter->first;
-    assert((input >= 0) && (input < 4));
 
     Flit * const f = iter->second;
     assert(f);
@@ -1651,22 +1583,38 @@ void RFLOVRouter::_RFlovStep() {
     int const vc = f->vc;
     assert((vc >= 0) && (vc < _vcs));
 
-    if (f->watch) {
-      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-        << "Bypass flit " << f->id << " to next router" << endl;
+    Buffer * const cur_buf = _buf[input];
+
+    int output;
+    if (input == _ring_in_port) {
+      output = DIR_NI;
+      if (f->watch) {
+        *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+          << "Bypass flit " << f->id << " to NI" << endl;
+      }
+    } else {
+      assert(input == DIR_NI);
+      output = _ring_out_port;
+      if (f->watch) {
+        *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+          << "Bypass flit " << f->id << " to next router" << endl;
+      }
     }
 
-    int output = input;
-    if (output % 2)
-      --output;
-    else
-      ++output;
-    assert((output >= 0) && (output < 4));
-
     BufferState * const dest_buf = _next_buf[output];
-    if (f->head)
-      dest_buf->TakeBuffer(vc, _vcs * _inputs);	// indicate its taken by flov
+    if (f->head) {
+      cur_buf->SetOutput(vc, output, vc);
+      cur_buf->SetState(vc, VC::active);
+      //dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
+      dest_buf->TakeBuffer(vc, input * _vcs + vc); // indicate its taken by nord
+    }
+    if (f->tail) {
+      cur_buf->SetState(vc, VC::idle);
+    }
     dest_buf->SendingFlit(f);
+
+    _pending_credits++;
+    _credit_counter[input][vc]++;
 
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -1675,7 +1623,7 @@ void RFLOVRouter::_RFlovStep() {
     }
     _output_buffer[output].push(f);
 
-    f->flov_hops++;
+    f->hops++;
   }
   _in_queue_flits.clear();
 
@@ -1710,21 +1658,17 @@ void RFLOVRouter::_RFlovStep() {
 
     dest_buf->ProcessCredit(c);
     // relay the credit to the upstream router
-    // RFLOV channel input output mapping
-    // input --> output
-    //	 0	 -->   1
-    //	 1	 -->   0
-    //	 2	 -->   3
-    //	 3	 -->   2
-    bool boundary = ((output == 1 && _id % gK == gK-1) || (output == 0 && _id % gK == 0) ||
-        (output == 3 && _id / gK == gK-1) || (output == 2 && _id / gK == 0));
-    if (output < 4 && !boundary) {
-      int input = output;
-      if (output % 2)
-        --input;
-      else
-        ++input;
-      assert((input >= 0) && (input < 4));
+    // Nord channel input output mapping
+    // ring_in_port --> NI
+    // ring_out_port --> NI
+    int input = -1;
+    if (output == DIR_NI) {
+      input = _ring_in_port;
+    } else if (output == _ring_out_port) {
+      input = DIR_NI;
+    }
+
+    if (input != -1) {
       if (_out_queue_credits.count(input) == 0) {
         _out_queue_credits.insert(make_pair(input, Credit::New()));
       }
@@ -1733,8 +1677,10 @@ void RFLOVRouter::_RFlovStep() {
 
         int const vc = *iter;
 
-        assert((vc >= 0) && (vc < _vcs));
+        assert(vc >= 0 && vc < _vcs);
         _out_queue_credits[input]->vc.insert(vc);
+        _credit_counter[input][vc]--;
+        _pending_credits--;
 
         ++iter;
       }
@@ -1743,29 +1689,9 @@ void RFLOVRouter::_RFlovStep() {
     c->Free();
     _proc_credits.pop_front();
   }
-
-  for (int in = 0; in < 4; ++in) {
-    int out = in;
-    if (in % 2)
-      --out;
-    else
-      ++out;
-    for (int vc = 0; vc < _vcs; ++vc) {
-      if (_credit_counter[out][vc] > 0) {
-        assert(in >= 0 && in < 4);
-        if (_out_queue_credits.count(in) == 0) {
-          _out_queue_credits.insert(make_pair(in, Credit::New()));
-        }
-        if (_out_queue_credits[in]->vc.count(vc) == 0) {
-          --_credit_counter[out][vc];
-          _out_queue_credits[in]->vc.insert(vc);
-        }
-      }
-    }
-  }
 }
 
-void RFLOVRouter::_HandshakeEvaluate() {
+void NordRouter::_HandshakeEvaluate() {
   while (!_proc_handshakes.empty()) {
     pair<int, Handshake *> const & item = _proc_handshakes.front();
     int const input = item.first;
@@ -1775,52 +1701,34 @@ void RFLOVRouter::_HandshakeEvaluate() {
     Handshake * h = item.second;
     assert(h);
 
-    if (h->new_state == power_off) {
-      if (_neighbor_states[output] != draining) {
-        cout << GetSimTime() << output << "'s state: " << POWERSTATE[_neighbor_states[output]] << endl;
-      }
-      assert(_neighbor_states[output] == draining);
-      assert(_drain_done_sent[output]);
-      _drain_done_sent[output] = false;
-      BufferState * dest_buf = _next_buf[output];
-      dest_buf->ClearCredits();
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    } else if (h->new_state == power_on && _neighbor_states[output] == wakeup) {
-      _drain_done_sent[output] = false;
-      BufferState * dest_buf = _next_buf[output];
-      dest_buf->FullCredits();
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    } else if (h->new_state == power_on && _neighbor_states[output] == draining) {
-      _drain_done_sent[output] = false;
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    } else if (h->new_state == draining || h->new_state == wakeup) {
-      _drain_done_sent[output] = false;
-      _neighbor_states[output] = (ePowerState) h->new_state;
-    }
+    switch (h->new_state) {
+      case power_off:
+        assert(0);
+        break;
 
-    if (h->drain_done) {
-      assert(_power_state == draining || _power_state == wakeup || _power_state == power_on);
-      if (h->hid == _req_hids[input] && (_power_state == draining || _power_state == wakeup)) {
-        _drain_tags[input] = true;
-      }
-      /*if (_power_state == draining || _power_state == wakeup) {
-        _drain_tags[input] = true;
-      }*/
-    } else {
-      _resp_hids[output] = h->hid;
+      case power_on:
+        _neighbor_states[output] = power_on;
+        _next_buf[output]->ResetVCBufferSize();
+        break;
+
+      default:
+        ostringstream err;
+        err << "Something wrong in the handshake state machine";
+        Error(err.str());
     }
 
     h->Free();
     _proc_handshakes.pop_front();
   }
+  assert(_proc_handshakes.empty());
 }
 
-void RFLOVRouter::_HandshakeResponse() {
+void NordRouter::_HandshakeResponse() {
   assert(_power_state == power_on || _power_state == draining);
 
   for (int out_port = 0; out_port < 4; ++out_port) {
-    if ((_neighbor_states[out_port] == draining || _neighbor_states[out_port] == wakeup) &&
-        (_power_state != draining || _power_state != wakeup)) {
+    if (_neighbor_states[out_port] == draining
+        || _neighbor_states[out_port] == wakeup) {
       if (_drain_done_sent[out_port])
         continue;
       bool drain_done = true;
@@ -1840,7 +1748,7 @@ void RFLOVRouter::_HandshakeResponse() {
       // check ST stage, crossbar_flits
       if (drain_done)
         for (deque<pair<int, pair<Flit *, pair<int, int> > > >::iterator iter =
-            _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
+             _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
           int const time = iter->first;
           assert(time <= GetSimTime());
           int const expanded_output = iter->second.second.second;
@@ -1857,10 +1765,8 @@ void RFLOVRouter::_HandshakeResponse() {
       // don't need to check link, because handshake has same delay as links
 
       if (drain_done) {
-        const FlitChannel * channel = _output_channels[out_port];
-        Router * router = channel->GetSink();
-        assert(router);
-        assert(_neighbor_states[out_port] == draining || _neighbor_states[out_port] == wakeup);
+        assert(_neighbor_states[out_port] == draining ||
+            _neighbor_states[out_port] == wakeup);
         assert(!_drain_done_sent[out_port]);
         if (_out_queue_handshakes.count(out_port) == 0) {
           _out_queue_handshakes.insert(make_pair(out_port, Handshake::New()));
@@ -1874,4 +1780,9 @@ void RFLOVRouter::_HandshakeResponse() {
   }
 }
 
+void NordRouter::SetRingOutputVCBufferSize(int vc_buf_size)
+{
+  _next_buf[_ring_out_port]->SetVCBufferSize(vc_buf_size);
+}
 /* ==== Power Gate - End ==== */
+

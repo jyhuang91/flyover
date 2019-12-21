@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -25,37 +25,46 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _ROUTEFUNC_HPP_
-#define _ROUTEFUNC_HPP_
+#ifndef _NORDTRAFFICMANAGER_HPP_
+#define _NORDTRAFFICMANAGER_HPP_
 
-#include "flit.hpp"
-#include "router.hpp"
-#include "outputset.hpp"
-#include "config_utils.hpp"
+#include <cassert>
+#include <unordered_map>
 
-typedef void (*tRoutingFunction)( const Router *, const Flit *, int in_channel, OutputSet *, bool );
+#include "trafficmanager.hpp"
+#include "buffer.hpp"
 
-void InitializeRoutingMap( const Configuration & config );
+class NordTrafficManager : public TrafficManager {
 
-/* ==== Power Gate - Begin ==== */
-enum Direction {
-    DIR_EAST = 0,
-    DIR_WEST,
-    DIR_SOUTH,
-    DIR_NORTH,
-    DIR_NI,
-    DIR_INVALID,
+private:
+
+  vector<vector<int> > _packet_size;
+  vector<vector<int> > _packet_size_rate;
+  vector<int> _packet_size_max_val;
+
+  vector<vector<bool> > _during_bypassing;
+
+  int _routing_deadlock_timeout_threshold;
+  int _performance_centric_wakeup_threshold;
+  int _power_centric_wakeup_threshold;
+  int _wakeup_monitor_epoch;
+  vector<int> _wakeup_monitor_vc_requests;
+  vector<bool> _performance_centric_routers;
+  // ============ Internal methods ============
+protected:
+
+  vector<vector<Buffer *> > _buffers;
+
+  virtual void _Inject();
+  virtual void _Step( );
+
+  virtual void _GeneratePacket( int source, int size, int cl, int time );
+
+public:
+
+  NordTrafficManager( const Configuration &config, const vector<Network *> & net );
+  virtual ~NordTrafficManager( );
+
 };
-
-extern int gRoutingDeadlockTimeoutThreshold;
-/* ==== Power Gate - End ==== */
-
-extern map<string, tRoutingFunction> gRoutingFunctionMap;
-
-extern int gNumVCs;
-extern int gReadReqBeginVC, gReadReqEndVC;
-extern int gWriteReqBeginVC, gWriteReqEndVC;
-extern int gReadReplyBeginVC, gReadReplyEndVC;
-extern int gWriteReplyBeginVC, gWriteReplyEndVC;
 
 #endif

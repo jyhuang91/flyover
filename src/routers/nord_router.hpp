@@ -25,89 +25,69 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _FLIT_HPP_
-#define _FLIT_HPP_
+#ifndef _NORD_ROUTER_HPP_
+#define _NORD_ROUTER_HPP_
 
-#include <iostream>
-#include <stack>
+#include "iq_router.hpp"
 
-#include "booksim.hpp"
-#include "outputset.hpp"
+/* ==== Power Gate - Begin ==== */
+class Handshake;
+/* ==== Power Gate - End ==== */
 
-class Flit {
+class NordRouter : public IQRouter {
+
+protected:
+
+  /* ==== Power Gate - Begin ==== */
+  int _routing_deadlock_timeout_threshold;
+
+  deque<pair<int, Handshake *> > _proc_handshakes;
+
+  map<int, Handshake *> _out_queue_handshakes;
+
+  vector<queue<Handshake *> > _handshake_buffer;
+
+  vector<vector<int> > _credit_counter;
+  int _pending_credits;
+
+  void _ReceiveHandshakes( );
+  /* ==== Power Gate - End ==== */
+
+  virtual void _InternalStep( );
+
+  virtual void _InputQueuing( );
+
+  virtual void _RouteUpdate( );
+  virtual void _VCAllocUpdate( );
+  virtual void _SWHoldUpdate( );
+  virtual void _SWAllocUpdate( );
+
+  virtual void _OutputQueuing( );
+
+  /* ==== Power Gate - Begin ==== */
+  void _SendHandshakes( );
+
+  void _NordStep( );  // fly-over operations
+  void _HandshakeEvaluate();
+  void _HandshakeResponse();
+  /* ==== Power Gate - End ==== */
 
 public:
 
-  const static int NUM_FLIT_TYPES = 5;
-  enum FlitType {
-    READ_REQUEST  = 0,
-    READ_REPLY    = 1,
-    WRITE_REQUEST = 2,
-    WRITE_REPLY   = 3,
-    ANY_TYPE      = 4 };
-  FlitType type;
+  NordRouter( Configuration const & config,
+          Module *parent, string const & name, int id,
+          int inputs, int outputs );
 
-  int vc;
-
-  int cl;
-
-  bool head;
-  bool tail;
-
-  int  ctime;
-  int  itime;
-  int  atime;
+  virtual ~NordRouter( );
 
   /* ==== Power Gate - Begin ==== */
-  int rtime;  // Enter router time
-  int bypass_vc;
+  virtual void PowerStateEvaluate( );
+  virtual void SetRingOutputVCBufferSize(int vc_buf_size);
   /* ==== Power Gate - End ==== */
 
-  int  id;
-  int  pid;
-
-  bool record;
-
-  int  src;
-  int  dest;
-
-  int  pri;
-
-  /* ==== Power Gate - Begin ==== */
-  int flov_hops;
-  /* ==== Power Gate - End ==== */
-  int  hops;
-  bool watch;
-  int  subnetwork;
-
-  // intermediate destination (if any)
-  mutable int intm;
-
-  // phase in multi-phase algorithms
-  mutable int ph;
-
-  // Fields for arbitrary data
-  void* data ;
-
-  // Lookahead route info
-  OutputSet la_route_set;
-
-  void Reset();
-
-  static Flit * New();
-  void Free();
-  static void FreeAll();
-
-private:
-
-  Flit();
-  ~Flit() {}
-
-  static stack<Flit *> _all;
-  static stack<Flit *> _free;
+  virtual void ReadInputs( );
+  virtual void WriteOutputs( );
 
 };
-
-ostream& operator<<( ostream& os, const Flit& f );
 
 #endif
