@@ -49,6 +49,7 @@
 #include "chaos_router.hpp"
 /* ==== Power Gate - Begin ==== */
 #include "rflov_router.hpp"
+#include "gflov_router.hpp"
 #include "flov_router.hpp"
 #include "rp_router.hpp"
 #include "nord_router.hpp"
@@ -214,10 +215,12 @@ Router *Router::NewRouter( const Configuration& config,
   } else if ( type == "chaos" ) {
     r = new ChaosRouter( config, parent, name, id, inputs, outputs );
     /* ==== Power Gate - Begin ==== */
-  } else if ( type == "rflov" ) {
-    r = new RFLOVRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "flov" ) {
     r = new FLOVRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "rflov" ) {
+    r = new RFLOVRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "gflov" ) {
+    r = new GFLOVRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "rp" ) {
     r = new RPRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "nord" ) {
