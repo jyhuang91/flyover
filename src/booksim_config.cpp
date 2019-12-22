@@ -375,10 +375,14 @@ BookSimConfig::BookSimConfig() {
   _int_map["idle_threshold"] = 5;
   _int_map["drain_threshold"] = 100;
   _int_map["bet_threshold"] = 10;
-  _int_map["wakeup_threshold"] = 3;
+  _int_map["wakeup_threshold"] = 10;
   _int_map["nord_performance_centric_wakeup_threshold"] = 1; // number of VC requests at NI within monitor epoch
   _int_map["nord_power_centric_wakeup_threshold"] = 3;
   _int_map["nord_wakeup_monitor_epoch"] = 10; // report every 10 cycles
+  _float_map["zeroload_latency"] = 30;
+  _float_map["low_watermark"] = 1.2;
+  _float_map["high_watermark"] = 1.5;
+  _int_map["flov_monitor_epoch"] = 500;
   _int_map["routing_deadlock_timeout_threshold"] = 512;
   /* ==== Power Gate - End ==== */
 

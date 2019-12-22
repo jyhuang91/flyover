@@ -14,7 +14,7 @@ def main():
 
     dimensions = [6, 8, 10]
     schemes = [
-        'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov'
+        'baseline', 'rpa', 'rpc', 'rflov', 'gflov', 'opt_rflov', 'opt_gflov'
     ]
     paper_schemes = [
         'Baseline', 'RPA', 'RPC', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt'

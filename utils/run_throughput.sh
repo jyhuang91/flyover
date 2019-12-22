@@ -9,12 +9,13 @@ do
   #for inj in 0.01 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.5 0.6
   for inj in `seq 0.01 0.01 0.60`
   do
-    for scheme in baseline rpa rpc rflov flov opt_rflov opt_flov
+    #for scheme in baseline rpa rpc rflov gflov opt_rflov opt_gflov
+    for scheme in gflov opt_gflov
     do
       powergate_type=$scheme
       if [ $scheme = "rflov" ] || [ $scheme = "opt_rflov" ]; then
         powergate_type="rflov"
-      elif [ $scheme = "flov" ] || [ $scheme = "opt_flov" ]; then
+      elif [ $scheme = "gflov" ] || [ $scheme = "opt_gflov" ]; then
         powergate_type="flov"
       elif [ $scheme = "baseline" ]; then
         powergate_type="no_pg"
