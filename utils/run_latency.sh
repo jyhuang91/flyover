@@ -7,7 +7,7 @@ for traffic in uniform tornado
 do
   for inj in 0.02 0.08
   do
-    for scheme in baseline rpa rpc rflov flov opt_rflov opt_flov
+    for scheme in baseline rpa rpc rflov gflov opt_rflov opt_gflov
     do
       mkdir -p ../results/latency/${scheme}
       for off_percent in 10 20 30 40 50 60 70 80;

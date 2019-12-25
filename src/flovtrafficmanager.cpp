@@ -7,7 +7,7 @@
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
 
-  Redistributions of source code must retain the above copyright notice, this 
+  Redistributions of source code must retain the above copyright notice, this
   list of conditions and the following disclaimer.
   Redistributions in binary form must reproduce the above copyright notice, this
   list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -35,7 +35,7 @@
 #include "booksim.hpp"
 #include "booksim_config.hpp"
 #include "flovtrafficmanager.hpp"
-#include "random_utils.hpp" 
+#include "random_utils.hpp"
 #include "vc.hpp"
 #include "packet_reply_info.hpp"
 
@@ -44,7 +44,7 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
     : TrafficManager(config, net)
 {
 
-    // ============ Traffic ============ 
+    // ============ Traffic ============
 
     string packet_size_str = config.GetStr("packet_size");
     if(packet_size_str.empty()) {
@@ -83,10 +83,10 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
             _packet_size_max_val.push_back(max_val);
         }
     }
-  
+
     for(int c = 0; c < _classes; ++c) {
         if(_use_read_write[c]) {
-            _packet_size[c] = 
+            _packet_size[c] =
                 vector<int>(1, (_read_request_size[c] + _read_reply_size[c] +
                                 _write_request_size[c] + _write_reply_size[c]) / 2);
             _packet_size_rate[c] = vector<int>(1, 1);
@@ -94,8 +94,8 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
         }
     }
 
-    // ============ Statistics ============ 
-    
+    // ============ Statistics ============
+
     /* ==== Power Gate - Begin ==== */
     _flov_hop_stats.resize(_classes);
     _overall_flov_hop_stats.resize(_classes, 0.0);
@@ -108,7 +108,7 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
         _stats[tmp_name.str()] = _hop_stats[c];
         tmp_name.str("");
     }
-    
+
     _router_idle_periods.resize(_nodes, 0);
     _idle_cycles.resize(_nodes);
     _overall_idle_cycles.resize(_nodes);
@@ -117,6 +117,24 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
       _overall_idle_cycles[n].resize(32000, 0);
     }
     _wakeup_handshake_latency.resize(_nodes, false);
+
+    _monitor_counter = 0;
+    _monitor_epoch = config.GetInt("flov_monitor_epoch");
+    double high_watermark = config.GetFloat("high_watermark");
+    double low_watermark = config.GetFloat("low_watermark");
+    double zeroload_latency = config.GetFloat("zeroload_latency");
+    _plat_high_watermark = zeroload_latency * high_watermark;
+    _plat_low_watermark = zeroload_latency * low_watermark;
+
+    _powergate_type = config.GetStr("powergate_type");
+    _per_node_plat.resize(_nodes);
+    for (int n = 0; n < _nodes; ++n) {
+      ostringstream tmp_name;
+
+      tmp_name << "per_node_plat_stat_" << n;
+      _per_node_plat[n] = new Stats(this, tmp_name.str(), 1.0, 1000);
+      tmp_name.str("");
+    }
     /* ==== Power Gate - End ==== */
 }
 
@@ -136,18 +154,18 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
 
     assert(_total_in_flight_flits[f->cl].count(f->id) > 0);
     _total_in_flight_flits[f->cl].erase(f->id);
-  
+
     if(f->record) {
         assert(_measured_in_flight_flits[f->cl].count(f->id) > 0);
         _measured_in_flight_flits[f->cl].erase(f->id);
     }
 
-    if ( f->watch ) { 
+    if ( f->watch ) {
         *gWatchOut << GetSimTime() << " | "
                    << "node" << dest << " | "
-                   << "Retiring flit " << f->id 
+                   << "Retiring flit " << f->id
                    << " (packet " << f->pid
-                   << ", src = " << f->src 
+                   << ", src = " << f->src
                    << ", dest = " << f->dest
                    << ", hops = " << f->hops
                    /* ==== Power Gate - Begin ==== */
@@ -162,7 +180,7 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
         err << "Flit " << f->id << " arrived at incorrect output " << dest;
         Error( err.str( ) );
     }
-  
+
     if((_slowest_flit[f->cl] < 0) ||
        (_flat_stats[f->cl]->Max() < (f->atime - f->itime)))
         _slowest_flit[f->cl] = f->id;
@@ -170,7 +188,7 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
     if(_pair_stats){
         _pair_flat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - f->itime );
     }
-      
+
     if ( f->tail ) {
         Flit * head;
         if(f->head) {
@@ -183,14 +201,14 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
             assert(head->head);
             assert(f->pid == head->pid);
         }
-        if ( f->watch ) { 
+        if ( f->watch ) {
             *gWatchOut << GetSimTime() << " | "
                        << "node" << dest << " | "
-                       << "Retiring packet " << f->pid 
+                       << "Retiring packet " << f->pid
                        << " (plat = " << f->atime - head->ctime
                        << ", nlat = " << f->atime - head->itime
                        << ", frag = " << (f->atime - head->atime) - (f->id - head->id) // NB: In the spirit of solving problems using ugly hacks, we compute the packet length by taking advantage of the fact that the IDs of flits within a packet are contiguous.
-                       << ", src = " << head->src 
+                       << ", src = " << head->src
                        << ", dest = " << head->dest
                        << ")." << endl;
         }
@@ -209,16 +227,17 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
             } else if(f->type == Flit::ANY_TYPE) {
                 _requestsOutstanding[f->src]--;
             }
-      
+
         }
 
         // Only record statistics once per packet (at tail)
         // and based on the simulation state
         if ( ( _sim_state == warming_up ) || f->record ) {
-      
+
             _hop_stats[f->cl]->AddSample( f->hops );
             /* ==== Power Gate - Begin ==== */
             _flov_hop_stats[f->cl]->AddSample(f->flov_hops);
+            _per_node_plat[dest]->AddSample(f->atime - head->ctime);
             /* ==== Power Gate - End ==== */
 
             if((_slowest_packet[f->cl] < 0) ||
@@ -227,19 +246,19 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
             _plat_stats[f->cl]->AddSample( f->atime - head->ctime);
             _nlat_stats[f->cl]->AddSample( f->atime - head->itime);
             _frag_stats[f->cl]->AddSample( (f->atime - head->atime) - (f->id - head->id) );
-   
+
             if(_pair_stats){
                 _pair_plat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->ctime );
                 _pair_nlat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->itime );
             }
         }
-    
+
         if(f != head) {
             head->Free();
         }
-    
+
     }
-  
+
     if(f->head && !f->tail) {
         _retired_packets[f->cl].insert(make_pair(f->pid, f));
     } else {
@@ -258,27 +277,27 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
 //                result = -1;
 //            }
 //        } else {
-//      
+//
 //            //produce a packet
 //            if(_injection_process[cl]->test(source)) {
-//	
+//
 //                //coin toss to determine request type.
 //                result = (RandomFloat() < _write_fraction[cl]) ? 2 : 1;
-//	
+//
 //                _requestsOutstanding[source]++;
 //            }
 //        }
 //    } else { //normal mode
 //        result = _injection_process[cl]->test(source) ? 1 : 0;
 //        _requestsOutstanding[source]++;
-//    } 
+//    }
 //    if(result != 0) {
 //        _packet_seq_no[source]++;
 //    }
 //    return result;
 //}
 
-void FLOVTrafficManager::_GeneratePacket( int source, int stype, 
+void FLOVTrafficManager::_GeneratePacket( int source, int stype,
                                       int cl, int time )
 {
     assert(stype!=0);
@@ -289,7 +308,7 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
     /* ==== Power Gate - End ==== */
 
     Flit::FlitType packet_type = Flit::ANY_TYPE;
-    int size = _GetNextPacketSize(cl); //input size 
+    int size = _GetNextPacketSize(cl); //input size
     int pid = _cur_pid++;
     assert(_cur_pid);
     int packet_destination = _traffic_pattern[cl]->dest(source);
@@ -350,18 +369,18 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         record = _measure_stats[cl];
     }
 
-    int subnetwork = ((packet_type == Flit::ANY_TYPE) ? 
+    int subnetwork = ((packet_type == Flit::ANY_TYPE) ?
                       RandomInt(_subnets-1) :
                       _subnet[packet_type]);
-  
-    if ( watch ) { 
+
+    if ( watch ) {
         *gWatchOut << GetSimTime() << " | "
                    << "node" << source << " | "
                    << "Enqueuing packet " << pid
                    << " at time " << time
                    << "." << endl;
     }
-  
+
     for ( int i = 0; i < size; ++i ) {
         Flit * f  = Flit::New();
         f->id     = _cur_id++;
@@ -378,7 +397,7 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         if(record) {
             _measured_in_flight_flits[f->cl].insert(make_pair(f->id, f));
         }
-    
+
         if(gTrace){
             cout<<"New Flit "<<f->src<<endl;
         }
@@ -413,10 +432,10 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         } else {
             f->tail = false;
         }
-    
+
         f->vc  = -1;
 
-        if ( f->watch ) { 
+        if ( f->watch ) {
             *gWatchOut << GetSimTime() << " | "
                        << "node" << source << " | "
                        << "Enqueuing flit " << f->id
@@ -447,10 +466,10 @@ void FLOVTrafficManager::_Inject()
                 bool generated = false;
                 while( !generated && ( _qtime[input][c] <= _time ) ) {
                     int stype = _IssuePacket( input, c );
-	  
+
                     if ( stype != 0 ) { //generate a packet
-                        _GeneratePacket( input, stype, c, 
-                                         _include_queuing==1 ? 
+                        _GeneratePacket( input, stype, c,
+                                         _include_queuing==1 ?
                                          _qtime[input][c] : _time );
                         generated = true;
                     }
@@ -459,8 +478,8 @@ void FLOVTrafficManager::_Inject()
                         ++_qtime[input][c];
                     }
                 }
-	
-                if ( ( _sim_state == draining ) && 
+
+                if ( ( _sim_state == draining ) &&
                      ( _qtime[input][c] > _drain_time ) ) {
                     _qdrained[input][c] = true;
                 }
@@ -494,6 +513,25 @@ void FLOVTrafficManager::_Step( )
     }
 
     /* ==== Power Gate - Begin ==== */
+    // adaptive power-gating
+    if (_monitor_counter / _monitor_epoch > 0 && _time) {
+      for (int n = 0; n < _nodes; ++n) {
+        if (_per_node_plat[n]->NumSamples() == 0)
+          continue;
+
+        double avg_plat = _per_node_plat[n]->Average();
+        if (avg_plat < _plat_low_watermark) {
+          cout << GetSimTime() << " | node " << n
+            << " | can switch off row and column to save more power" << endl;
+        } else if (avg_plat > _plat_high_watermark) {
+          cout << GetSimTime() << " | node " << n
+            << " | should switch on row and column for performance" << endl;
+        }
+        _per_node_plat[n]->Clear();
+      }
+      _monitor_counter = 0;
+    }
+
     for (int n = 0; n < _nodes; ++n) {
         bool is_idle = true;
         bool is_inj_busy = false;
@@ -542,7 +580,7 @@ void FLOVTrafficManager::_Step( )
     /* ==== Power Gate - End ==== */
 
     vector<map<int, Flit *> > flits(_subnets);
-  
+
     for ( int subnet = 0; subnet < _subnets; ++subnet ) {
         for ( int n = 0; n < _nodes; ++n ) {
             Flit * const f = _net[subnet]->ReadFlit( n );
@@ -582,7 +620,7 @@ void FLOVTrafficManager::_Step( )
         }
         _net[subnet]->ReadInputs( );
     }
-  
+
     if ( !_empty_network ) {
         _Inject();
     }
@@ -601,12 +639,12 @@ void FLOVTrafficManager::_Step( )
 
             if(_hold_switch_for_packet) {
                 list<Flit *> const & pp = _partial_packets[n][last_class];
-                if(!pp.empty() && !pp.front()->head && 
+                if(!pp.empty() && !pp.front()->head &&
                    !dest_buf->IsFullFor(pp.front()->vc)) {
                     f = pp.front();
                     assert(f->vc == _last_vc[n][subnet][last_class]);
 
-                    // if we're holding the connection, we don't need to check that class 
+                    // if we're holding the connection, we don't need to check that class
                     // again in the for loop
                     --class_limit;
                 }
@@ -625,7 +663,7 @@ void FLOVTrafficManager::_Step( )
                 Flit * const cf = pp.front();
                 assert(cf);
                 assert(cf->cl == c);
-	
+
                 if(cf->subnetwork != subnet) {
                     continue;
                 }
@@ -675,8 +713,8 @@ void FLOVTrafficManager::_Step( )
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
-                        // NOTE: Because the lookahead is not for injection, but for the 
-                        // first hop, we have to temporarily set cf's VC to be non-negative 
+                        // NOTE: Because the lookahead is not for injection, but for the
+                        // first hop, we have to temporarily set cf's VC to be non-negative
                         // in order to avoid seting of an assertion in the routing function.
                         cf->vc = vc_start;
                         _rf(router, cf, in_channel, &cf->la_route_set, false);
@@ -732,7 +770,7 @@ void FLOVTrafficManager::_Step( )
                         }
                     }
                 }
-	
+
                 if(cf->vc == -1) {
                     if(cf->watch) {
                         *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -760,7 +798,7 @@ void FLOVTrafficManager::_Step( )
                 int const c = f->cl;
 
                 if(f->head) {
-	  
+
                     /* ==== Power Gate - Begin ==== */
                     // should not send if router is sleeping, wake it up
                     const FlitChannel * inject = _net[subnet]->GetInject(n);
@@ -783,7 +821,7 @@ void FLOVTrafficManager::_Step( )
                         _wakeup_handshake_latency[n] = false;
                     }
                     /* ==== Power Gate - End ==== */
-                    
+
                     if (_lookahead_routing) {
                         if(!_noq) {
                             const FlitChannel * inject = _net[subnet]->GetInject(n);
@@ -810,7 +848,7 @@ void FLOVTrafficManager::_Step( )
                     dest_buf->TakeBuffer(f->vc);
                     _last_vc[n][subnet][c] = f->vc;
                 }
-	
+
                 _last_class[n][subnet] = c;
 
                 _partial_packets[n][c].pop_front();
@@ -821,12 +859,12 @@ void FLOVTrafficManager::_Step( )
 #endif
 
                 dest_buf->SendingFlit(f);
-	
+
                 if(_pri_type == network_age_based) {
                     f->pri = numeric_limits<int>::max() - _time;
                     assert(f->pri >= 0);
                 }
-	
+
                 if(f->watch) {
                     *gWatchOut << GetSimTime() << " | "
                                << "node" << n << " | "
@@ -843,20 +881,20 @@ void FLOVTrafficManager::_Step( )
                     Flit * const nf = _partial_packets[n][c].front();
                     nf->vc = f->vc;
                 }
-	
+
                 if((_sim_state == warming_up) || (_sim_state == running)) {
                     ++_sent_flits[c][n];
                     if(f->head) {
                         ++_sent_packets[c][n];
                     }
                 }
-	
+
 #ifdef TRACK_FLOWS
                 ++_injected_flits[c][n];
 #endif
-	
+
                 _net[subnet]->WriteFlit(f, n);
-	
+
             }
         }
     }
@@ -871,18 +909,18 @@ void FLOVTrafficManager::_Step( )
                 if(f->watch) {
                     *gWatchOut << GetSimTime() << " | "
                                << "node" << n << " | "
-                               << "Injecting credit for VC " << f->vc 
-                               << " into subnet " << subnet 
+                               << "Injecting credit for VC " << f->vc
+                               << " into subnet " << subnet
                                << "." << endl;
                 }
                 Credit * const c = Credit::New();
                 c->vc.insert(f->vc);
                 _net[subnet]->WriteCredit(c, n);
-	
+
 #ifdef TRACK_FLOWS
                 ++_ejected_flits[f->cl][n];
 #endif
-	
+
                 _RetireFlit(f, n);
             }
         }
@@ -894,6 +932,7 @@ void FLOVTrafficManager::_Step( )
         _net[subnet]->WriteOutputs( );
     }
 
+    ++_monitor_counter;
     ++_time;
     assert(_time);
     if(gTrace){
@@ -901,13 +940,13 @@ void FLOVTrafficManager::_Step( )
     }
 
 }
-  
+
 //bool FLOVTrafficManager::_PacketsOutstanding( ) const
 //{
 //    for ( int c = 0; c < _classes; ++c ) {
 //        if ( _measure_stats[c] ) {
 //            if ( _measured_in_flight_flits[c].empty() ) {
-//	
+//
 //                for ( int s = 0; s < _nodes; ++s ) {
 //                    if ( !_qdrained[s][c] ) {
 //#ifdef DEBUG_DRAIN
@@ -972,7 +1011,7 @@ void FLOVTrafficManager::_ClearStats( )
     _reset_time = _time;
 }
 
-//void FLOVTrafficManager::_ComputeStats( const vector<int> & stats, int *sum, int *min, int *max, int *min_pos, int *max_pos ) const 
+//void FLOVTrafficManager::_ComputeStats( const vector<int> & stats, int *sum, int *min, int *max, int *min_pos, int *max_pos ) const
 //{
 //    int const count = stats.size();
 //    assert(count > 0);
@@ -1011,7 +1050,7 @@ void FLOVTrafficManager::_ClearStats( )
 //    }
 //}
 
-//void FLOVTrafficManager::_DisplayRemaining( ostream & os ) const 
+//void FLOVTrafficManager::_DisplayRemaining( ostream & os ) const
 //{
 //    for(int c = 0; c < _classes; ++c) {
 //
@@ -1028,9 +1067,9 @@ void FLOVTrafficManager::_ClearStats( )
 //        }
 //        if(_total_in_flight_flits[c].size() > 10)
 //            os << "[...] ";
-//    
+//
 //        os << "(" << _total_in_flight_flits[c].size() << " flits)" << endl;
-//    
+//
 //        os << "Measured flits: ";
 //        for ( iter = _measured_in_flight_flits[c].begin( ), i = 0;
 //              ( iter != _measured_in_flight_flits[c].end( ) ) && ( i < 10 );
@@ -1039,45 +1078,45 @@ void FLOVTrafficManager::_ClearStats( )
 //        }
 //        if(_measured_in_flight_flits[c].size() > 10)
 //            os << "[...] ";
-//    
+//
 //        os << "(" << _measured_in_flight_flits[c].size() << " flits)" << endl;
-//    
+//
 //    }
 //}
 
 //bool FLOVTrafficManager::_SingleSim( )
 //{
 //    int converged = 0;
-//  
-//    //once warmed up, we require 3 converging runs to end the simulation 
+//
+//    //once warmed up, we require 3 converging runs to end the simulation
 //    vector<double> prev_latency(_classes, 0.0);
 //    vector<double> prev_accepted(_classes, 0.0);
 //    bool clear_last = false;
 //    int total_phases = 0;
-//    while( ( total_phases < _max_samples ) && 
-//           ( ( _sim_state != running ) || 
+//    while( ( total_phases < _max_samples ) &&
+//           ( ( _sim_state != running ) ||
 //             ( converged < 3 ) ) ) {
-//    
+//
 //        if ( clear_last || (( ( _sim_state == warming_up ) && ( ( total_phases % 2 ) == 0 ) )) ) {
 //            clear_last = false;
 //            _ClearStats( );
 //        }
-//    
-//    
+//
+//
 //        for ( int iter = 0; iter < _sample_period; ++iter )
 //            _Step( );
-//    
+//
 //        //cout << _sim_state << endl;
 //
 //        UpdateStats();
 //        DisplayStats();
-//    
+//
 //        int lat_exc_class = -1;
 //        int lat_chg_exc_class = -1;
 //        int acc_chg_exc_class = -1;
-//    
+//
 //        for(int c = 0; c < _classes; ++c) {
-//      
+//
 //            if(_measure_stats[c] == 0) {
 //                continue;
 //            }
@@ -1097,21 +1136,21 @@ void FLOVTrafficManager::_ClearStats( )
 //
 //            double latency = (double)_plat_stats[c]->Sum();
 //            double count = (double)_plat_stats[c]->NumSamples();
-//      
+//
 //            map<int, Flit *>::const_iterator iter;
-//            for(iter = _total_in_flight_flits[c].begin(); 
-//                iter != _total_in_flight_flits[c].end(); 
+//            for(iter = _total_in_flight_flits[c].begin();
+//                iter != _total_in_flight_flits[c].end();
 //                iter++) {
 //                latency += (double)(_time - iter->second->ctime);
 //                count++;
 //            }
-//      
+//
 //            if((lat_exc_class < 0) &&
 //               (_latency_thres[c] >= 0.0) &&
 //               ((latency / count) > _latency_thres[c])) {
 //                lat_exc_class = c;
 //            }
-//      
+//
 //            cout << "latency change    = " << latency_change << endl;
 //            if(lat_chg_exc_class < 0) {
 //                if((_sim_state == warming_up) &&
@@ -1124,7 +1163,7 @@ void FLOVTrafficManager::_ClearStats( )
 //                    lat_chg_exc_class = c;
 //                }
 //            }
-//      
+//
 //            cout << "throughput change = " << accepted_change << endl;
 //            if(acc_chg_exc_class < 0) {
 //                if((_sim_state == warming_up) &&
@@ -1137,27 +1176,27 @@ void FLOVTrafficManager::_ClearStats( )
 //                    acc_chg_exc_class = c;
 //                }
 //            }
-//      
+//
 //        }
-//    
+//
 //        // Fail safe for latency mode, throughput will ust continue
 //        if ( _measure_latency && ( lat_exc_class >= 0 ) ) {
-//      
+//
 //            cout << "Average latency for class " << lat_exc_class
 //                << " exceeded " << _latency_thres[lat_exc_class]
 //                << " cycles. Aborting simulation." << endl;
-//            converged = 0; 
+//            converged = 0;
 //            _sim_state = draining;
 //            _drain_time = _time;
 //            if(_stats_out) {
 //                WriteStats(*_stats_out);
 //            }
 //            break;
-//      
+//
 //        }
-//    
+//
 //        if ( _sim_state == warming_up ) {
-//            if ( ( _warmup_periods > 0 ) ? 
+//            if ( ( _warmup_periods > 0 ) ?
 //                 ( total_phases + 1 >= _warmup_periods ) :
 //                 ( ( !_measure_latency || ( lat_chg_exc_class < 0 ) ) &&
 //                   ( acc_chg_exc_class < 0 ) ) ) {
@@ -1175,71 +1214,71 @@ void FLOVTrafficManager::_ClearStats( )
 //        }
 //        ++total_phases;
 //    }
-//  
+//
 //    if ( _sim_state == running ) {
 //        ++converged;
-//    
+//
 //        _sim_state  = draining;
 //        _drain_time = _time;
 //
 //        if ( _measure_latency ) {
 //            cout << "Draining all recorded packets ..." << endl;
 //            int empty_steps = 0;
-//            while( _PacketsOutstanding( ) ) { 
-//                _Step( ); 
-//	
+//            while( _PacketsOutstanding( ) ) {
+//                _Step( );
+//
 //                ++empty_steps;
-//	
+//
 //                if ( empty_steps % 1000 == 0 ) {
-//	  
+//
 //                    int lat_exc_class = -1;
-//	  
+//
 //                    for(int c = 0; c < _classes; c++) {
-//	    
+//
 //                        double threshold = _latency_thres[c];
-//	    
+//
 //                        if(threshold < 0.0) {
 //                            continue;
 //                        }
-//	    
+//
 //                        double acc_latency = _plat_stats[c]->Sum();
 //                        double acc_count = (double)_plat_stats[c]->NumSamples();
-//	    
+//
 //                        map<int, Flit *>::const_iterator iter;
-//                        for(iter = _total_in_flight_flits[c].begin(); 
-//                            iter != _total_in_flight_flits[c].end(); 
+//                        for(iter = _total_in_flight_flits[c].begin();
+//                            iter != _total_in_flight_flits[c].end();
 //                            iter++) {
 //                            acc_latency += (double)(_time - iter->second->ctime);
 //                            acc_count++;
 //                        }
-//	    
+//
 //                        if((acc_latency / acc_count) > threshold) {
 //                            lat_exc_class = c;
 //                            break;
 //                        }
 //                    }
-//	  
+//
 //                    if(lat_exc_class >= 0) {
 //                        cout << "Average latency for class " << lat_exc_class
 //                            << " exceeded " << _latency_thres[lat_exc_class]
 //                            << " cycles. Aborting simulation." << endl;
-//                        converged = 0; 
+//                        converged = 0;
 //                        _sim_state = warming_up;
 //                        if(_stats_out) {
 //                            WriteStats(*_stats_out);
 //                        }
 //                        break;
 //                    }
-//	  
-//                    _DisplayRemaining( ); 
-//	  
+//
+//                    _DisplayRemaining( );
+//
 //                }
 //            }
 //        }
 //    } else {
 //        cout << "Too many sample periods needed to converge" << endl;
 //    }
-//  
+//
 //    return ( converged > 0 );
 //}
 
@@ -1269,7 +1308,7 @@ void FLOVTrafficManager::_ClearStats( )
 //        // converge
 //        // draing, wait until all packets finish
 //        _sim_state    = warming_up;
-//  
+//
 //        _ClearStats( );
 //
 //        for(int c = 0; c < _classes; ++c) {
@@ -1292,15 +1331,15 @@ void FLOVTrafficManager::_ClearStats( )
 //            packets_left |= !_total_in_flight_flits[c].empty();
 //        }
 //
-//        while( packets_left ) { 
-//            _Step( ); 
+//        while( packets_left ) {
+//            _Step( );
 //
 //            ++empty_steps;
 //
 //            if ( empty_steps % 1000 == 0 ) {
-//                _DisplayRemaining( ); 
+//                _DisplayRemaining( );
 //            }
-//      
+//
 //            packets_left = false;
 //            for(int c = 0; c < _classes; ++c) {
 //                packets_left |= !_total_in_flight_flits[c].empty();
@@ -1314,47 +1353,47 @@ void FLOVTrafficManager::_ClearStats( )
 //
 //        //for the love of god don't ever say "Time taken" anywhere else
 //        //the power script depend on it
-//        cout << "Time taken is " << _time << " cycles" <<endl; 
+//        cout << "Time taken is " << _time << " cycles" <<endl;
 //
 //        if(_stats_out) {
 //            WriteStats(*_stats_out);
 //        }
 //        _UpdateOverallStats();
 //    }
-//  
+//
 //    DisplayOverallStats();
 //    if(_print_csv_results) {
 //        DisplayOverallStatsCSV();
 //    }
-//  
+//
 //    return true;
 //}
 
 void FLOVTrafficManager::_UpdateOverallStats() {
     TrafficManager::_UpdateOverallStats();
-    
+
     for ( int c = 0; c < _classes; ++c ) {
-    
+
         if(_measure_stats[c] == 0) {
             continue;
         }
-        
-       /* ==== Power Gate - Begin ==== */ 
+
+       /* ==== Power Gate - Begin ==== */
         _overall_flov_hop_stats[c] += _flov_hop_stats[c]->Average();
         /* ==== Power Gate - End ==== */
     }
 }
 
 void FLOVTrafficManager::WriteStats(ostream & os) const {
-  
+
     os << "%=================================" << endl;
 
     for(int c = 0; c < _classes; ++c) {
-    
+
         if(_measure_stats[c] == 0) {
             continue;
         }
-    
+
         //c+1 due to matlab array starting at 1
         os << "plat(" << c+1 << ") = " << _plat_stats[c]->Average() << ";" << endl
            << "plat_hist(" << c+1 << ",:) = " << *_plat_stats[c] << ";" << endl
@@ -1480,7 +1519,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //            for(int router = 0; router < _routers; ++router) {
 //                Router * const r = _router[subnet][router];
 //#ifdef TRACK_FLOWS
-//                char trail_char = 
+//                char trail_char =
 //                    ((router == _routers - 1) && (subnet == _subnets - 1) && (c == _classes - 1)) ? '\n' : ',';
 //                if(_received_flits_out) *_received_flits_out << r->GetReceivedFlits(c) << trail_char;
 //                if(_stored_flits_out) *_stored_flits_out << r->GetStoredFlits(c) << trail_char;
@@ -1523,7 +1562,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //        }
 //        for(int r = 0; r < _routers; ++r) {
 //            Router const * const rtr = _router[s][r];
-//            char trail_char = 
+//            char trail_char =
 //                ((r == _routers - 1) && (s == _subnets - 1)) ? '\n' : ',';
 //            if(_used_credits_out) *_used_credits_out << rtr->UsedCredits() << trail_char;
 //            if(_free_credits_out) *_free_credits_out << rtr->FreeCredits() << trail_char;
@@ -1538,16 +1577,16 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //}
 
 //void FLOVTrafficManager::DisplayStats(ostream & os) const {
-//  
+//
 //    for(int c = 0; c < _classes; ++c) {
-//    
+//
 //        if(_measure_stats[c] == 0) {
 //            continue;
 //        }
-//    
+//
 //        cout << "Class " << c << ":" << endl;
-//    
-//        cout 
+//
+//        cout
 //            << "Packet latency average = " << _plat_stats[c]->Average() << endl
 //            << "\tminimum = " << _plat_stats[c]->Min() << endl
 //            << "\tmaximum = " << _plat_stats[c]->Max() << endl
@@ -1562,7 +1601,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //            << "Fragmentation average = " << _frag_stats[c]->Average() << endl
 //            << "\tminimum = " << _frag_stats[c]->Min() << endl
 //            << "\tmaximum = " << _frag_stats[c]->Max() << endl;
-//    
+//
 //        int count_sum, count_min, count_max;
 //        double rate_sum, rate_min, rate_max;
 //        double rate_avg;
@@ -1576,7 +1615,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //        rate_avg = rate_sum / (double)_nodes;
 //        sent_packets = count_sum;
 //        cout << "Injected packet rate average = " << rate_avg << endl
-//             << "\tminimum = " << rate_min 
+//             << "\tminimum = " << rate_min
 //             << " (at node " << min_pos << ")" << endl
 //             << "\tmaximum = " << rate_max
 //             << " (at node " << max_pos << ")" << endl;
@@ -1587,7 +1626,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //        rate_avg = rate_sum / (double)_nodes;
 //        accepted_packets = count_sum;
 //        cout << "Accepted packet rate average = " << rate_avg << endl
-//             << "\tminimum = " << rate_min 
+//             << "\tminimum = " << rate_min
 //             << " (at node " << min_pos << ")" << endl
 //             << "\tmaximum = " << rate_max
 //             << " (at node " << max_pos << ")" << endl;
@@ -1598,7 +1637,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //        rate_avg = rate_sum / (double)_nodes;
 //        sent_flits = count_sum;
 //        cout << "Injected flit rate average = " << rate_avg << endl
-//             << "\tminimum = " << rate_min 
+//             << "\tminimum = " << rate_min
 //             << " (at node " << min_pos << ")" << endl
 //             << "\tmaximum = " << rate_max
 //             << " (at node " << max_pos << ")" << endl;
@@ -1609,18 +1648,18 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //        rate_avg = rate_sum / (double)_nodes;
 //        accepted_flits = count_sum;
 //        cout << "Accepted flit rate average= " << rate_avg << endl
-//             << "\tminimum = " << rate_min 
+//             << "\tminimum = " << rate_min
 //             << " (at node " << min_pos << ")" << endl
 //             << "\tmaximum = " << rate_max
 //             << " (at node " << max_pos << ")" << endl;
-//    
+//
 //        cout << "Injected packet length average = " << (double)sent_flits / (double)sent_packets << endl
 //             << "Accepted packet length average = " << (double)accepted_flits / (double)accepted_packets << endl;
 //
 //        cout << "Total in-flight flits = " << _total_in_flight_flits[c].size()
 //             << " (" << _measured_in_flight_flits[c].size() << " measured)"
 //             << endl;
-//    
+//
 //#ifdef TRACK_STALLS
 //        _ComputeStats(_buffer_busy_stalls[c], &count_sum);
 //        rate_sum = (double)count_sum / time_delta;
@@ -1643,7 +1682,7 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 //        rate_avg = rate_sum / (double)(_subnets*_routers);
 //        os << "Crossbar conflict stall rate = " << rate_avg << endl;
 //#endif
-//    
+//
 //    }
 //}
 
@@ -1798,7 +1837,7 @@ void FLOVTrafficManager::DisplayOverallStats( ostream & os ) const {
 //void FLOVTrafficManager::_LoadWatchList(const string & filename){
 //    ifstream watch_list;
 //    watch_list.open(filename.c_str());
-//  
+//
 //    string line;
 //    if(watch_list.is_open()) {
 //        while(!watch_list.eof()) {
@@ -1811,7 +1850,7 @@ void FLOVTrafficManager::DisplayOverallStats( ostream & os ) const {
 //                }
 //            }
 //        }
-//    
+//
 //    } else {
 //        Error("Unable to open flit watch file: " + filename);
 //    }

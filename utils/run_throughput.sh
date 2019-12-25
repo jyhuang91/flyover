@@ -14,7 +14,7 @@ do
       powergate_type=$scheme
       if [ $scheme = "rflov" ] || [ $scheme = "opt_rflov" ]; then
         powergate_type="rflov"
-      elif [ $scheme = "flov" ] || [ $scheme = "opt_flov" ]; then
+      elif [ $scheme = "gflov" ] || [ $scheme = "opt_gflov" ]; then
         powergate_type="flov"
       elif [ $scheme = "baseline" ]; then
         powergate_type="no_pg"

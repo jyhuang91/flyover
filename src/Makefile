@@ -30,11 +30,9 @@ YACC   = bison -y
 DEFINE = 
 INCPATH = -I. -Iarbiters -Iallocators -Irouters -Inetworks -Ipower
 CPPFLAGS += -Wall $(INCPATH) $(DEFINE)
-CPPFLAGS += -O3
 CPPFLAGS += -g
 LFLAGS +=
 
-CCFLAGS += -Wall -O3 -g $(INCPATH) $(DEFINE)
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   CPPFLAGS +=
@@ -62,6 +60,12 @@ OBJS :=  $(CPP_OBJS) $(LEX_OBJS) $(YACC_OBJS)
 
 .PHONY: clean
 
+dbg: CPPFLAGS += -O0
+dbg: CCFLAGS += -Wall -O0 -g $(INCPATH) $(DEFINE)
+dbg: $(OBJDIR) $(PROG)
+
+all: CPPFLAGS += -O3
+all: CCFLAGS += -Wall -O3 -g $(INCPATH) $(DEFINE)
 all: $(OBJDIR) $(PROG)
 
 $(OBJDIR):
