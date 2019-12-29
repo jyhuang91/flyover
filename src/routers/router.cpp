@@ -148,6 +148,7 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   _router_state = true;
   _req_hids.resize(4, -1);
   _resp_hids.resize(4, -1);
+  _watch_power_gating = false;
   /* ==== Power Gate - End ==== */
 }
 
