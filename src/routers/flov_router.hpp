@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -36,6 +36,13 @@ class Handshake;
 
 class FLOVRouter : public IQRouter {
 
+/* ==== Power Gate - Begin ==== */
+public:
+  enum eFLOVPolicy { state_min = 0, gflov = state_min, rflov, noflov,
+    state_max = noflov };
+  static const char * const FLOVPOLICY[];
+/* ==== Power Gate - End ==== */
+
 protected:
 
   /* ==== Power Gate - Begin ==== */
@@ -47,7 +54,8 @@ protected:
   vector<bool> _clear_credits;
 
   vector<queue<Handshake *> > _handshake_buffer;
- 
+
+  eFLOVPolicy _flov_policy;
 
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */
@@ -65,27 +73,34 @@ protected:
 
   /* ==== Power Gate - Begin ==== */
   void _SendHandshakes( );
-  
+
   void _FlovStep( );  // fly-over operations
   void _HandshakeEvaluate();
   void _HandshakeResponse();
+  void _RFLOVPowerStateEvaluate();
+  void _GFLOVPowerStateEvaluate();
+  void _NoFLOVPowerStateEvaluate();
   /* ==== Power Gate - End ==== */
-  
+
 public:
 
   FLOVRouter( Configuration const & config,
-	    Module *parent, string const & name, int id,
-	    int inputs, int outputs );
-  
+      Module *parent, string const & name, int id,
+      int inputs, int outputs );
+
   virtual ~FLOVRouter( );
-  
+
   /* ==== Power Gate - Begin ==== */
   virtual void PowerStateEvaluate( );
+  virtual void AggressFLOVPolicy();
+  virtual void RegressFLOVPolicy();
+  virtual inline void AggressPowerGatingPolicy() { AggressFLOVPolicy(); }
+  virtual inline void RegressPowerGatingPolicy() { RegressFLOVPolicy(); }
   /* ==== Power Gate - End ==== */
-  
+
   virtual void ReadInputs( );
   virtual void WriteOutputs( );
-  
+
 };
 
 #endif

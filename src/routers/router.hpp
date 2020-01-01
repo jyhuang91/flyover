@@ -146,6 +146,7 @@ protected:
   // asyncrhonous handshaking
   vector<int> _req_hids;
   vector<int> _resp_hids;
+  bool _watch_power_gating;
   /* ==== Power Gate - End ==== */
 
 public:
@@ -300,9 +301,13 @@ public:
   inline Router::ePowerState GetNeighborPowerState(int out_port) const {return _neighbor_states[out_port];}
   inline void SetLogicalNeighbor(int out_port, int id) {_logical_neighbors[out_port] = id;}
   inline int GetLogicalNeighbor(int out_port) const {return _logical_neighbors[out_port];}
+  inline void WatchPowerGating() {_watch_power_gating = true;}
 
   void IdleDetected();
   Router * GetNeighborRouter(int out_port);
+
+  virtual void AggressPowerGatingPolicy() {};
+  virtual void RegressPowerGatingPolicy() {};
   /* ==== Power Gate - End ==== */
 
 };

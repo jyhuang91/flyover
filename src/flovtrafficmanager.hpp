@@ -52,6 +52,7 @@ private:
   int _monitor_counter;
   int _monitor_epoch;
   vector<Stats *> _per_node_plat;
+  vector<int> _power_state_votes;
   string _powergate_type;
   /* ==== Power Gate - End ==== */
 

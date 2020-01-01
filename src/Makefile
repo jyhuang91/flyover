@@ -27,7 +27,7 @@
 LEX = flex
 YACC   = bison -y
 # DEBUG Flags: DEBUG_POWERGATE DEBUG_ROUTE DEBUG_POWERGATE_CONFIG
-DEFINE = 
+DEFINE = -DDEBUG_POWERGATE_CONFIG
 INCPATH = -I. -Iarbiters -Iallocators -Irouters -Inetworks -Ipower
 CPPFLAGS += -Wall $(INCPATH) $(DEFINE)
 CPPFLAGS += -g
@@ -60,13 +60,13 @@ OBJS :=  $(CPP_OBJS) $(LEX_OBJS) $(YACC_OBJS)
 
 .PHONY: clean
 
-dbg: CPPFLAGS += -O0
-dbg: CCFLAGS += -Wall -O0 -g $(INCPATH) $(DEFINE)
-dbg: $(OBJDIR) $(PROG)
-
 all: CPPFLAGS += -O3
 all: CCFLAGS += -Wall -O3 -g $(INCPATH) $(DEFINE)
 all: $(OBJDIR) $(PROG)
+
+dbg: CPPFLAGS += -O0
+dbg: CCFLAGS += -Wall -O0 -g $(INCPATH) $(DEFINE)
+dbg: $(OBJDIR) $(PROG)
 
 $(OBJDIR):
 	 mkdir -p $(OBJDIR)
@@ -86,23 +86,23 @@ $(LEX_OBJS): $(LEX_SRCS) $(YACC_HDRS)
 $(YACC_OBJS): $(YACC_SRCS)
 	$(CC) $(CCFLAGS) -c $< -o $@
 
-${OBJDIR}/%.o: %.cpp 
+${OBJDIR}/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) -MMD -c $< -o $@
 
 # rules to compile networks
-${OBJDIR}/%.o: networks/%.cpp 
+${OBJDIR}/%.o: networks/%.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
 # rules to compile arbiters
-${OBJDIR}/%.o: arbiters/%.cpp 
+${OBJDIR}/%.o: arbiters/%.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
 # rules to compile allocators
-${OBJDIR}/%.o: allocators/%.cpp 
+${OBJDIR}/%.o: allocators/%.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
 # rules to compile routers
-${OBJDIR}/%.o: routers/%.cpp 
+${OBJDIR}/%.o: routers/%.cpp
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
 # rules to compile power classes

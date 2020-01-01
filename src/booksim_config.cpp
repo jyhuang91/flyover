@@ -304,6 +304,9 @@ BookSimConfig::BookSimConfig() {
   AddStrField("watch_flits", "");
   AddStrField("watch_packets", "");
   AddStrField("watch_transactions", "");
+  AddStrField("watch_power_gating_routers", "");
+
+  _int_map["watch_all_packets"] = 0;
 
   AddStrField("watch_out", "");
 
@@ -382,7 +385,7 @@ BookSimConfig::BookSimConfig() {
   _float_map["zeroload_latency"] = 30;
   _float_map["low_watermark"] = 1.2;
   _float_map["high_watermark"] = 1.5;
-  _int_map["flov_monitor_epoch"] = 500;
+  _int_map["flov_monitor_epoch"] = 1000;
   _int_map["routing_deadlock_timeout_threshold"] = 512;
   /* ==== Power Gate - End ==== */
 

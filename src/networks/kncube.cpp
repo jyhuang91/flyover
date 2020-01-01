@@ -225,6 +225,11 @@ void KNCube::_BuildNet( const Configuration &config )
     }
     cout << endl;
   }
+
+  vector<int> watch_power_gating_routers = config.GetIntArray("watch_power_gating_routers");
+  for (size_t i = 0; i < watch_power_gating_routers.size(); ++i) {
+    _routers[watch_power_gating_routers[i]]->WatchPowerGating();
+  }
 }
 
 int KNCube::_LeftChannel( int node, int dim )

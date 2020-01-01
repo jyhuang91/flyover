@@ -127,6 +127,7 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
     _plat_low_watermark = zeroload_latency * low_watermark;
 
     _powergate_type = config.GetStr("powergate_type");
+    _power_state_votes.resize(_nodes, 0);
     _per_node_plat.resize(_nodes);
     for (int n = 0; n < _nodes; ++n) {
       ostringstream tmp_name;
@@ -323,6 +324,7 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
     /* ==== Power Gate - End ==== */
     bool record = false;
     bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0);
+    watch |= _watch_all_packets;
     if(_use_read_write[cl]){
         if(stype > 0) {
             if (stype == 1) {
@@ -357,7 +359,7 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         }
     }
 
-    if ((packet_destination <0) || (packet_destination >= _nodes)) {
+    if ((packet_destination < 0) || (packet_destination >= _nodes)) {
         ostringstream err;
         err << "Incorrect packet destination " << packet_destination
             << " for stype " << packet_type;
@@ -514,22 +516,71 @@ void FLOVTrafficManager::_Step( )
 
     /* ==== Power Gate - Begin ==== */
     // adaptive power-gating
-    if (_monitor_counter / _monitor_epoch > 0 && _time) {
-      for (int n = 0; n < _nodes; ++n) {
-        if (_per_node_plat[n]->NumSamples() == 0)
-          continue;
+    if (_powergate_type == "flov" && _monitor_counter / _monitor_epoch > 0) {
+      int turn = _monitor_counter % _monitor_epoch;
+      for (int row = 0; row < gK; ++row) {
+        for (int col = 0; col < gK; ++col) {
+          if (row == turn || col == turn) {
+            int n = row * gK + col;
+            if (_per_node_plat[n]->NumSamples() == 0)
+              continue;
 
-        double avg_plat = _per_node_plat[n]->Average();
-        if (avg_plat < _plat_low_watermark) {
-          cout << GetSimTime() << " | node " << n
-            << " | can switch off row and column to save more power" << endl;
-        } else if (avg_plat > _plat_high_watermark) {
-          cout << GetSimTime() << " | node " << n
-            << " | should switch on row and column for performance" << endl;
+            int vote = 0;
+            double avg_plat = _per_node_plat[n]->Average();
+            if (avg_plat < _plat_low_watermark) {
+              vote = 1;
+            } else if (avg_plat > _plat_high_watermark) {
+              vote = -1;
+            }
+
+            if (row == turn) {
+              for (int c = 0; c < gK; ++c) {
+                if (c == col)
+                  continue;
+
+                int node = row * gK + c;
+                _power_state_votes[node] += vote;
+              }
+            }
+            if (col == turn) {
+              for (int r = 0; r < gK; ++r) {
+                if (r == row)
+                  continue;
+
+                int node = r * gK + col;
+                _power_state_votes[node] += vote;
+              }
+            }
+            _power_state_votes[n] += vote;
+
+            _per_node_plat[n]->Clear();
+          }
         }
-        _per_node_plat[n]->Clear();
       }
-      _monitor_counter = 0;
+
+      if (turn == gK) {
+        vector<Router *> routers = _net[0]->GetRouters();
+        for (int n = 0; n < _nodes; ++n) {
+          if (n >= _nodes - gK) {
+            _power_state_votes[n] = 0;
+            continue;
+          }
+
+          if (_power_state_votes[n] > 0) {
+            routers[n]->AggressPowerGatingPolicy();
+            //cout << GetSimTime() << " | node " << n
+            //  << " | (vote " << _power_state_votes[n]
+            //  << ") can switch off to save more power" << endl;
+          } else if (_power_state_votes[n] < 0) {
+            routers[n]->RegressPowerGatingPolicy();
+            //cout << GetSimTime() << " | node " << n
+            //  << " | (vote " << _power_state_votes[n]
+            //  << ") should switch on for performance" << endl;
+          }
+          _power_state_votes[n] = 0;
+        }
+        _monitor_counter = 0;
+      }
     }
 
     for (int n = 0; n < _nodes; ++n) {
