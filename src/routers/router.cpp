@@ -57,8 +57,8 @@
 ///////////////////////////////////////////////////////
 
 /* ==== Power Gate - Begin ==== */
-const char * const Router::POWERSTATE[] = {"power_off",
-  "power_on", "draining", "wakeup", "invalid"};
+const char * const Router::POWERSTATE[] = {"power-off",
+  "power-on", "draining", "wakeup", "invalid"};
 
 int const Router::STALL_BUFFER_BUSY = -2;
 int const Router::STALL_BUFFER_CONFLICT = -3;

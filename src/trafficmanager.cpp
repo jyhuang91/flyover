@@ -386,6 +386,8 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _packets_to_watch.insert(watch_packets[i]);
     }
 
+    _watch_all_packets = (config.GetInt("watch_all_packets") > 0);
+
     string stats_out_file = config.GetStr( "stats_out" );
     if(stats_out_file == "") {
         _stats_out = NULL;
