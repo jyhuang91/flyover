@@ -107,7 +107,7 @@ void KNCube::_BuildNet( const Configuration &config )
     bool is_nord = (type == "nord");
     if (_router_states[node] == false) {
       _routers[node]->SetRouterState(false);
-      if (is_nord || is_rp) { // TODO: make all dynamic
+      if (is_rp) { // TODO: make all dynamic
         _routers[node]->SetPowerState(Router::power_off);
       }
     } else if (is_rp) {

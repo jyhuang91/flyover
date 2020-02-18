@@ -603,6 +603,9 @@ BufferState::BufferState( const Configuration& config, Module *parent, const str
 {
   _vcs = config.GetInt( "num_vcs" );
   _size = config.GetInt("buf_size");
+  /* ==== Power Gate - Begin ==== */
+  _full_vc_buf_size = config.GetInt("vc_buf_size");
+  /* ==== Power Gate - End ==== */
   if(_size < 0) {
     _size = _vcs * config.GetInt("vc_buf_size");
   }
@@ -771,11 +774,17 @@ void BufferState::FillCredits()
 }
 
 void BufferState::ResetVCBufferSize() {
+  _size = _vcs * _full_vc_buf_size;
   _buffer_policy->ResetVCBufferSize();
 }
 
 void BufferState::SetVCBufferSize(int vc_buf_size)
 {
+  if (_size != _vcs * _full_vc_buf_size) {
+    assert(_size == _vcs * vc_buf_size);
+  } else {
+    _size = _vcs * vc_buf_size;
+  }
   _buffer_policy->SetVCBufferSize(vc_buf_size);
 }
 /* ==== Power Gate - End ==== */

@@ -34,7 +34,7 @@
 #include "trafficmanager.hpp"
 #include "buffer.hpp"
 
-class NordTrafficManager : public TrafficManager {
+class NoRDTrafficManager : public TrafficManager {
 
 private:
 
@@ -62,8 +62,8 @@ protected:
 
 public:
 
-  NordTrafficManager( const Configuration &config, const vector<Network *> & net );
-  virtual ~NordTrafficManager( );
+  NoRDTrafficManager( const Configuration &config, const vector<Network *> & net );
+  virtual ~NoRDTrafficManager( );
 
 };
 

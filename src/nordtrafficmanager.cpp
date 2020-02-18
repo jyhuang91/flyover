@@ -40,7 +40,7 @@
 #include "packet_reply_info.hpp"
 
 
-NordTrafficManager::NordTrafficManager( const Configuration &config,
+NoRDTrafficManager::NoRDTrafficManager( const Configuration &config,
                                     const vector<Network *> & net )
     : TrafficManager(config, net)
 {
@@ -133,7 +133,7 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
     }
 
     // initialize neighbor power states
-    for (int s = 0; s < _nodes; ++s) {
+    /*for (int s = 0; s < _nodes; ++s) {
       if (router_states[s] == false) {
         for (int dir = 0; dir < 4; ++dir) {
           int direction;
@@ -145,7 +145,7 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
           neighbor->SetNeighborPowerState(direction, Router::power_off);
         }
       }
-    }
+    }*/
 
     _during_bypassing.resize(_nodes);
     for (int s = 0; s < _nodes; ++s) {
@@ -162,21 +162,22 @@ NordTrafficManager::NordTrafficManager( const Configuration &config,
     for (int n = 0; n < _nodes; ++n) {
       int row = n / gK;
       int col = n % gK;
-      if ((row == 1) || (row == gK - 1 && col > 0 && col < gK - 1) || (gK > 4 && row == gK / 2)) {
+      if ((row == 1) || (gK > 4 && row == gK / 2) ||
+          (row == gK - 1 && col > 0 && col < gK - 1)) {
         _performance_centric_routers[n] = true;
       }
     }
     /* ==== Power Gate - End ==== */
 }
 
-NordTrafficManager::~NordTrafficManager( )
+NoRDTrafficManager::~NoRDTrafficManager( )
 {
 
 }
 
 
 
-void NordTrafficManager::_GeneratePacket( int source, int stype,
+void NoRDTrafficManager::_GeneratePacket( int source, int stype,
                                       int cl, int time )
 {
     assert(stype!=0);
@@ -328,7 +329,7 @@ void NordTrafficManager::_GeneratePacket( int source, int stype,
     }
 }
 
-void NordTrafficManager::_Inject()
+void NoRDTrafficManager::_Inject()
 {
     /* ==== Power Gate - Begin ==== */
     vector<bool> & core_states = _net[0]->GetCoreStates();
@@ -368,7 +369,7 @@ void NordTrafficManager::_Inject()
     }
 }
 
-void NordTrafficManager::_Step( )
+void NoRDTrafficManager::_Step( )
 {
   bool flits_in_flight = false;
   for(int c = 0; c < _classes; ++c) {
@@ -919,6 +920,7 @@ void NordTrafficManager::_Step( )
           int vc = f->vc;
           f->bypass_vc = f->vc;
           f->vc = -1;
+          assert(_buffers[n][subnet]->Empty(vc));
           _buffers[n][subnet]->AddFlit(vc, f);
           if (f->head) {
             // XXX: a packet can be reroute back to this node

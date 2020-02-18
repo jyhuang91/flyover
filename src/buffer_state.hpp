@@ -180,6 +180,9 @@ class BufferState : public Module {
 
   bool _wait_for_tail_credit;
   int  _size;
+  /* ==== Power Gate - Begin ==== */
+  int _full_vc_buf_size;
+  /* ==== Power Gate - End ==== */
   int  _occupancy;
   vector<int> _vc_occupancy;
   int  _vcs;

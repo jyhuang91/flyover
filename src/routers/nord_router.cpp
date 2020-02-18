@@ -47,13 +47,13 @@
 #include "switch_monitor.hpp"
 #include "buffer_monitor.hpp"
 
-NordRouter::NordRouter( Configuration const & config, Module *parent,
+NoRDRouter::NoRDRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
 : IQRouter( config, parent, name, id, inputs, outputs )
 {
   /* ==== Power Gate - Begin ==== */
 
-  // forming Nord ring directions
+  // forming NoRD ring directions
   int row = _id / gK;
   int col = _id % gK;
 
@@ -94,16 +94,21 @@ NordRouter::NordRouter( Configuration const & config, Module *parent,
   }
 
   // Redefine next VCs' buffer state and size
-  if (_power_state == power_off)
+  if (_power_state == power_off) {
     _next_buf[_ring_out_port]->SetVCBufferSize(1);
+    _next_buf[4]->SetVCBufferSize(1);
+  }
 
   _handshake_buffer.resize(4);
 
   _routing_deadlock_timeout_threshold = config.GetInt("routing_deadlock_timeout_threshold");
+  _drain_done_sent.resize(4, false);
+  _drain_tags.resize(4, false);
+  _outstanding_bypass_flits = 0;
   /* ==== Power Gate - End ==== */
 }
 
-NordRouter::~NordRouter( )
+NoRDRouter::~NoRDRouter( )
 {
   assert(_pending_credits == 0);
   for (int input = 0; input < _inputs; input++) {
@@ -113,9 +118,10 @@ NordRouter::~NordRouter( )
   }
 }
 
-void NordRouter::ReadInputs( )
+void NoRDRouter::ReadInputs( )
 {
   bool have_flits = _ReceiveFlits( );
+  if (have_flits) _idle_timer = 0;
   bool have_credits = _ReceiveCredits( );
   /* ==== Power Gate - Begin ==== */
   _ReceiveHandshakes();
@@ -127,49 +133,319 @@ void NordRouter::ReadInputs( )
 }
 
 /* ==== Power Gate - Begin ==== */
-void NordRouter::PowerStateEvaluate()
+void NoRDRouter::PowerStateEvaluate()
 {
   // bottom row routers are always on
   if (_id >= gNodes - gK) {
-    if (_power_state != power_on) {
-      cout << GetSimTime() << " | " << FullName() << " | is not power on " << endl;
-    }
     assert(_power_state == power_on);
+    return;
   }
 
   switch (_power_state) {
-    case power_on:
-      break;
-
-    case power_off:
-      ++_power_off_cycles;
-      ++_total_power_off_cycles;
-      if (_wakeup_signal) {
-        _power_state = wakeup;
-        assert(_wakeup_timer == 0);
-      }
-      break;
-
-    case wakeup:
-      ++_wakeup_timer;
-      if (_wakeup_timer >= _wakeup_threshold) {
+    case power_on: {
+      _idle_timer++;
+      if (_wakeup_signal == true) {
         _wakeup_signal = false;
-        _wakeup_timer = 0;
-        _power_state = power_on;
-        for (int out = 0; out < _outputs; out++) {
-          if (_neighbor_states[out] != power_off) {
-            _next_buf[out]->ResetVCBufferSize();
+      } else if (_router_state == false && _idle_timer > _idle_threshold) {
+        assert(_outstanding_requests == 0);
+        bool router_empty = true;
+        router_empty &= _in_queue_flits.empty();
+        router_empty &= _crossbar_flits.empty();
+        for (int in_port = 0; in_port < _inputs; ++in_port) {
+          Buffer const * const cur_buf = _buf[in_port];
+          for (int vc = 0; vc < _vcs; ++vc) {
+            if (cur_buf->GetState(vc) != VC::idle) {
+              router_empty = false;
+              break;
+            }
           }
         }
+        for (int out_port = 0; out_port < _outputs; ++out_port) {
+          router_empty &= _output_buffer[out_port].empty();
+          BufferState * const dest_buf = _next_buf[out_port];
+          router_empty &= (dest_buf->Occupancy() == 0);
+        }
+        bool neighbor_draining_wakeup = false;
+        for (int out = 0; out < 4; ++out) {
+          if (_neighbor_states[out] == draining ||
+              _neighbor_states[out] == wakeup) {
+            neighbor_draining_wakeup = true;
+            break;
+          }
+        }
+        if (router_empty && !neighbor_draining_wakeup) {
+          _power_state = draining;
+          _idle_timer = 0;
+          _drain_timer = 0;
+          assert(_out_queue_handshakes.empty());
+          _drain_tags.clear();
+          _drain_tags.resize(4, false);
+          for (int out = 0; out < 4; ++out) {
+            if ((out == DIR_EAST && _id % gK == gK-1) ||
+                (out == DIR_WEST && _id % gK == 0) ||
+                (out == DIR_SOUTH && _id / gK == gK-1) ||
+                (out == DIR_NORTH && _id / gK == 0)) {
+              _drain_tags[out] = true;
+              continue;
+            }
+            _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+            _out_queue_handshakes[out]->new_state = draining;
+            _out_queue_handshakes[out]->id = _id;
+            _out_queue_handshakes[out]->hid = ++_req_hids[out];
+          }
+          if (_watch_power_gating) {
+            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+              << "[NoRD | power-on] changes from PowerOn to Draining."
+              << endl << "  Drain done tags:";
+            for (int out = 0; out < 4; ++out) {
+              *gWatchOut << " " << out << ":" << (_drain_tags[out] ? "True" : "False");
+            }
+            *gWatchOut << endl;
+          }
+        }
+      }
+    }
+    break;
+
+    case draining: {
+      ++_drain_timer;
+      bool neighbor_wakeup = false;
+      bool neighbor_draining = false;
+      for (int out = 0; out < 4; ++out) {
+        if (_neighbor_states[out] == wakeup)
+          neighbor_wakeup = true;
+        if (_neighbor_states[out] == draining)
+          if (out == DIR_WEST || out == DIR_NORTH)
+            neighbor_draining = true;
+      }
+      bool drain_done = true;
+      for (int out = 0; out < 4; ++out) {
+        drain_done &= _drain_tags[out];
+      }
+      if (_wakeup_signal == true || neighbor_wakeup || neighbor_draining) {
+        _power_state = power_on;
+        _drain_tags.clear();
+        _drain_tags.resize(4, false);
+        _idle_timer = 0;
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < 4; ++out) {
+          if ((out == DIR_EAST && _id % gK == gK-1) ||
+              (out == DIR_WEST && _id % gK == 0) ||
+              (out == DIR_SOUTH && _id / gK == gK-1) ||
+              (out == DIR_NORTH && _id / gK == 0))
+            continue;
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
           _out_queue_handshakes[out]->new_state = power_on;
           _out_queue_handshakes[out]->id = _id;
           _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
+        if (_watch_power_gating) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "[NoRD | draining] change from Draining to PowerOn due to";
+          if (_wakeup_signal == true) {
+            *gWatchOut << " wakeup-signal";
+          }
+          if (neighbor_draining) {
+            *gWatchOut << " neighbor-draining";
+          }
+          if (neighbor_wakeup) {
+            *gWatchOut << " neighbor-wakeup";
+          }
+          *gWatchOut << endl;
+        }
+        _wakeup_signal = false;
+      } else if (drain_done) {
+        _power_state = power_off;
+        _drain_tags.clear();
+        _drain_tags.resize(4, false);
+        _off_timer = 0;
+        _next_buf[_ring_out_port]->SetVCBufferSize(1);
+        _next_buf[4]->SetVCBufferSize(1);
+        assert(_out_queue_handshakes.empty());
+        for (int out = 0; out < 4; ++out) {
+          if ((out == DIR_EAST && _id % gK == gK-1) ||
+              (out == DIR_WEST && _id % gK == 0) ||
+              (out == DIR_SOUTH && _id / gK == gK-1) ||
+              (out == DIR_NORTH && _id / gK == 0))
+            continue;
+          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+          _out_queue_handshakes[out]->new_state = power_off;
+          _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
+        }
+        if (_watch_power_gating) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "[NoRD | draining] change from Draining to PowerOff." << endl;
+        }
+      } else if (_drain_timer > _drain_threshold) {
+        _power_state = power_on;
+        _drain_tags.clear();
+        _drain_tags.resize(4, false);
+        _idle_timer = 0;
+        assert(_out_queue_handshakes.empty());
+        for (int out = 0; out < 4; ++out) {
+          if ((out == DIR_EAST && _id % gK == gK-1) ||
+              (out == DIR_WEST && _id % gK == 0) ||
+              (out == DIR_SOUTH && _id / gK == gK-1) ||
+              (out == DIR_NORTH && _id / gK == 0))
+            continue; // for edge routers
+          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+          _out_queue_handshakes[out]->new_state = power_on;
+          _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
+        }
+        if (_watch_power_gating) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "[NoRD | draining] change from Draining to PowerOn due to draining timeout"
+            << endl;
+        }
       }
-      break;
+    }
+    break;
+
+    case power_off: {
+      ++_off_timer;
+      ++_power_off_cycles;
+      ++_total_power_off_cycles;
+      if (_wakeup_signal && _off_timer >= _bet_threshold) {
+        bool neighbor_draining_wakeup = false;
+        for (int out = 0; out < 4; ++out) {
+          if ((out == DIR_EAST && _id % gK == gK-1) ||
+              (out == DIR_WEST && _id % gK == 0) ||
+              (out == DIR_SOUTH && _id / gK == gK-1) ||
+              (out == DIR_NORTH && _id / gK == 0))
+            continue;
+          if (_neighbor_states[out] == draining ||
+              _neighbor_states[out] == wakeup) {
+            neighbor_draining_wakeup = true;
+            break;
+          }
+        }
+        if (!neighbor_draining_wakeup && _off_timer >= _bet_threshold &&
+            _out_queue_handshakes.empty()) {
+          _power_state = wakeup;
+          assert(_wakeup_timer == 0);
+          _off_timer = 0;
+          _drain_tags.clear();
+          _drain_tags.resize(4, false);
+          for (int out = 0; out < 4; ++out) {
+            if ((out == DIR_EAST && _id % gK == gK-1) ||
+                (out == DIR_WEST && _id % gK == 0) ||
+                (out == DIR_SOUTH && _id / gK == gK-1) ||
+                (out == DIR_NORTH && _id / gK == 0)) {
+              _drain_tags[out] = true;
+              continue;
+            }
+            _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+            _out_queue_handshakes[out]->new_state = wakeup;
+            _out_queue_handshakes[out]->id = _id;
+            _out_queue_handshakes[out]->hid = ++_req_hids[out];
+          }
+          if (_watch_power_gating) {
+            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+              << "[NoRD | power-off] changes from PowerOff to WakeUp."
+              << endl << "  Drain done tags:";
+            for (int out = 0; out < 4; ++out) {
+              *gWatchOut << " " << out << ":" << (_drain_tags[out] ? "True" : "False");
+            }
+            *gWatchOut << endl;
+          }
+        }
+      }
+    }
+    break;
+
+    case wakeup: {
+      ++_wakeup_timer;
+      bool neighbor_wakeup = false;
+      bool neighbor_draining = false;
+      for (int out = 0; out < 4; ++out) {
+        if (_neighbor_states[out] == wakeup)
+          if (out == DIR_WEST || out == DIR_NORTH)
+            neighbor_wakeup = true;
+        if (_neighbor_states[out] == draining)
+          if (out == DIR_WEST || out == DIR_NORTH)
+            neighbor_draining = true;
+      }
+      bool router_empty = true;
+      router_empty &= _in_queue_flits.empty();
+      router_empty &= _crossbar_flits.empty();
+      for (int in_port = 0; in_port < _inputs; ++in_port) {
+        Buffer const * const cur_buf = _buf[in_port];
+        for (int vc = 0; vc < _vcs; ++vc) {
+          if (cur_buf->GetState(vc) != VC::idle) {
+            router_empty = false;
+            break;
+          }
+        }
+      }
+      for (int out_port = 0; out_port < _outputs; ++out_port) {
+        router_empty &= _output_buffer[out_port].empty();
+        BufferState * const dest_buf = _next_buf[out_port];
+        router_empty &= (dest_buf->Occupancy() == 0);
+      }
+      bool drain_done = true;
+      for (int out = 0; out < 4; ++out) {
+        drain_done &= _drain_tags[out];
+      }
+      if (neighbor_wakeup || neighbor_draining) {
+        _power_state = power_off;
+        _drain_tags.clear();
+        _drain_tags.resize(4, false);
+        _wakeup_timer = 0;
+        assert(_out_queue_handshakes.empty());
+        for (int out = 0; out < 4; ++out) {
+          if ((out == DIR_EAST && _id % gK == gK-1) ||
+              (out == DIR_WEST && _id % gK == 0) ||
+              (out == DIR_SOUTH && _id / gK == gK-1) ||
+              (out == DIR_NORTH && _id / gK == 0))
+            continue;
+          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+          _out_queue_handshakes[out]->new_state = power_off;
+          _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
+        }
+        if (_watch_power_gating) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "[NoRD | wakeup] change from WakeUp to PowerOff due to";
+          if (neighbor_draining) {
+            *gWatchOut << " neighbor-draining";
+          }
+          if (neighbor_wakeup) {
+            *gWatchOut << " neighbor-wakeup";
+          }
+          *gWatchOut << endl;
+        }
+      } else if (router_empty && drain_done && _wakeup_timer >= _wakeup_threshold) {
+        _wakeup_signal = false;
+        _wakeup_timer = 0;
+        _power_state = power_on;
+        for (int out = 0; out < 4; out++) {
+          if (_neighbor_states[out] != power_off) {
+            _next_buf[out]->ResetVCBufferSize();
+          }
+        }
+        _next_buf[4]->ResetVCBufferSize();
+        assert(_out_queue_handshakes.empty());
+        for (int out = 0; out < 4; ++out) {
+          if ((out == DIR_EAST && _id % gK == gK-1) ||
+              (out == DIR_WEST && _id % gK == 0) ||
+              (out == DIR_SOUTH && _id / gK == gK-1) ||
+              (out == DIR_NORTH && _id / gK == 0))
+            continue;
+          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+          _out_queue_handshakes[out]->new_state = power_on;
+          _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
+        }
+        if (_watch_power_gating) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "[NoRD | wakeup] changes from WakeUp to PowerOn."
+            << endl;
+        }
+      }
+    }
+    break;
 
     default: // Must be something wrong
       ostringstream err;
@@ -180,16 +456,16 @@ void NordRouter::PowerStateEvaluate()
 /* ==== Power Gate - End ==== */
 
 
-
-void NordRouter::_InternalStep( )
+void NoRDRouter::_InternalStep( )
 {
   /* ==== Power Gate - Begin ==== */
   if (_power_state == power_off || _power_state == wakeup) {
-    _NordStep();
+    _NoRDStep();
     _OutputQueuing();
     assert(_out_queue_handshakes.empty());
     //_active = !_out_queue_handshakes.empty() || ...
     _active = !_proc_credits.empty() || !_in_queue_flits.empty();
+    _HandshakeResponse();
     return;
   }
   /* ==== Power Gate - End ==== */
@@ -264,7 +540,7 @@ void NordRouter::_InternalStep( )
   _switchMonitor->cycle( );
 }
 
-void NordRouter::WriteOutputs( )
+void NoRDRouter::WriteOutputs( )
 {
   _SendFlits( );
   _SendCredits( );
@@ -279,7 +555,37 @@ void NordRouter::WriteOutputs( )
 //------------------------------------------------------------------------------
 
 /* ==== Power Gate - Begin ==== */
-void NordRouter::_ReceiveHandshakes()
+bool NoRDRouter::_ReceiveFlits( )
+{
+  bool activity = false;
+  for (int input = 0; input < _inputs; ++input) {
+    Flit * const f = _input_channels[input]->Receive();
+    if(f) {
+
+#ifdef TRACK_FLOWS
+      ++_received_flits[f->cl][input];
+#endif
+
+      if(f->watch) {
+        *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+          << "Received flit " << f->id
+          << " from channel at input " << input
+          << "." << endl;
+      }
+      _in_queue_flits.insert(make_pair(input, f));
+      activity = true;
+
+      if (_power_state == power_off || _power_state == wakeup) {
+        if (input < 4) {
+          ++_outstanding_bypass_flits;
+        }
+      }
+    }
+  }
+  return activity;
+}
+
+void NoRDRouter::_ReceiveHandshakes()
 {
   for (int input = 0; input < 4; ++input) {
     Handshake * const h = _input_handshakes[input]->Receive();
@@ -294,7 +600,7 @@ void NordRouter::_ReceiveHandshakes()
 // input queuing
 //------------------------------------------------------------------------------
 
-void NordRouter::_InputQueuing( )
+void NoRDRouter::_InputQueuing( )
 {
   for(map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
       iter != _in_queue_flits.end();
@@ -424,7 +730,7 @@ void NordRouter::_InputQueuing( )
 // routing
 //------------------------------------------------------------------------------
 
-void NordRouter::_RouteUpdate( )
+void NoRDRouter::_RouteUpdate( )
 {
   assert(_routing_delay);
 
@@ -509,7 +815,7 @@ void NordRouter::_RouteUpdate( )
 // VC allocation
 //------------------------------------------------------------------------------
 
-void NordRouter::_VCAllocUpdate( )
+void NoRDRouter::_VCAllocUpdate( )
 {
   assert(_vc_allocator);
 
@@ -750,7 +1056,7 @@ void NordRouter::_VCAllocUpdate( )
 // switch holding
 //------------------------------------------------------------------------------
 
-void NordRouter::_SWHoldUpdate( )
+void NoRDRouter::_SWHoldUpdate( )
 {
   assert(_hold_switch_for_packet);
 
@@ -972,7 +1278,7 @@ void NordRouter::_SWHoldUpdate( )
 // switch allocation
 //------------------------------------------------------------------------------
 
-void NordRouter::_SWAllocUpdate( )
+void NoRDRouter::_SWAllocUpdate( )
 {
   while(!_sw_alloc_vcs.empty()) {
 
@@ -1482,7 +1788,7 @@ void NordRouter::_SWAllocUpdate( )
 // output queuing
 //------------------------------------------------------------------------------
 
-void NordRouter::_OutputQueuing( )
+void NoRDRouter::_OutputQueuing( )
 {
   /* ==== power gate - begin ==== */
   if (_power_state == power_on && _pending_credits > 0) {
@@ -1541,7 +1847,39 @@ void NordRouter::_OutputQueuing( )
 //------------------------------------------------------------------------------
 
 /* ==== Power Gate - Begin ==== */
-void NordRouter::_SendHandshakes()
+
+void NoRDRouter::_SendFlits( )
+{
+  for ( int output = 0; output < _outputs; ++output ) {
+    if ( !_output_buffer[output].empty( ) ) {
+      Flit * const f = _output_buffer[output].front( );
+      assert(f);
+      _output_buffer[output].pop( );
+
+#ifdef TRACK_FLOWS
+      ++_sent_flits[f->cl][output];
+#endif
+
+      if(f->watch)
+        *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+          << "Sending flit " << f->id
+          << " to channel at output " << output
+          << "." << endl;
+      if(gTrace) {
+        cout << "Outport " << output << endl << "Stop Mark" << endl;
+      }
+      _output_channels[output]->Send( f );
+
+      if (_power_state == power_off || _power_state == wakeup) {
+        if (output < 4) {
+          --_outstanding_bypass_flits;
+        }
+      }
+    }
+  }
+}
+
+void NoRDRouter::_SendHandshakes()
 {
   for (int output = 0; output < 4; ++output) {
     if (!_handshake_buffer[output].empty()) {
@@ -1557,11 +1895,11 @@ void NordRouter::_SendHandshakes()
 
 /* ==== Power Gate - Begin ==== */
 //--------------------------------
-// Nord Facilities
+// NoRD Facilities
 //--------------------------------
 
-
-void NordRouter::_NordStep() {
+void NoRDRouter::_NoRDStep()
+{
   assert(_power_state == power_off || _power_state == wakeup);
   assert(_route_vcs.empty());
   assert(_vc_alloc_vcs.empty());
@@ -1588,7 +1926,7 @@ void NordRouter::_NordStep() {
     int output;
     if (input == _ring_in_port) {
       output = DIR_NI;
-      if (f->watch) {
+      if (f->watch || _watch_power_gating) {
         *gWatchOut << GetSimTime() << " | " << FullName() << " | "
           << "Bypass flit " << f->id << " to NI" << endl;
       }
@@ -1658,7 +1996,7 @@ void NordRouter::_NordStep() {
 
     dest_buf->ProcessCredit(c);
     // relay the credit to the upstream router
-    // Nord channel input output mapping
+    // NoRD channel input output mapping
     // ring_in_port --> NI
     // ring_out_port --> NI
     int input = -1;
@@ -1691,7 +2029,14 @@ void NordRouter::_NordStep() {
   }
 }
 
-void NordRouter::_HandshakeEvaluate() {
+void NoRDRouter::_HandshakeEvaluate()
+{
+  if (!_proc_handshakes.empty() && _watch_power_gating) {
+    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+      << "[NoRD | " << POWERSTATE[_power_state] << "] "
+      << "receive handshake(s):" << endl;
+  }
+
   while (!_proc_handshakes.empty()) {
     pair<int, Handshake *> const & item = _proc_handshakes.front();
     int const input = item.first;
@@ -1701,31 +2046,66 @@ void NordRouter::_HandshakeEvaluate() {
     Handshake * h = item.second;
     assert(h);
 
-    switch (h->new_state) {
-      case power_off:
-        assert(0);
-        break;
+    if (_watch_power_gating) {
+      *gWatchOut << *h;
+    }
 
-      case power_on:
-        _neighbor_states[output] = power_on;
-        _next_buf[output]->ResetVCBufferSize();
-        break;
+    if (h->new_state >= 0) {
+      switch (h->new_state) {
+        case power_on:
+          assert(_neighbor_states[output] == wakeup ||
+              _neighbor_states[output] == draining);
+          _neighbor_states[output] = power_on;
+          _next_buf[output]->ResetVCBufferSize();
+          _resp_hids[input] = h->hid;
+          break;
 
-      default:
-        ostringstream err;
-        err << "Something wrong in the handshake state machine";
-        Error(err.str());
+        case draining:
+          assert(_neighbor_states[output] == power_on);
+          _neighbor_states[output] = draining;
+          _resp_hids[input] = h->hid;
+          _drain_done_sent[output] = false;
+          break;
+
+        case power_off:
+          assert(_neighbor_states[output] == draining);
+          _neighbor_states[output] = power_off;
+          if (_neighbor_states[output] == wakeup && output == _ring_out_port)
+            _next_buf[output]->SetVCBufferSize(1);
+          for (int vc = 0; vc < _vcs; ++vc) {
+            if (!_next_buf[output]->IsAvailableFor(vc)) {
+              cout << "(2) break here" << endl;
+            }
+            assert(_next_buf[output]->IsAvailableFor(vc));
+          }
+          _resp_hids[input] = h->hid;
+          break;
+
+        case wakeup:
+          assert(_neighbor_states[output] == power_off);
+          _neighbor_states[output] = wakeup;
+          _drain_done_sent[output] = false;
+          _resp_hids[input] = h->hid;
+          break;
+
+        default:
+          ostringstream err;
+          err << "Something wrong in the handshake state machine";
+          Error(err.str());
+      }
+    }
+
+    if (h->drain_done && h->hid == _req_hids[input]) {
+      _drain_tags[input] = true;
     }
 
     h->Free();
     _proc_handshakes.pop_front();
   }
-  assert(_proc_handshakes.empty());
 }
 
-void NordRouter::_HandshakeResponse() {
-  assert(_power_state == power_on || _power_state == draining);
-
+void NoRDRouter::_HandshakeResponse()
+{
   for (int out_port = 0; out_port < 4; ++out_port) {
     if (_neighbor_states[out_port] == draining
         || _neighbor_states[out_port] == wakeup) {
@@ -1745,6 +2125,7 @@ void NordRouter::_HandshakeResponse() {
           }
         }
       }
+      drain_done &= (_outstanding_bypass_flits == 0);
       // check ST stage, crossbar_flits
       if (drain_done)
         for (deque<pair<int, pair<Flit *, pair<int, int> > > >::iterator iter =
@@ -1780,7 +2161,7 @@ void NordRouter::_HandshakeResponse() {
   }
 }
 
-void NordRouter::SetRingOutputVCBufferSize(int vc_buf_size)
+void NoRDRouter::SetRingOutputVCBufferSize(int vc_buf_size)
 {
   _next_buf[_ring_out_port]->SetVCBufferSize(vc_buf_size);
 }
