@@ -25,10 +25,12 @@ def main():
     injection_rate_name = {'0.02': '002', '0.08': '008'}
 
     schemes = [
-        'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov'
+        #'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov'
+        'baseline', 'rpa', 'rpc', 'nord', 'flov', 'opt_flov'
     ]
     paper_schemes = [
-        'Baseline', 'RP', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt'
+        #'Baseline', 'RP', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt'
+        'Baseline', 'RP', 'NoRD', 'FLOV', 'FLOV+'
     ]
     off_percentile = [10, 20, 30, 40, 50, 60, 70, 80]
     breakdown_comp = [
@@ -126,10 +128,10 @@ def main():
                 4][o * len(schemes)
                    + s] = latency[s][o] - zeroload_lat  # contention
 
-    paper_latency = latency[[0, 1, 3, 4, 5, 6], :]
-    paper_dynamic_power = dynamic_power[[0, 1, 3, 4, 5, 6], :]
-    paper_static_power = static_power[[0, 1, 3, 4, 5, 6], :]
-    paper_total_power = total_power[[0, 1, 3, 4, 5, 6], :]
+    paper_latency = latency[[0, 1, 3, 4, 5], :]
+    paper_dynamic_power = dynamic_power[[0, 1, 3, 4, 5], :]
+    paper_static_power = static_power[[0, 1, 3, 4, 5], :]
+    paper_total_power = total_power[[0, 1, 3, 4, 5], :]
     # select aggresive or conservative for router parking
     del_cols = []
     for o, off in enumerate(off_percentile):

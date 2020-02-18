@@ -14,13 +14,16 @@ def main():
 
     dimensions = [6, 8, 10]
     schemes = [
-        'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov', 'nord'
+        #'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov', 'nord'
+        'baseline', 'flov'
     ]
     paper_schemes = [
-        'Baseline', 'RPA', 'RPC', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt', 'NoRD'
+        #'Baseline', 'RPA', 'RPC', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt', 'NoRD'
+        'Baseline', 'FLOV'
     ]
     injection_rates = []
-    for i in range(1, 61):
+    #for i in range(1, 61):
+    for i in range(1, 60):
         injection_rates.append("%.2f" % (float(i) / 100))
 
     latencies = []

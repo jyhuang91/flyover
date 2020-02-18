@@ -4,17 +4,19 @@ traffic=uniform
 powergate_auto_config=1
 off_percentile=50
 
-for dim in 6 8 10
+for dim in 6 #6 8 10
 do
   #for inj in 0.01 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.5 0.6
-  for inj in `seq 0.01 0.01 0.60`
+  for inj in `seq -w 0.01 0.01 0.60`
   do
-    for scheme in baseline rpa rpc rflov flov opt_rflov opt_flov nord
+    for scheme in flov #baseline rpa rpc nord flov opt_flov #rflov gflov opt_rflov opt_gflov
     do
       powergate_type=$scheme
-      if [ $scheme = "rflov" ] || [ $scheme = "opt_rflov" ]; then
-        powergate_type="rflov"
-      elif [ $scheme = "gflov" ] || [ $scheme = "opt_gflov" ]; then
+      #if [ $scheme = "rflov" ] || [ $scheme = "opt_rflov" ]; then
+      #  powergate_type="rflov"
+      #elif [ $scheme = "gflov" ] || [ $scheme = "opt_gflov" ]; then
+      #  powergate_type="flov"
+      if [ $scheme = "flov" ] || [ $scheme = "opt_flov" ]; then
         powergate_type="flov"
       elif [ $scheme = "baseline" ]; then
         powergate_type="no_pg"
@@ -25,10 +27,10 @@ do
       done
       logfile=../results/throughput/${scheme}/${dim}dim/${traffic}_${inj}inj_${dim}dim_${off_percentile}off.log
       mkdir -p ../results/throughput/${scheme}/${dim}dim
+        #wait_for_tail_credit=1 \
       ../src/booksim \
         ../runfiles/${scheme}/meshcmp_${off_percentile}off.cfg \
         converged_threshold=-1 \
-        wait_for_tail_credit=1 \
         powergate_auto_config=1 \
         traffic=${traffic} \
         powergate_percentile=${off_percentile} \
