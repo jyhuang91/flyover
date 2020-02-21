@@ -49,7 +49,7 @@ protected:
 
   vector<vector<int> > _credit_counter;
   int _pending_credits;
-  int _outstanding_bypass_flits;
+  vector<int> _outstanding_bypass_packets;
 
   bool _ReceiveFlits();
   void _ReceiveHandshakes( );

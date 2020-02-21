@@ -104,7 +104,7 @@ NoRDRouter::NoRDRouter( Configuration const & config, Module *parent,
   _routing_deadlock_timeout_threshold = config.GetInt("routing_deadlock_timeout_threshold");
   _drain_done_sent.resize(4, false);
   _drain_tags.resize(4, false);
-  _outstanding_bypass_flits = 0;
+  _outstanding_bypass_packets.clear();
   /* ==== Power Gate - End ==== */
 }
 
@@ -280,7 +280,6 @@ void NoRDRouter::PowerStateEvaluate()
         _drain_tags.clear();
         _drain_tags.resize(4, false);
         _off_timer = 0;
-        //_next_buf[_ring_out_port]->SetVCBufferSize(1);
         _next_buf[4]->SetVCBufferSize(1);
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < 4; ++out) {
@@ -329,48 +328,32 @@ void NoRDRouter::PowerStateEvaluate()
       ++_power_off_cycles;
       ++_total_power_off_cycles;
       if (_wakeup_signal && _off_timer >= _bet_threshold) {
-        bool neighbor_draining_wakeup = false;
+        _power_state = wakeup;
+        assert(_wakeup_timer == 0);
+        _off_timer = 0;
+        _drain_tags.clear();
+        _drain_tags.resize(4, false);
         for (int out = 0; out < 4; ++out) {
           if ((out == DIR_EAST && _id % gK == gK-1) ||
               (out == DIR_WEST && _id % gK == 0) ||
               (out == DIR_SOUTH && _id / gK == gK-1) ||
-              (out == DIR_NORTH && _id / gK == 0))
+              (out == DIR_NORTH && _id / gK == 0)) {
+            _drain_tags[out] = true;
             continue;
-          if (_neighbor_states[out] == draining ||
-              _neighbor_states[out] == wakeup) {
-            neighbor_draining_wakeup = true;
-            break;
           }
+          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
+          _out_queue_handshakes[out]->new_state = wakeup;
+          _out_queue_handshakes[out]->id = _id;
+          _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
-        if (!neighbor_draining_wakeup && _off_timer >= _bet_threshold &&
-            _out_queue_handshakes.empty()) {
-          _power_state = wakeup;
-          assert(_wakeup_timer == 0);
-          _off_timer = 0;
-          _drain_tags.clear();
-          _drain_tags.resize(4, false);
+        if (_watch_power_gating) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+            << "[NoRD | power-off] changes from PowerOff to WakeUp."
+            << endl << "  Drain done tags:";
           for (int out = 0; out < 4; ++out) {
-            if ((out == DIR_EAST && _id % gK == gK-1) ||
-                (out == DIR_WEST && _id % gK == 0) ||
-                (out == DIR_SOUTH && _id / gK == gK-1) ||
-                (out == DIR_NORTH && _id / gK == 0)) {
-              _drain_tags[out] = true;
-              continue;
-            }
-            _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-            _out_queue_handshakes[out]->new_state = wakeup;
-            _out_queue_handshakes[out]->id = _id;
-            _out_queue_handshakes[out]->hid = ++_req_hids[out];
+            *gWatchOut << " " << out << ":" << (_drain_tags[out] ? "True" : "False");
           }
-          if (_watch_power_gating) {
-            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-              << "[NoRD | power-off] changes from PowerOff to WakeUp."
-              << endl << "  Drain done tags:";
-            for (int out = 0; out < 4; ++out) {
-              *gWatchOut << " " << out << ":" << (_drain_tags[out] ? "True" : "False");
-            }
-            *gWatchOut << endl;
-          }
+          *gWatchOut << endl;
         }
       }
     }
@@ -378,82 +361,12 @@ void NoRDRouter::PowerStateEvaluate()
 
     case wakeup: {
       ++_wakeup_timer;
-      bool neighbor_wakeup = false;
-      bool neighbor_draining = false;
-      for (int out = 0; out < 4; ++out) {
-        if (_neighbor_states[out] == wakeup)
-          if (out == DIR_WEST || out == DIR_NORTH)
-            neighbor_wakeup = true;
-        if (_neighbor_states[out] == draining)
-          if (out == DIR_WEST || out == DIR_NORTH)
-            neighbor_draining = true;
-      }
-      bool router_empty = true;
-      router_empty &= _in_queue_flits.empty();
-      router_empty &= _crossbar_flits.empty();
-      for (int in_port = 0; in_port < _inputs; ++in_port) {
-        Buffer const * const cur_buf = _buf[in_port];
-        for (int vc = 0; vc < _vcs; ++vc) {
-          if (cur_buf->GetState(vc) != VC::idle) {
-            router_empty = false;
-            break;
-          }
-        }
-      }
-      for (int out_port = 0; out_port < _outputs; ++out_port) {
-        router_empty &= _output_buffer[out_port].empty();
-        BufferState * const dest_buf = _next_buf[out_port];
-        router_empty &= (dest_buf->Occupancy() == 0);
-      }
-      router_empty &= (_pending_credits == 0);
-      bool drain_done = true;
-      for (int out = 0; out < 4; ++out) {
-        drain_done &= _drain_tags[out];
-      }
-      //if (neighbor_wakeup || neighbor_draining) {
-      if (neighbor_wakeup || neighbor_draining ||
-          _wakeup_timer > _drain_threshold) {
-        _power_state = power_off;
-        _drain_tags.clear();
-        _drain_tags.resize(4, false);
-        assert(_out_queue_handshakes.empty());
-        for (int out = 0; out < 4; ++out) {
-          if ((out == DIR_EAST && _id % gK == gK-1) ||
-              (out == DIR_WEST && _id % gK == 0) ||
-              (out == DIR_SOUTH && _id / gK == gK-1) ||
-              (out == DIR_NORTH && _id / gK == 0))
-            continue;
-          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-          _out_queue_handshakes[out]->new_state = power_off;
-          _out_queue_handshakes[out]->id = _id;
-          _out_queue_handshakes[out]->hid = ++_req_hids[out];
-        }
-        if (_watch_power_gating) {
-          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << "[NoRD | wakeup] change from WakeUp to PowerOff due to";
-          if (_wakeup_timer > _drain_threshold) {
-            *gWatchOut << " wakeup-timeout";
-          }
-          if (neighbor_draining) {
-            *gWatchOut << " neighbor-draining";
-          }
-          if (neighbor_wakeup) {
-            *gWatchOut << " neighbor-wakeup";
-          }
-          *gWatchOut << endl;
-        }
-        _wakeup_timer = 0;
-      } else if (router_empty && drain_done && _wakeup_timer >= _wakeup_threshold) {
+      if (_wakeup_timer >= _wakeup_threshold) {
         _wakeup_signal = false;
         _wakeup_timer = 0;
         _power_state = power_on;
-        // TODO: should be handled in HandshakeEvaluate, delete me, 02/19/2020
-        //for (int out = 0; out < 4; out++) {
-        //  if (_neighbor_states[out] != power_off) {
-        //    _next_buf[out]->ResetVCBufferSize();
-        //  }
-        //}
-        _next_buf[4]->ResetVCBufferSize();
+        // TODO: delete, reset when bypass is done
+        //_next_buf[4]->ResetVCBufferSize();
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < 4; ++out) {
           if ((out == DIR_EAST && _id % gK == gK-1) ||
@@ -604,8 +517,17 @@ bool NoRDRouter::_ReceiveFlits( )
       activity = true;
 
       if (_power_state == power_off || _power_state == wakeup) {
-        if (input < 4) {
-          ++_outstanding_bypass_flits;
+        if (input < 4 && f->head) {
+          _outstanding_bypass_packets.push_back(f->pid);
+        }
+      } else if (_next_buf[4]->Size() == 1 && input == 4 && f->tail) {
+        vector<int>::iterator iter = find(_outstanding_bypass_packets.begin(),
+            _outstanding_bypass_packets.end(), f->pid);
+        if (iter != _outstanding_bypass_packets.end()) {
+          _outstanding_bypass_packets.erase(iter);
+        }
+        if (_outstanding_bypass_packets.empty()) {
+          _next_buf[4]->ResetVCBufferSize();
         }
       }
     }
@@ -909,13 +831,8 @@ void NoRDRouter::_VCAllocUpdate( )
 
       if (router) {
         const bool is_mc = (router->GetID() >= gNodes - gK);
-        if (!is_mc && (_neighbor_states[match_output] == draining ||
-              _neighbor_states[match_output] == wakeup)) {
-          // should not block escape
-          if ((vc != 0 && vc != _vcs - 1 && match_vc != 0 && match_vc != _vcs - 1) ||
-              _drain_done_sent[match_output]) {
-            back_to_route = true;
-          }
+        if (!is_mc && _neighbor_states[match_output] == draining) {
+          back_to_route = true;
         }
         if (_neighbor_states[match_output] == power_off) {
           if (match_output != _ring_out_port) {
@@ -1014,9 +931,7 @@ void NoRDRouter::_VCAllocUpdate( )
         Router * router = channel->GetSink();
         if (router) {
           const bool is_mc = (router->GetID() >= gNodes - gK);
-          if (!is_mc && (_neighbor_states[out_port] == draining ||
-                _neighbor_states[out_port] == wakeup)) {
-            if ((vc != 0 && vc != _vcs - 1) || _drain_done_sent[out_port])
+          if (!is_mc && _neighbor_states[out_port] == draining) {
               delete_route = true;
           }
           if (_neighbor_states[out_port] == power_off)
@@ -1466,11 +1381,8 @@ void NoRDRouter::_SWAllocUpdate( )
           Router * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
-            if (!is_mc && (_neighbor_states[output] == draining ||
-                  _neighbor_states[output] == wakeup)) {
-              if ((vc != 0 && vc != _vcs - 1 && match_vc != 0 && match_vc != _vcs - 1) ||
-                  _drain_done_sent[output])
-                back_to_route = true;
+            if (!is_mc && _neighbor_states[output] == draining) {
+              back_to_route = true;
             }
             if (_downstream_states[output] == power_off)
               assert(output == _ring_out_port);
@@ -1669,10 +1581,8 @@ void NoRDRouter::_SWAllocUpdate( )
             Router * router = channel->GetSink();
             if (router) {
               const bool is_mc = (router->GetID() >= gNodes - gK);
-              if (!is_mc && (_neighbor_states[out_port] == draining ||
-                    _neighbor_states[out_port] == wakeup)) {
-                if ((vc != 0 && vc != _vcs - 1) || _drain_done_sent[out_port])
-                  delete_route = true;
+              if (!is_mc && _neighbor_states[out_port] == draining) {
+                delete_route = true;
               }
               if (_neighbor_states[out_port] == power_off)
                 assert(out_port == _ring_out_port);
@@ -1706,11 +1616,8 @@ void NoRDRouter::_SWAllocUpdate( )
           Router * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
-            if (!is_mc && (_neighbor_states[output] == draining ||
-                  _neighbor_states[output] == wakeup)) {
-              if ((vc != 0 && vc != _vcs - 1 && match_vc != 0 && match_vc != _vcs - 1) ||
-                  _drain_done_sent[output])
-                back_to_route = true;
+            if (!is_mc && _neighbor_states[output] == draining) {
+              back_to_route = true;
             }
             if (_neighbor_states[output] == power_off)
               assert(output == _ring_out_port);
@@ -1935,8 +1842,11 @@ void NoRDRouter::_SendFlits( )
       _output_channels[output]->Send( f );
 
       if (_power_state == power_off || _power_state == wakeup) {
-        if (output < 4) {
-          --_outstanding_bypass_flits;
+        if (output < 4 && f->tail) {
+          vector<int>::iterator iter = find(_outstanding_bypass_packets.begin(),
+              _outstanding_bypass_packets.end(), f->pid);
+          assert(iter != _outstanding_bypass_packets.end());
+          _outstanding_bypass_packets.erase(iter);
         }
       }
     }
@@ -2145,14 +2055,9 @@ void NoRDRouter::_HandshakeEvaluate()
           break;
 
         case power_off:
-          assert(_neighbor_states[output] == draining ||
-              _neighbor_states[output] == wakeup);
+          assert(_neighbor_states[output] == draining);
           if (output == _ring_out_port) {
-            if (_neighbor_states[output] == draining) {
-              _next_buf[output]->SetVCBufferSize(1);
-            } else {
-              assert(_next_buf[output]->Size() == _vcs);
-            }
+            _next_buf[output]->SetVCBufferSize(1);
           } else {
             for (int vc = 0; vc < _vcs; ++vc) {
               assert(_next_buf[output]->IsAvailableFor(vc));
@@ -2188,8 +2093,7 @@ void NoRDRouter::_HandshakeEvaluate()
 void NoRDRouter::_HandshakeResponse()
 {
   for (int out_port = 0; out_port < 4; ++out_port) {
-    if (_neighbor_states[out_port] == draining
-        || _neighbor_states[out_port] == wakeup) {
+    if (_neighbor_states[out_port] == draining) {
       if (_drain_done_sent[out_port])
         continue;
       bool drain_done = true;
@@ -2207,7 +2111,7 @@ void NoRDRouter::_HandshakeResponse()
         }
       }
       if (out_port == _ring_out_port) {
-        drain_done &= (_outstanding_bypass_flits == 0);
+        drain_done &= (_outstanding_bypass_packets.empty());
       }
       // check ST stage, crossbar_flits
       if (drain_done)
@@ -2229,8 +2133,7 @@ void NoRDRouter::_HandshakeResponse()
       // don't need to check link, because handshake has same delay as links
 
       if (drain_done) {
-        assert(_neighbor_states[out_port] == draining ||
-            _neighbor_states[out_port] == wakeup);
+        assert(_neighbor_states[out_port] == draining);
         assert(!_drain_done_sent[out_port]);
         if (_out_queue_handshakes.count(out_port) == 0) {
           _out_queue_handshakes.insert(make_pair(out_port, Handshake::New()));
