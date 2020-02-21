@@ -791,12 +791,17 @@ void BufferState::SetVCBufferSize(int vc_buf_size)
 
 void BufferState::Display( ostream & os ) const
 {
-  os << FullName() << " :" << endl;
-  os << " occupied = " << _occupancy << endl;
-  for ( int v = 0; v < _vcs; ++v ) {
-    os << "  VC " << v << ": ";
-    os << "in_use_by = " << _in_use_by[v]
-      << ", tail_sent = " << _tail_sent[v]
-      << ", occupied = " << _vc_occupancy[v] << endl;
+  if (_occupancy) {
+    os << FullName() << " :" << endl;
+    os << " occupied = " << _occupancy;
+    os << ", size = " << _size << endl;
+    for ( int v = 0; v < _vcs; ++v ) {
+      if (_vc_occupancy[v]) {
+        os << "  VC " << v << ": ";
+        os << "in_use_by = " << _in_use_by[v]
+          << ", tail_sent = " << _tail_sent[v]
+          << ", occupied = " << _vc_occupancy[v] << endl;
+      }
+    }
   }
 }

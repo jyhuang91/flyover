@@ -260,6 +260,12 @@ public:
     return _vc_occupancy[vc];
   }
 
+  /* ==== Power Gate - Begin ==== */
+  inline int Size() const {
+    return _size;
+  }
+  /* ==== Power Gate - End ==== */
+
 #ifdef TRACK_BUFFERS
   inline int OccupancyForClass(int c) const {
     assert((c >= 0) && (c < _classes));

@@ -2282,7 +2282,9 @@ void IQRouter::Display( ostream & os ) const
 {
   for ( int input = 0; input < _inputs; ++input ) {
     _buf[input]->Display( os );
-    _next_buf[input]->Display( os );
+  }
+  for (int output = 0; output < _outputs; ++output) {
+    _next_buf[output]->Display(os);
   }
 }
 

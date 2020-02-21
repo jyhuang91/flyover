@@ -110,11 +110,12 @@ NoRDTrafficManager::NoRDTrafficManager( const Configuration &config,
     // reset VC buffer depth for bypass latches
     vector<bool> const & router_states = _net[0]->GetRouterStates();
     for (int s = 0; s < _nodes; ++s) {
-      FlitChannel *ring_output_channel = routers[s]->GetRingOutputChannel();
-      int ring_next_router = ring_output_channel->GetSink()->GetID();
-      if (router_states[ring_next_router] == false) {
-        routers[s]->SetRingOutputVCBufferSize(1);
-      }
+      // TODO: This will be set dynamically now, remove me should be fine
+      //FlitChannel *ring_output_channel = routers[s]->GetRingOutputChannel();
+      //int ring_next_router = ring_output_channel->GetSink()->GetID();
+      //if (router_states[ring_next_router] == false) {
+      //  routers[s]->SetRingOutputVCBufferSize(1);
+      //}
       if (router_states[s] == false) {
         for (int subnet = 0; subnet < _subnets; ++subnet) {
           _buf_states[s][subnet]->SetVCBufferSize(1);
@@ -166,6 +167,11 @@ NoRDTrafficManager::NoRDTrafficManager( const Configuration &config,
           (row == gK - 1 && col > 0 && col < gK - 1)) {
         _performance_centric_routers[n] = true;
       }
+    }
+
+    vector<int> watch_power_gating_routers = config.GetIntArray("watch_power_gating_routers");
+    for (size_t i = 0; i < watch_power_gating_routers.size(); ++i) {
+      _routers_to_watch_power_gating.insert(watch_power_gating_routers[i]);
     }
     /* ==== Power Gate - End ==== */
 }
@@ -388,17 +394,19 @@ void NoRDTrafficManager::_Step( )
     }
     cout << endl;
     for (int n = 0; n < _nodes; ++n) {
-      for (int c = 0; c < _classes; ++c) {
-        if (routers[n]->GetPowerState() == Router::power_off) {
-          // TODO
-          cout << "node " << n << " | Bypassing flit lists:" << endl;
-        }
+      cout << "node " << n << " | "
+        << routers[n]->FullName() << " | ["
+        << Router::POWERSTATE[routers[n]->GetPowerState()] << "]";
+      if (routers[n]->GetPowerState() == Router::power_off) {
+        cout << " | Bypassing flit lists (if any):";
       }
+      cout << endl;
       _buffers[n][0]->Display(cout);
       routers[n]->Display(cout);
       _buf_states[n][0]->Display(cout);
+      cout << endl;
     }
-    cout << endl << endl;
+    cout << endl;
     /* ==== Power Gate Debug - End ==== */
   }
 
@@ -414,9 +422,10 @@ void NoRDTrafficManager::_Step( )
           routers[n]->GetPowerState() == Router::power_on) {
         assert(router_states[n] == false);
         _wakeup_monitor_vc_requests[n] = 0;
-        for (int subnet = 0; subnet < _subnets; ++subnet) {
-          _buf_states[n][subnet]->ResetVCBufferSize();
-        }
+        // TODO: no need to reset now, since off node won't inject flits, only bypass
+        //for (int subnet = 0; subnet < _subnets; ++subnet) {
+        //  _buf_states[n][subnet]->ResetVCBufferSize();
+        //}
       }
     }
   }
@@ -458,6 +467,14 @@ void NoRDTrafficManager::_Step( )
           --_outstanding_credits[cl][subnet][n];
         }
 #endif
+        if (_routers_to_watch_power_gating.count(n) > 0) {
+          *gWatchOut << GetSimTime() << " | node " << n << " | "
+            << "receives credit for bypass VCs";
+          for (set<int>::iterator iter = c->vc.begin(); iter != c->vc.end(); ++iter) {
+            *gWatchOut << " " << *iter;
+          }
+          *gWatchOut << endl;
+        }
         _buf_states[n][subnet]->ProcessCredit(c);
         c->Free();
       }
