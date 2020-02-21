@@ -58,6 +58,7 @@ map<string, tRoutingFunction> gRoutingFunctionMap;
 
 /* ==== Power Gate - Begin ==== */
 int gRoutingDeadlockTimeoutThreshold;
+int gNoRDMissRouteThreshold;
 /* ==== Power Gate - End ==== */
 
 int gNumVCs;
@@ -2405,12 +2406,7 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
 
     bool go_to_escape = false;
     if (in_escape == false) {
-      int src_x = f->src / gK;
-      int src_y = f->src % gK;
-      int dest_x = f->dest / gK;
-      int dest_y = f->dest % gK;
-      int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
-      go_to_escape = (f->hops > shortest_hops + gK);
+      go_to_escape = (f->misroute_hops > gNoRDMissRouteThreshold);
     }
 
     bool uturn = (in_channel == out_port);
@@ -2423,6 +2419,7 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
         vcBegin = in_vc;
         vcEnd = in_vc;
       }
+    //} else if (go_to_escape || uturn) {
     } else if (go_to_escape) {
       out_port = r->GetRingOutput();
       if (r->GetID() == gNodes - 1) { // dateline
@@ -2480,6 +2477,7 @@ void InitializeRoutingMap( const Configuration & config )
 
   /* ==== Power Gate - Begin ==== */
   gRoutingDeadlockTimeoutThreshold = config.GetInt("routing_deadlock_timeout_threshold");
+  gNoRDMissRouteThreshold = gK; //config.GetInt("nord_misroute_threshold");
   /* ==== Power Gate - End ==== */
 
   gNumVCs = config.GetInt( "num_vcs" );

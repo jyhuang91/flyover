@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <limits>
+#include <algorithm>
 
 #include "globals.hpp"
 #include "random_utils.hpp"
@@ -146,8 +147,8 @@ void NoRDRouter::PowerStateEvaluate()
       _idle_timer++;
       if (_wakeup_signal == true) {
         _wakeup_signal = false;
+        _idle_timer = 0;
       } else if (_router_state == false && _idle_timer > _idle_threshold) {
-        assert(_outstanding_requests == 0);
         bool router_empty = true;
         router_empty &= _in_queue_flits.empty();
         router_empty &= _crossbar_flits.empty();
@@ -515,6 +516,7 @@ bool NoRDRouter::_ReceiveFlits( )
       }
       _in_queue_flits.insert(make_pair(input, f));
       activity = true;
+      _idle_timer = 0;
 
       if (_power_state == power_off || _power_state == wakeup) {
         if (input < 4 && f->head) {
@@ -1096,6 +1098,64 @@ void NoRDRouter::_SWHoldUpdate( )
       f->hops++;
       f->vc = match_vc;
 
+      if (f->head) {
+        int src_x = f->src / gK;
+        int src_y = f->src % gK;
+        int dest_x = f->dest / gK;
+        int dest_y = f->dest % gK;
+        int src_dest_x = abs(src_x - dest_x);
+        int src_dest_y = abs(src_y - dest_y);
+        int shortest_hops = src_dest_x + src_dest_y;
+
+        int curr_x = _id / gK;
+        int curr_y = _id % gK;
+        int curr_dest_x = abs(curr_x - dest_x);
+        int curr_dest_y = abs(curr_y - dest_y);
+        int curr_hops = curr_dest_x + curr_dest_y;
+
+        bool detour = false;
+        int neighbor_port = -1;
+
+        if (input >= 4) {
+          if (f->src != _id) { // bypass
+            neighbor_port = _ring_in_port;
+          }
+        } else {
+          neighbor_port = input;
+        }
+
+        if (neighbor_port >= 0) {
+          const FlitChannel *channel = _output_channels[neighbor_port];
+          Router *neighbor = channel->GetSink();
+          int prev_x = neighbor->GetID() / gK;
+          int prev_y = neighbor->GetID() % gK;
+          int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
+
+          if (prev_hops < curr_hops)
+            detour = true;
+        }
+
+        if (!detour) {
+          if (src_x <= dest_x) {
+            if (curr_x < src_x || curr_x > dest_x)
+              detour = true;
+          } else {
+            if (curr_x < dest_x || curr_x > src_x)
+              detour = true;
+          }
+          if (src_y <= dest_y) {
+            if (curr_y < src_y || curr_y > dest_y)
+              detour = true;
+          } else {
+            if (curr_y < dest_y || curr_y > src_y )
+              detour = true;
+          }
+        }
+
+        if (f->hops >= shortest_hops || detour)
+          f->misroute_hops++;
+      }
+
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
         const Router * router = channel->GetSink();
@@ -1441,6 +1501,60 @@ void NoRDRouter::_SWAllocUpdate( )
 
       f->hops++;
       f->vc = match_vc;
+
+      if (f->head) {
+        int src_x = f->src / gK;
+        int src_y = f->src % gK;
+        int dest_x = f->dest / gK;
+        int dest_y = f->dest % gK;
+        int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
+
+        int curr_x = _id / gK;
+        int curr_y = _id % gK;
+        int curr_hops = abs(curr_x - dest_x) + abs(curr_y - dest_y);
+
+        bool detour = false;
+        int neighbor_port = -1;
+
+        if (input >= 4) {
+          if (f->src != _id) { // bypass
+            neighbor_port = _ring_in_port;
+          }
+        } else {
+          neighbor_port = input;
+        }
+
+        if (neighbor_port >= 0) {
+          const FlitChannel *channel = _output_channels[neighbor_port];
+          Router *neighbor = channel->GetSink();
+          int prev_x = neighbor->GetID() / gK;
+          int prev_y = neighbor->GetID() % gK;
+          int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
+
+          if (prev_hops < curr_hops)
+            detour = true;
+        }
+
+        if (!detour) {
+          if (src_x <= dest_x) {
+            if (curr_x < src_x || curr_x > dest_x)
+              detour = true;
+          } else {
+            if (curr_x < dest_x || curr_x > src_x)
+              detour = true;
+          }
+          if (src_y <= dest_y) {
+            if (curr_y < src_y || curr_y > dest_y)
+              detour = true;
+          } else {
+            if (curr_y < dest_y || curr_y > src_y )
+              detour = true;
+          }
+        }
+
+        if (f->hops >= shortest_hops || detour)
+          f->misroute_hops++;
+      }
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
@@ -1897,6 +2011,8 @@ void NoRDRouter::_NoRDStep()
 
     Buffer * const cur_buf = _buf[input];
 
+    f->hops++;
+
     int output;
     if (input == _ring_in_port) {
       output = DIR_NI;
@@ -1913,13 +2029,54 @@ void NoRDRouter::_NoRDStep()
           << POWERSTATE[_power_state]
           << "] Bypass flit " << f->id << " to next router" << endl;
       }
+
+      if (f->head) {
+        bool detour = false;
+
+        int src_x = f->src / gK;
+        int src_y = f->src % gK;
+        int dest_x = f->dest / gK;
+        int dest_y = f->dest % gK;
+        int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
+
+        const FlitChannel *channel = _output_channels[_ring_in_port];
+        Router *neighbor = channel->GetSink();
+        int prev_x = neighbor->GetID() / gK;
+        int prev_y = neighbor->GetID() % gK;
+        int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
+
+        int curr_x = _id / gK;
+        int curr_y = _id % gK;
+        int curr_hops = abs(curr_x - dest_x) + abs(curr_y - dest_y);
+
+        if (prev_hops < curr_hops) {
+          detour = true;
+        } else {
+          if (src_x <= dest_x) {
+            if (curr_x < src_x || curr_x > dest_x)
+              detour = true;
+          } else {
+            if (curr_x < dest_x || curr_x > src_x)
+              detour = true;
+          }
+          if (src_y <= dest_y) {
+            if (curr_y < src_y || curr_y > dest_y)
+              detour = true;
+          } else {
+            if (curr_y < dest_y || curr_y > src_y )
+              detour = true;
+          }
+        }
+
+        if (f->hops >= shortest_hops || detour)
+          f->misroute_hops++;
+      }
     }
 
     BufferState * const dest_buf = _next_buf[output];
     if (f->head) {
       cur_buf->SetOutput(vc, output, vc);
       cur_buf->SetState(vc, VC::active);
-      //dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by nord
       dest_buf->TakeBuffer(vc, input * _vcs + vc); // indicate its taken by nord
     }
     if (f->tail) {
@@ -1936,8 +2093,6 @@ void NoRDRouter::_NoRDStep()
         << endl;
     }
     _output_buffer[output].push(f);
-
-    f->hops++;
   }
   _in_queue_flits.clear();
 
