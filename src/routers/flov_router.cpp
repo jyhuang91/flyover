@@ -1401,7 +1401,7 @@ void FLOVRouter::_VCAllocUpdate( )
         if (f->watch) {
           assert(f->head);
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << " downstrema router is " << POWERSTATE[_downstream_states[match_output]]
+            << " downstream router is " << POWERSTATE[_downstream_states[match_output]]
             << "(logical neighbor: " << _logical_neighbors[match_output]
             << "), back to RC stage." << endl;
 
@@ -1593,6 +1593,60 @@ void FLOVRouter::_SWHoldUpdate( )
 
       f->hops++;
       f->vc = match_vc;
+
+      if (f->head) {
+        int src_x = f->src / gK;
+        int src_y = f->src % gK;
+        int dest_x = f->dest / gK;
+        int dest_y = f->dest % gK;
+        int src_dest_x = abs(src_x - dest_x);
+        int src_dest_y = abs(src_y - dest_y);
+        int shortest_hops = src_dest_x + src_dest_y;
+
+        int curr_x = _id / gK;
+        int curr_y = _id % gK;
+        int curr_dest_x = abs(curr_x - dest_x);
+        int curr_dest_y = abs(curr_y - dest_y);
+        int curr_hops = curr_dest_x + curr_dest_y;
+
+        bool detour = false;
+        int neighbor_port = -1;
+
+        if (input < 4) {
+          neighbor_port = input;
+        }
+
+        if (neighbor_port >= 0) {
+          const FlitChannel *channel = _output_channels[neighbor_port];
+          Router *neighbor = channel->GetSink();
+          int prev_x = neighbor->GetID() / gK;
+          int prev_y = neighbor->GetID() % gK;
+          int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
+
+          if (prev_hops < curr_hops)
+            detour = true;
+        }
+
+        if (!detour) {
+          if (src_x <= dest_x) {
+            if (curr_x < src_x || curr_x > dest_x)
+              detour = true;
+          } else {
+            if (curr_x < dest_x || curr_x > src_x)
+              detour = true;
+          }
+          if (src_y <= dest_y) {
+            if (curr_y < src_y || curr_y > dest_y)
+              detour = true;
+          } else {
+            if (curr_y < dest_y || curr_y > src_y )
+              detour = true;
+          }
+        }
+
+        if (f->hops >= shortest_hops || detour)
+          f->misroute_hops++;
+      }
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
@@ -1939,6 +1993,56 @@ void FLOVRouter::_SWAllocUpdate( )
 
       f->hops++;
       f->vc = match_vc;
+
+      if (f->head) {
+        int src_x = f->src / gK;
+        int src_y = f->src % gK;
+        int dest_x = f->dest / gK;
+        int dest_y = f->dest % gK;
+        int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
+
+        int curr_x = _id / gK;
+        int curr_y = _id % gK;
+        int curr_hops = abs(curr_x - dest_x) + abs(curr_y - dest_y);
+
+        bool detour = false;
+        int neighbor_port = -1;
+
+        if (input < 4) {
+          neighbor_port = input;
+        }
+
+        if (neighbor_port >= 0) {
+          const FlitChannel *channel = _output_channels[neighbor_port];
+          Router *neighbor = channel->GetSink();
+          int prev_x = neighbor->GetID() / gK;
+          int prev_y = neighbor->GetID() % gK;
+          int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
+
+          if (prev_hops < curr_hops)
+            detour = true;
+        }
+
+        if (!detour) {
+          if (src_x <= dest_x) {
+            if (curr_x < src_x || curr_x > dest_x)
+              detour = true;
+          } else {
+            if (curr_x < dest_x || curr_x > src_x)
+              detour = true;
+          }
+          if (src_y <= dest_y) {
+            if (curr_y < src_y || curr_y > dest_y)
+              detour = true;
+          } else {
+            if (curr_y < dest_y || curr_y > src_y )
+              detour = true;
+          }
+        }
+
+        if (f->hops >= shortest_hops || detour)
+          f->misroute_hops++;
+      }
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
@@ -2329,6 +2433,48 @@ void FLOVRouter::_FlovStep() {
     _output_buffer[output].push(f);
 
     f->flov_hops++;
+
+    if (f->head) {
+      bool detour = false;
+
+      int src_x = f->src / gK;
+      int src_y = f->src % gK;
+      int dest_x = f->dest / gK;
+      int dest_y = f->dest % gK;
+      int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
+
+      const FlitChannel *channel = _output_channels[input];
+      Router *neighbor = channel->GetSink();
+      int prev_x = neighbor->GetID() / gK;
+      int prev_y = neighbor->GetID() % gK;
+      int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
+
+      int curr_x = _id / gK;
+      int curr_y = _id % gK;
+      int curr_hops = abs(curr_x - dest_x) + abs(curr_y - dest_y);
+
+      if (prev_hops < curr_hops) {
+        detour = true;
+      } else {
+        if (src_x <= dest_x) {
+          if (curr_x < src_x || curr_x > dest_x)
+            detour = true;
+        } else {
+          if (curr_x < dest_x || curr_x > src_x)
+            detour = true;
+        }
+        if (src_y <= dest_y) {
+          if (curr_y < src_y || curr_y > dest_y)
+            detour = true;
+        } else {
+          if (curr_y < dest_y || curr_y > src_y )
+            detour = true;
+        }
+      }
+
+      if (f->hops >= shortest_hops || detour)
+        f->misroute_hops++;
+    }
   }
   _in_queue_flits.clear();
 

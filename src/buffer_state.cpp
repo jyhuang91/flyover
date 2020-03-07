@@ -748,8 +748,8 @@ void BufferState::ClearCredits()
   _occupancy += _size;
   for (int vc = 0; vc < _vcs; ++vc) {
     _vc_occupancy[vc] += _size / _vcs;
-    _in_use_by[vc] = -1;
-    _tail_sent[vc] = false;
+    _in_use_by[vc] = _vcs * 4; // intentional to support wait_for_tail_credit
+    _tail_sent[vc] = true;
   }
 }
 

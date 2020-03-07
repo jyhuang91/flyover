@@ -87,6 +87,16 @@ NoRDRouter::NoRDRouter( Configuration const & config, Module *parent,
     _ring_out_port = DIR_SOUTH;
   }
 
+  if (row == 0) {
+    _ring_id = _id;
+  } else {
+    if (col % 2 == 1) {
+      _ring_id = (gK - col) * (gK - 1) + row;
+    } else {
+      _ring_id = (gK - col) * (gK - 1) + (gK - row);
+    }
+  }
+
   // for flow control
   _pending_credits = 0;
   _credit_counter.resize(_inputs);
@@ -334,19 +344,6 @@ void NoRDRouter::PowerStateEvaluate()
         _off_timer = 0;
         _drain_tags.clear();
         _drain_tags.resize(4, false);
-        for (int out = 0; out < 4; ++out) {
-          if ((out == DIR_EAST && _id % gK == gK-1) ||
-              (out == DIR_WEST && _id % gK == 0) ||
-              (out == DIR_SOUTH && _id / gK == gK-1) ||
-              (out == DIR_NORTH && _id / gK == 0)) {
-            _drain_tags[out] = true;
-            continue;
-          }
-          _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
-          _out_queue_handshakes[out]->new_state = wakeup;
-          _out_queue_handshakes[out]->id = _id;
-          _out_queue_handshakes[out]->hid = ++_req_hids[out];
-        }
         if (_watch_power_gating) {
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
             << "[NoRD | power-off] changes from PowerOff to WakeUp."
@@ -366,8 +363,6 @@ void NoRDRouter::PowerStateEvaluate()
         _wakeup_signal = false;
         _wakeup_timer = 0;
         _power_state = power_on;
-        // TODO: delete, reset when bypass is done
-        //_next_buf[4]->ResetVCBufferSize();
         assert(_out_queue_handshakes.empty());
         for (int out = 0; out < 4; ++out) {
           if ((out == DIR_EAST && _id % gK == gK-1) ||
@@ -971,45 +966,7 @@ void NoRDRouter::_VCAllocUpdate( )
         continue;
       }
 
-      bool escape = true;
-      iset = setlist.begin();
-      while (iset != setlist.end()) {
-        int const out_port = iset->output_port;
-        assert((out_port >= 0) && (out_port < _outputs));
-        if (out_port != _ring_out_port) {
-          escape = false;
-          break;
-        }
-        int vc_start = iset->vc_start;
-        int vc_end = iset->vc_end;
-        if (!(vc_start == 0 && vc_end == 0) &&
-            !(vc_start == _vcs - 1 && vc_end == _vcs - 1)) {
-          escape = false;
-          break;
-        }
-        iset++;
-      }
-      if (GetSimTime() - f->rtime >= _routing_deadlock_timeout_threshold && escape == false) { // timeout
-        if (f->watch) {
-          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << "flit " << f->id << " (pid " << f->pid << ") times out,"
-            << " back to route from VCAllocUpdate" << endl;
-        }
-        _buf[input]->SetState(vc, VC::routing);
-        _route_vcs.push_back(make_pair(-1, make_pair(input, vc)));
-        if (_speculative) {
-          pair<int, int> input_vc = make_pair(input, vc);
-          for (unsigned i = 0; i < _sw_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _sw_alloc_vcs[i];
-            if (item.second.first == input_vc) {
-              _sw_alloc_vcs.erase(_sw_alloc_vcs.begin()+i);
-              break;
-            }
-          }
-        }
-      } else {
-        _vc_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
-      }
+      _vc_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
       /* ==== Power Gate - End ==== */
     }
     _vc_alloc_vcs.pop_front();
@@ -1778,79 +1735,7 @@ void NoRDRouter::_SWAllocUpdate( )
       }
 #endif
 
-      /* ==== Power Gate - Begin ==== */
-      int const input = item.second.first.first;
-      assert((input >= 0) && (input < _inputs));
-      int const vc = item.second.first.second;
-      assert((vc >= 0) && (vc < _vcs));
-      Buffer * const cur_buf = _buf[input];
-      bool escape = true;
-      if (cur_buf->GetState(vc) == VC::active) {
-        int output = cur_buf->GetOutputPort(vc);
-        int match_vc = cur_buf->GetOutputVC(vc);
-        if (output != _ring_out_port && (match_vc != 0 && match_vc != _vcs - 1))
-          escape = false;
-      } else {
-        assert(cur_buf->GetState(vc) == VC::vc_alloc);
-        OutputSet const * route_set = cur_buf->GetRouteSet(vc);
-        assert(route_set);
-
-        set<OutputSet::sSetElement> setlist = route_set->GetSet();
-
-        set<OutputSet::sSetElement>::iterator iset = setlist.begin();
-        while (iset != setlist.end()) {
-          int const out_port = iset->output_port;
-          assert((out_port >= 0) && (out_port < _outputs));
-          if (out_port != _ring_out_port) {
-            escape = false;
-            break;
-          }
-          int vc_start = iset->vc_start;
-          int vc_end = iset->vc_end;
-          if (!(vc_start == 0 && vc_end == 0) &&
-              !(vc_start == _vcs - 1 && vc_end == _vcs - 1)) {
-            escape = false;
-            break;
-          }
-          iset++;
-        }
-      }
-      if (GetSimTime() - f->rtime >= _routing_deadlock_timeout_threshold && f->head && escape == false) { // timeout
-        if (cur_buf->GetState(vc) == VC::active) {
-          int const dest_output = cur_buf->GetOutputPort(vc);
-          assert((dest_output >= 0) && (dest_output < _outputs));
-          int const dest_vc = cur_buf->GetOutputVC(vc);
-          assert((dest_vc >= 0) && (dest_vc < _vcs));
-          BufferState * const dest_buf = _next_buf[dest_output];
-          dest_buf->ReturnBuffer(dest_vc);
-          _route_vcs.push_back(make_pair(-1, item.second.first));
-          cur_buf->SetState(vc, VC::routing);
-        } else {
-          assert(cur_buf->GetState(vc) == VC::vc_alloc);
-          int const dest_output = cur_buf->GetOutputPort(vc);
-          assert(dest_output == -1);
-          int const dest_vc = cur_buf->GetOutputVC(vc);
-          assert(dest_vc == -1);
-          pair<int, int> input_vc = make_pair(input, vc);
-          for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
-            pair<int, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
-            if (item.second.first == input_vc) {
-              _vc_alloc_vcs.erase(_vc_alloc_vcs.begin()+i);
-              break;
-            }
-          }
-          _route_vcs.push_back(make_pair(-1, item.second.first));
-          cur_buf->SetState(vc, VC::routing);
-        }
-        if (f->watch) {
-          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << "flit " << f->id << " (pid " << f->pid << ") times out,"
-            << " back to route from SWAllocUpdate" << endl;
-        }
-      } else {
-        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
-      }
-      /* ==== Power Gate - End ==== */
+      _sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
     }
     _sw_alloc_vcs.pop_front();
   }
@@ -2194,9 +2079,9 @@ void NoRDRouter::_HandshakeEvaluate()
     if (h->new_state >= 0) {
       switch (h->new_state) {
         case power_on:
-          assert(_neighbor_states[output] == wakeup ||
+          assert(_neighbor_states[output] == power_off ||
               _neighbor_states[output] == draining);
-          if (_neighbor_states[output] == wakeup && output == _ring_out_port)
+          if (_neighbor_states[output] == power_off && output == _ring_out_port)
             _next_buf[output]->ResetVCBufferSize();
           _neighbor_states[output] = power_on;
           _resp_hids[input] = h->hid;

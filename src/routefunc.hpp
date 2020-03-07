@@ -48,7 +48,7 @@ enum Direction {
 };
 
 extern int gRoutingDeadlockTimeoutThreshold;
-extern int gNoRDMissRouteThreshold;
+extern int gMissRouteThreshold;
 /* ==== Power Gate - End ==== */
 
 extern map<string, tRoutingFunction> gRoutingFunctionMap;

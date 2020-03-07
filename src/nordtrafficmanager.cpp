@@ -99,6 +99,8 @@ NoRDTrafficManager::NoRDTrafficManager( const Configuration &config,
 
     /* ==== Power Gate - Begin ==== */
 
+    assert(config.GetInt("wait_for_tail_credit") > 0);
+
     vector<Router *> routers = _net[0]->GetRouters();
     for (int n = 0; n < _nodes; ++n) {
       if (n % gK == 0)
@@ -163,7 +165,7 @@ NoRDTrafficManager::NoRDTrafficManager( const Configuration &config,
     for (int n = 0; n < _nodes; ++n) {
       int row = n / gK;
       int col = n % gK;
-      if ((row == 1) || (gK > 4 && row == gK / 2) ||
+      if ((row == 1) || (gK > 4 && row % 2 == 1 && row < gK - 1) ||
           (row == gK - 1 && col > 0 && col < gK - 1)) {
         _performance_centric_routers[n] = true;
       }
@@ -293,6 +295,8 @@ void NoRDTrafficManager::_GeneratePacket( int source, int stype,
             f->head = true;
             //packets are only generated to nodes smaller or equal to limit
             f->dest = packet_destination;
+            const vector<Router *> routers = _net[0]->GetRouters();
+            f->ring_dest = routers[f->dest]->GetRingID();
         } else {
             f->head = false;
             //f->dest = -1; // XXX: for bypass
@@ -659,6 +663,8 @@ void NoRDTrafficManager::_Step( )
 
             assert(cf->head);
 
+            const vector<Router *> routers = _net[0]->GetRouters();
+
             if (_performance_centric_wakeup_threshold > 0 &&
                 _power_centric_wakeup_threshold > 0) {
               int wakeup_threshold = _performance_centric_routers[n] ?
@@ -666,57 +672,67 @@ void NoRDTrafficManager::_Step( )
                 _power_centric_wakeup_threshold;
               ++_wakeup_monitor_vc_requests[n];
               if (_time % _wakeup_monitor_epoch == 0) {
-                if (_wakeup_monitor_vc_requests[n] > wakeup_threshold) {
-                  const vector<Router *> routers = _net[0]->GetRouters();
+                if (_wakeup_monitor_vc_requests[n] >= wakeup_threshold) {
                   routers[n]->WakeUp();
                 }
               }
             }
 
             OutputSet route_set;
-            _rf(nullptr, cf, -1, &route_set, false);
+            _rf(routers[n], cf, -1, &route_set, true);
             set<OutputSet::sSetElement> const & os = route_set.GetSet();
-            assert(os.size() == 1);
-            OutputSet::sSetElement const & se = *os.begin();
-            assert(se.output_port == -1);
-            int vc_start = se.vc_start;
-            int vc_end = se.vc_end;
-            int vc_count = vc_end - vc_start + 1;
-            assert(!_noq);
-            if(cf->watch) {
-              *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                << "Finding output VC for flit " << cf->id
-                << ":" << endl;
-            }
-            for(int i = 1; i <= vc_count; ++i) {
-              int const lvc = last_vc;
-              int const out_vc =
-                (lvc < vc_start || lvc > vc_end) ?
-                vc_start :
-                (vc_start + (lvc - vc_start + i) % vc_count);
-              assert((out_vc >= vc_start) && (out_vc <= vc_end));
-              if(!dest_buf->IsAvailableFor(out_vc)) {
-                if(cf->watch) {
+            for (set<OutputSet::sSetElement>::const_iterator iset = os.begin();
+                iset != os.end(); ++iset)
+            {
+              OutputSet::sSetElement const & se = *(iset);
+              assert(se.output_port == -1);
+              bool found;
+              int vc_start = se.vc_start;
+              int vc_end = se.vc_end;
+              int vc_count = vc_end - vc_start + 1;
+              assert(!_noq);
+              if(cf->watch) {
+                *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                  << "Finding output VC for flit " << cf->id
+                  << ":" << endl;
+              }
+              for(int i = 1; i <= vc_count; ++i) {
+                int const lvc = last_vc;
+                int const out_vc =
+                  (lvc < vc_start || lvc > vc_end) ?
+                  vc_start :
+                  (vc_start + (lvc - vc_start + i) % vc_count);
+                assert((out_vc >= vc_start) && (out_vc <= vc_end));
+                if (out_vc < 0 || out_vc >= _vcs) {
                   *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                    << "  Output VC " << out_vc << " is busy." << endl;
+                    << "Finding output VC for flit " << cf->id
+                    << ":" << endl;
                 }
-              } else {
-                if(dest_buf->IsFullFor(out_vc)) {
+                if(!dest_buf->IsAvailableFor(out_vc)) {
                   if(cf->watch) {
                     *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                      << "  Output VC " << out_vc << " is full." << endl;
+                      << "  Output VC " << out_vc << " is busy." << endl;
                   }
                 } else {
-                  if(cf->watch) {
-                    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                      << "  Selected output VC " << out_vc << "." << endl;
+                  if(dest_buf->IsFullFor(out_vc)) {
+                    if(cf->watch) {
+                      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                        << "  Output VC " << out_vc << " is full." << endl;
+                    }
+                  } else {
+                    if(cf->watch) {
+                      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                        << "  Selected output VC " << out_vc << "." << endl;
+                    }
+                    _buffers[n][subnet]->SetOutput(vc, -1, out_vc);
+                    _buffers[n][subnet]->SetState(vc, VC::active);
+                    cf->vc = out_vc;
+                    found = true;
+                    break;
                   }
-                  _buffers[n][subnet]->SetOutput(vc, -1, out_vc);
-                  _buffers[n][subnet]->SetState(vc, VC::active);
-                  cf->vc = out_vc;
-                  break;
                 }
               }
+              if (found) break;
             }
           } else if (!cf->head && cf->vc == -1) {
             assert(cf->src != n);

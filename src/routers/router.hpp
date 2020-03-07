@@ -67,6 +67,9 @@ protected:
   static int const STALL_CROSSBAR_CONFLICT;
 
   int _id;
+  /* ==== Power Gate - Begin ==== */
+  int _ring_id;
+  /* ==== Power Gate - End ==== */
 
   int _inputs;
   int _outputs;
@@ -190,6 +193,11 @@ public:
   inline int GetID( ) const {return _id;}
 
 
+  /* ==== Power Gate - Begin ==== */
+  inline int GetRingID( ) const {return _ring_id;}
+
+  virtual int GetFreeCredit(int o) const {return 0;}
+  /* ==== Power Gate - End ==== */
   virtual int GetUsedCredit(int o) const = 0;
   virtual int GetBufferOccupancy(int i) const = 0;
 

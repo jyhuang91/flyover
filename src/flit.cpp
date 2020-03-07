@@ -85,6 +85,7 @@ void Flit::Reset()
   bypass_vc = -1 ;
   flov_hops = 0 ;
   misroute_hops = 0;
+  ring_dest = 0;
   /* ==== Power Gate - End ==== */
 }
 
