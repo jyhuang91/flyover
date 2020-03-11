@@ -2742,6 +2742,9 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
   int out_port = -1;
   bool timeout = (GetSimTime() - f->rtime > gRoutingDeadlockTimeoutThreshold);
 
+  bool go_to_escape = false;
+  go_to_escape = (f->misroute_hops > gMissRouteThreshold);
+
   if(r == nullptr && inject) {
     // injection can use all VCs
     out_port = -1;
@@ -2767,25 +2770,28 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
       }
     } else {
       vcEnd -= 2;
-      outputs->AddRange(out_port, vcBegin, vcEnd, 1);
-      if (f->watch) {
-        *gWatchOut << GetSimTime() << " | "
-          << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-          << " at bypassing port for flit " << f->id
-          << " (destination " << f->dest << ")." << endl;
-      }
-      int escape_vc;
-      if (f->ring_dest > r->GetRingID()) {
-        escape_vc = vcEnd + 1;
+      if (!go_to_escape) {
+        outputs->AddRange(out_port, vcBegin, vcEnd, 1);
+        if (f->watch) {
+          *gWatchOut << GetSimTime() << " | "
+            << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+            << " at bypassing port for flit " << f->id
+            << " (destination " << f->dest << ")." << endl;
+        }
       } else {
-        escape_vc = vcEnd + 2;
-      }
-      outputs->AddRange(out_port, escape_vc, escape_vc, 0);
-      if (f->watch) {
-        *gWatchOut << GetSimTime() << " | "
-          << "Adding VC range [" << escape_vc << "," << escape_vc << "]"
-          << " at bypassing escape port for flit " << f->id
-          << " (destination " << f->dest << ")." << endl;
+        int escape_vc;
+        if (f->ring_dest > r->GetRingID()) {
+          escape_vc = vcEnd + 1;
+        } else {
+          escape_vc = vcEnd + 2;
+        }
+        outputs->AddRange(out_port, escape_vc, escape_vc, 0);
+        if (f->watch) {
+          *gWatchOut << GetSimTime() << " | "
+            << "Adding VC range [" << escape_vc << "," << escape_vc << "]"
+            << " at bypassing escape port for flit " << f->id
+            << " (destination " << f->dest << ")." << endl;
+        }
       }
     }
     return;
@@ -2813,10 +2819,7 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
         (in_vc == vcEnd - 1 || in_vc == vcEnd))
       in_escape = true;
 
-    bool go_to_escape = false;
-    if (in_escape == false) {
-      go_to_escape = (f->misroute_hops > gMissRouteThreshold);
-    }
+    int ring_out_port = r->GetRingOutput();
 
     int xy_out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
     int yx_out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
@@ -2824,24 +2827,22 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
     int credit_yx = r->GetFreeCredit(yx_out_port);
     int xy_pri, yx_pri;
     if (credit_xy >= credit_yx) {
-      xy_pri = 2;
-      yx_pri = 1;
-    } else if (credit_xy < credit_yx) {
-      xy_pri = 1;
+      xy_pri = 3;
       yx_pri = 2;
     } else {
-      xy_pri = GetSimTime() % 2 + 1;
-      yx_pri = (xy_pri + 1) % 3;
+      xy_pri = 2;
+      yx_pri = 3;
     }
     if (xy_out_port == yx_out_port)
       yx_pri = xy_pri;
     bool xy_avaiable = (xy_out_port != in_channel &&
-        r->GetNeighborPowerState(xy_out_port) == Router::power_on);
+        (r->GetNeighborPowerState(xy_out_port) == Router::power_on ||
+         xy_out_port == ring_out_port));
     bool yx_avaiable = (yx_out_port != in_channel &&
-        r->GetNeighborPowerState(yx_out_port) == Router::power_on);
+        (r->GetNeighborPowerState(yx_out_port) == Router::power_on ||
+         yx_out_port == ring_out_port));
 
     // Add escape channel with low priority
-    int ring_out_port = r->GetRingOutput();
     if (in_escape) {
       if (f->ring_dest > r->GetRingID()) {
         in_vc = vcEnd - 1;
@@ -2896,14 +2897,16 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
             << "." << endl;
         }
       }
-      if (!xy_avaiable && !yx_avaiable && ring_out_port != in_channel) {
-        outputs->AddRange(ring_out_port, vcBegin, vcEnd, 1);
-        if (f->watch) {
-          *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
-            << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-            << " at ring output port " << ring_out_port << " for flit " << f->id
-            << " (input port " << in_channel << ", destination " << f->dest << ")"
-            << "." << endl;
+      if (!xy_avaiable && !yx_avaiable) {
+        if (ring_out_port != in_channel) {
+          outputs->AddRange(ring_out_port, vcBegin, vcEnd, 1);
+          if (f->watch) {
+            *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+              << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
+              << " at ring output port " << ring_out_port << " for flit " << f->id
+              << " (input port " << in_channel << ", destination " << f->dest << ")"
+              << "." << endl;
+          }
         }
       }
     }

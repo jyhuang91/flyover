@@ -517,15 +517,6 @@ bool NoRDRouter::_ReceiveFlits( )
         if (input < 4 && f->head) {
           _outstanding_bypass_packets.push_back(f->pid);
         }
-      } else if (_next_buf[4]->Size() == 1 && input == 4 && f->tail) {
-        vector<int>::iterator iter = find(_outstanding_bypass_packets.begin(),
-            _outstanding_bypass_packets.end(), f->pid);
-        if (iter != _outstanding_bypass_packets.end()) {
-          _outstanding_bypass_packets.erase(iter);
-        }
-        if (_outstanding_bypass_packets.empty()) {
-          _next_buf[4]->ResetVCBufferSize();
-        }
       }
     }
   }
@@ -1840,12 +1831,15 @@ void NoRDRouter::_SendFlits( )
       }
       _output_channels[output]->Send( f );
 
-      if (_power_state == power_off || _power_state == wakeup) {
-        if (output < 4 && f->tail) {
-          vector<int>::iterator iter = find(_outstanding_bypass_packets.begin(),
-              _outstanding_bypass_packets.end(), f->pid);
-          assert(iter != _outstanding_bypass_packets.end());
+      if (output < 4 && f->tail) {
+        vector<int>::iterator iter = find(_outstanding_bypass_packets.begin(),
+            _outstanding_bypass_packets.end(), f->pid);
+        if (iter != _outstanding_bypass_packets.end())
           _outstanding_bypass_packets.erase(iter);
+        if ((_power_state == power_on || _power_state == draining) &&
+            _next_buf[4]->Size() == _vcs &&
+            _outstanding_bypass_packets.empty()) {
+          _next_buf[4]->ResetVCBufferSize();
         }
       }
     }
