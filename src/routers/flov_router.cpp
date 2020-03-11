@@ -2714,7 +2714,7 @@ void FLOVRouter::_HandshakeEvaluate() {
           assert(_downstream_states[input] != wakeup);
           _drain_done_sent[input] = false;
         } else if (src_state == power_off) {
-          assert(0); // XXX:should I receive power_off when I am waking up?
+          // XXX: when to be power_off router's downstream routers are off, wakeup router can receive power_off
           // if downstream is wakeup, it should send src state for flow control (clear credit counter)
           //assert(_downstream_states[input] == draining || _downstream_states[input] == wakeup);
           assert(_downstream_states[input] == draining);
