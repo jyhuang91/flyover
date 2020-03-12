@@ -673,6 +673,10 @@ void FLOVRouter::_RFLOVPowerStateEvaluate()
         assert(cur_buf->GetState(vc) == VC::idle);
       }
     }
+    for (int out = 0; out < 4; ++out) {
+      if (_downstream_states[out] == power_off)
+        _drain_tags[out] = true;
+    }
     // don't consider draining since wakeup has higher priority
     // NOTE: can wake up at the same time, the handshake relaying is done
     // in _HandshakeEvaluate()
@@ -2716,8 +2720,8 @@ void FLOVRouter::_HandshakeEvaluate() {
         } else if (src_state == power_off) {
           // XXX: when to be power_off router's downstream routers are off, wakeup router can receive power_off
           // if downstream is wakeup, it should send src state for flow control (clear credit counter)
-          //assert(_downstream_states[input] == draining || _downstream_states[input] == wakeup);
-          assert(_downstream_states[input] == draining);
+          assert(_downstream_states[input] == draining || _downstream_states[input] == wakeup);
+          //assert(_downstream_states[input] == draining);
           for (int vc = 0; vc < _vcs; ++vc)
             _credit_counter[input][vc] = 0;
           _next_buf[input]->ClearCredits();
