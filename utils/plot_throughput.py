@@ -1,10 +1,14 @@
 #!/usr/bin/python
 
+import os
 import sys
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from easypyplot import pdf, barchart, color
 from easypyplot import format as fmt
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 
 def main():
@@ -12,23 +16,27 @@ def main():
     traffic = 'uniform'
     off = 50
 
-    dimensions = [6, 8, 10]
+    dimensions = [6, 8]
     schemes = [
-        #'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov', 'nord'
-        'baseline', 'flov'
+        'baseline', 'rp', 'nord', 'flov', 'opt_flov'
     ]
     paper_schemes = [
-        #'Baseline', 'RPA', 'RPC', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt', 'NoRD'
-        'Baseline', 'FLOV'
+        'Baseline', 'RP', 'NoRD', 'FLOV', 'FLOV+'
     ]
+    rp_schemes = ['rpa', 'rpc', 'norp']
     injection_rates = []
-    #for i in range(1, 61):
-    for i in range(1, 60):
+    for i in range(1, 91, 1):
         injection_rates.append("%.2f" % (float(i) / 100))
 
+    saturations = np.zeros((int(len(dimensions)), int(len(schemes))), dtype=np.float)
     latencies = []
+    powers = []
     for d, dimension in enumerate(dimensions):
         latencies.append(
+            np.zeros(
+                (int(len(schemes)), int(len(injection_rates))),
+                dtype=np.float))
+        powers.append(
             np.zeros(
                 (int(len(schemes)), int(len(injection_rates))),
                 dtype=np.float))
@@ -36,17 +44,71 @@ def main():
     for d, dimension in enumerate(dimensions):
         for s, scheme in enumerate(schemes):
             for i, injection_rate in enumerate(injection_rates):
+                if schemes[s] == 'rp':
+                    rp_idx = 0
+                    #power = None
+                    latency = None
+                    for j, rp in enumerate(rp_schemes):
+                        rpfile = rp + '/' + str(dimension) + 'dim/' + traffic + '_' + injection_rate + 'inj_' + str(dimension) + 'dim_' + str(off) + 'off.log'
+
+                        if os.path.exists(rpfile):
+                            infile = open(rpfile)
+                            for l, line in enumerate(infile):
+                                if 'Packet latency average' in line and 'samples' in line:
+                                    line = line.split()
+                                    if latency == None:
+                                        rp_idx = j
+                                        latency = float(line[4])
+                                    elif latency > 1.25 * float(line[4]):
+                                        rp_idx = j
+                                        latency = float(line[4])
+                                    break
+                                #if 'Total Power:' in line:
+                                #    line = line.split()
+                                #    if power == None:
+                                #        rp_idx = j
+                                #        power = line[3]
+                                #    elif line[3] < power:
+                                #        rp_idx = j
+                                #        power = line[3]
+                                #    break
+                    scheme = rp_schemes[rp_idx]
+
                 filename = scheme + '/' + str(
                     dimension
                 ) + 'dim/' + traffic + '_' + injection_rate + 'inj_' + str(
                     dimension) + 'dim_' + str(off) + 'off.log'
 
-                infile = open(filename)
-                for l, line in enumerate(infile):
-                    if 'Packet latency average' in line and 'samples' in line:
-                        line = line.split()
-                        latencies[d][s][i] = line[4]
-                        break
+                if os.path.exists(filename):
+                    infile = open(filename)
+                    for l, line in enumerate(infile):
+                        if 'Packet latency average' in line and 'samples' in line:
+                            line = line.split()
+                            latencies[d][s][i] = line[4]
+                            if float(line[4]) > 300 and saturations[d][s] == 0:
+                                saturations[d][s] = float(injection_rate)
+                        if 'Total Power:' in line:
+                            line = line.split()
+                            powers[d][s][i] = line[3]
+                            break
+                else:
+                    latencies[d][s][i] = 1000
+
+    paper_inj_rates = []
+    paper_indices = []
+    for d, dimension in enumerate(dimensions):
+        paper_inj_rates.append([])
+        paper_indices.append([])
+        for s, scheme in enumerate(schemes):
+            saturation = int(math.ceil(saturations[d][s] * 100))
+            paper_inj_rates[d].append([])
+            paper_inj_rates[d][s].append("0.01")
+            for i in range(5, saturation - 3, 5):
+                paper_inj_rates[d][s].append("%.2f" % (float(i) / 100))
+            for i in range(saturation - 3, saturation + 1, 1):
+                paper_inj_rates[d][s].append("%.2f" % (float(i) / 100))
+            inj_rate_set = set(paper_inj_rates[d][s])
+            paper_indices[d].append([i for i, ele in enumerate(injection_rates) if ele in inj_rate_set])
 
     # figure generation
     plt.rc('font', size=14)
@@ -61,6 +123,13 @@ def main():
         '#27408b', '#c39d00', '#8b5742', '#000000', '#ee0000', '#cd3278',
         '#451900', '#66c2a4'
     ]
+    # matlab colors
+    colors = ['#b7312c', '#f2a900', '#48a23f', '#00a9e0', '#715091', '#636569',
+            '#0076a8', '#d78825', '#004b87']
+    colors = ['#b7312c', '#f2a900', '#48a23f', '#00a9e0', '#004b87', '#715091', '#636569',
+            '#0076a8', '#d78825']
+    markers = ['x', 'o', 'd', '^', 's', 'p', 'v', 'D', 'x']
+    linestyles = ['-', '-', '-', '-', '-']
 
     for d, dimension in enumerate(dimensions):
         figname = traffic + '_' + str(dimension) + 'dim_50off_throughput.pdf'
@@ -68,11 +137,15 @@ def main():
         ax = fig.gca()
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
-                injection_rates,
-                latencies[d][s, :],
+                #injection_rates,
+                #latencies[d][s, :],
+                paper_inj_rates[d][s],
+                latencies[d][s, paper_indices[d][s]],
                 marker=markers[s],
                 markersize=9,
+                markeredgewidth=2,
                 markeredgecolor=colors[s],
+                fillstyle='none',
                 color=colors[s],
                 linestyle=linestyles[s],
                 linewidth=2,
@@ -85,212 +158,76 @@ def main():
             hdls,
             lab,
             loc='upper center',
-            bbox_to_anchor=(0.5, 1.3),
-            ncol=4,
+            bbox_to_anchor=(0.5, 1.2),
+            ncol=5,
             frameon=False,
-            handletextpad=0.2,
-            columnspacing=0.8)
+            handletextpad=0.5,
+            columnspacing=1)
         ax.set_ylim(0, 300)
-        fig.subplots_adjust(top=0.8, bottom=0.2)
+        fig.subplots_adjust(top=0.85, bottom=0.2)
         pdf.plot_teardown(pdfpage, fig)
 
-    #figname = traffic + injection_rate_name[injection_rate] + 'latency.pdf'
-    #pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    #ax = fig.gca()
-    #for s, scheme in enumerate(paper_schemes):
-    #    ax.plot(
-    #        off_percentile,
-    #        paper_latency[s, :],
-    #        marker=markers[s],
-    #        markersize=9,
-    #        markeredgecolor=colors[s],
-    #        color=colors[s],
-    #        linestyle=linestyles[s],
-    #        linewidth=2,
-    #        label=scheme)
-    #ax.set_ylabel('Packet Latency (Cycles)')
-    ##ax.set_xlabel('Fraction of Power-Gated Cores (%)')
-    #xlab = 'Fraction of Power-Gated Cores (%), ' + injection_rate + ' flits/core/cycle'
-    #ax.set_xlabel(xlab)
-    #ax.yaxis.grid(True, linestyle='--', color='black')
-    #hdls, lab = ax.get_legend_handles_labels()
-    #ax.legend(
-    #    hdls,
-    #    lab,
-    #    loc='upper center',
-    #    bbox_to_anchor=(0.5, 1.3),
-    #    ncol=3,
-    #    frameon=False)
-    ##ax.legend(loc='upper center', ncol=4, frameon=False)
-    #if traffic == 'uniform':
-    #    ax.set_ylim(25, 45)
-    #else:
-    #    ax.set_ylim(10, 30)
-    #ax.set_xlim(0, 90)
-    #fig.subplots_adjust(top=0.8, bottom=0.2)
-    ##plt.tight_layout()
-    #pdf.plot_teardown(pdfpage, fig)
-
-    #figname = traffic + injection_rate_name[injection_rate] + 'dynamic_power.pdf'
-    #pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    #ax = fig.gca()
-    #for s, scheme in enumerate(paper_schemes):
-    #    ax.plot(
-    #        off_percentile,
-    #        paper_dynamic_power[s, :],
-    #        #router_dynamic_power[s, :],
-    #        marker=markers[s],
-    #        markersize=9,
-    #        markeredgecolor=colors[s],
-    #        color=colors[s],
-    #        linestyle=linestyles[s],
-    #        linewidth=2,
-    #        label=scheme)
-    #ax.set_ylabel('Dynamic Power (W)')
-    ##ax.set_xlabel('Fraction of Power-Gated Cores (%)')
-    #ax.set_xlabel(xlab)
-    #ax.yaxis.grid(True, linestyle='--', color='black')
-    #hdls, lab = ax.get_legend_handles_labels()
-    #ax.legend(
-    #    hdls,
-    #    lab,
-    #    loc='upper center',
-    #    bbox_to_anchor=(0.5, 1.3),
-    #    ncol=3,
-    #    frameon=False)
-    ##ax.legend(loc='upper center', ncol=4)
-    #ax.set_xlim(0, 90)
-    #if injection_rate == '0.02':
-    #    ax.set_ylim(0, 0.3)
-    #elif injection_rate == '0.08':
-    #    ax.set_ylim(0, 0.8)
-    #fig.subplots_adjust(top=0.8, bottom=0.2)
-    #pdf.plot_teardown(pdfpage, fig)
-
-    #figname = traffic + injection_rate_name[injection_rate] + 'total_power.pdf'
-    #pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    #ax = fig.gca()
-    #for s, scheme in enumerate(paper_schemes):
-    #    ax.plot(
-    #        off_percentile,
-    #        paper_total_power[s, :],
-    #        #router_total_power[s, :],
-    #        marker=markers[s],
-    #        markersize=9,
-    #        markeredgecolor=colors[s],
-    #        color=colors[s],
-    #        linestyle=linestyles[s],
-    #        linewidth=2,
-    #        label=scheme)
-    #ax.set_ylabel('Total Power (W)')
-    ##ax.set_xlabel('Fraction of Power-Gated Cores (%)')
-    #ax.set_xlabel(xlab)
-    #ax.yaxis.grid(True, linestyle='--', color='black')
-    #hdls, lab = ax.get_legend_handles_labels()
-    #ax.legend(
-    #    hdls,
-    #    lab,
-    #    loc='upper center',
-    #    bbox_to_anchor=(0.5, 1.3),
-    #    ncol=3,
-    #    frameon=False)
-    ##ax.legend(loc='upper center', ncol=4)
-    #ax.set_xlim(0, 90)
-    #if injection_rate == '0.02':
-    #    ax.set_ylim(0, 1)
-    #elif injection_rate == '0.08':
-    #    ax.set_ylim(0, 1.4)
-    #fig.subplots_adjust(top=0.8, bottom=0.2)
-    #pdf.plot_teardown(pdfpage, fig)
-
-    #figname = traffic + injection_rate_name[injection_rate] + 'static_power.pdf'
-    ##figname = injection_rate + 'static_power.pdf'
-    #pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    #ax = fig.gca()
-    #for s, scheme in enumerate(paper_schemes):
-    #    ax.plot(
-    #        off_percentile,
-    #        paper_static_power[s, :],
-    #        marker=markers[s],
-    #        markersize=9,
-    #        markeredgecolor=colors[s],
-    #        color=colors[s],
-    #        linestyle=linestyles[s],
-    #        linewidth=2,
-    #        label=scheme)
-    #ax.set_ylabel('Static Power (W)')
-    #ax.set_xlabel('Fraction of Power-Gated Cores (%), ' + injection_rate +
-    #              ' flits/cycle/core')
-    #ax.yaxis.grid(True, linestyle='--', color='black')
-    #hdls, lab = ax.get_legend_handles_labels()
-    #ax.legend(
-    #    hdls,
-    #    lab,
-    #    loc='upper center',
-    #    bbox_to_anchor=(0.5, 1.3),
-    #    ncol=3,
-    #    frameon=False)
-    #ax.set_xlim(0, 90)
-    #fig.subplots_adjust(top=0.8, bottom=0.2)
-    #pdf.plot_teardown(pdfpage, fig)
-
-    #group_names = []
-    #xticks = []
-    #for o, off in enumerate(off_percentile):
-    #    for s, scheme in enumerate(paper_schemes):
-    #        group_names.append(scheme)
-    #        xticks.append(o * (len(paper_schemes) + 1) + s)
-
-    #colors = ['#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#253494']
-    #colors = ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0']
-    #colors = ['#0570b0', '#000000', '#ffffff', '#fee0d2', '#f7fcf5']
-    #figname = traffic + injection_rate_name[injection_rate] + 'lat_breakdown.pdf'
-    #pdfpage, fig = pdf.plot_setup(figname, figsize=(12, 4), fontsize=14)
-    #ax = fig.gca()
-    #hdls = barchart.draw(
-    #    ax,
-    #    paper_latency_breakdown,
-    #    group_names=group_names,
-    #    entry_names=breakdown_comp,
-    #    breakdown=True,
-    #    xticks=xticks,
-    #    width=0.8,
-    #    colors=colors,
-    #    legendloc='upper center',
-    #    legendncol=5,
-    #    xticklabelfontsize=11,
-    #    xticklabelrotation=90)
-    #ax.set_ylabel('Latency (Cycles)')
-    #ax.set_xlabel(xlab)
-    #ax.xaxis.set_label_coords(0.5, -0.55)
-    #ax.yaxis.grid(True, linestyle='--')
-    #ax.legend(
-    #    hdls,
-    #    breakdown_comp,
-    #    loc='upper center',
-    #    bbox_to_anchor=(0.5, 1.2),
-    #    ncol=5,
-    #    frameon=False,
-    #    handletextpad=0.1,
-    #    columnspacing=0.5)
-    #fmt.resize_ax_box(ax, hratio=0.8)
-    #ly = len(off_percentile)
-    #scale = 1. / ly
-    #ypos = -.5
-    #pos = 0
-    #for pos in xrange(ly + 1):
-    #    lxpos = (pos + 0.5) * scale
-    #    if pos < ly:
-    #        ax.text(
-    #            lxpos,
-    #            ypos,
-    #            off_percentile[pos],
-    #            ha='center',
-    #            transform=ax.transAxes)
-    #        add_line(ax, pos * scale, ypos)
-    #add_line(ax, 1, ypos)
-    #fig.subplots_adjust(bottom=0.38)
-    #pdf.plot_teardown(pdfpage, fig)
+    for d, dimension in enumerate(dimensions):
+        figname = traffic + '_' + str(dimension) + 'dim_50off_power.pdf'
+        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
+        ax = fig.gca()
+        axins = zoomed_inset_axes(ax, 2, loc=4) # zoom-factor: 2.5, location: lower-right
+        for s, scheme in enumerate(paper_schemes):
+            ax.plot(
+                #injection_rates,
+                #powers[d][s, :],
+                paper_inj_rates[d][s],
+                powers[d][s, paper_indices[d][s]],
+                marker=markers[s],
+                markersize=9,
+                markeredgewidth=2,
+                markeredgecolor=colors[s],
+                fillstyle='none',
+                color=colors[s],
+                linestyle=linestyles[s],
+                linewidth=2,
+                label=scheme)
+            axins.plot(
+                #injection_rates,
+                #powers[d][s, :],
+                paper_inj_rates[d][s],
+                powers[d][s, paper_indices[d][s]],
+                marker=markers[s],
+                markersize=9,
+                markeredgewidth=2,
+                markeredgecolor=colors[s],
+                fillstyle='none',
+                color=colors[s],
+                linestyle=linestyles[s],
+                linewidth=2,
+                label=scheme)
+        ax.set_ylabel('NoC Power (Watts)')
+        ax.set_xlabel('injection rate (flits/cycle/core)')
+        ax.yaxis.grid(True, linestyle='--', color='black')
+        hdls, lab = ax.get_legend_handles_labels()
+        ax.legend(
+            hdls,
+            lab,
+            loc='upper center',
+            bbox_to_anchor=(0.5, 1.2),
+            ncol=5,
+            frameon=False,
+            handletextpad=0.5,
+            columnspacing=1)
+        if dimension == 6:
+            x1, x2, y1, y2 = 0, 0.15, 0.2, 0.8 # specify the limits
+        elif dimension == 8:
+            x1, x2, y1, y2 = 0, 0.15, 0.3, 1.5 # specify the limits
+        axins.set_xlim(x1, x2) # apply the x-limits
+        axins.set_ylim(y1, y2) # apply the y-limits
+        axins.yaxis.grid(True, linestyle='--', color='black')
+        axins.xaxis.set_ticklabels([])
+        axins.yaxis.set_ticklabels([])
+        axins.xaxis.set_ticks_position('none')
+        axins.yaxis.set_ticks_position('none')
+        mark_inset(ax, axins, loc1=2, loc2=3, fc="none", lw=1)
+        fig.subplots_adjust(top=0.85, bottom=0.2)
+        pdf.plot_teardown(pdfpage, fig)
 
     #plt.show()
 
