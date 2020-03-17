@@ -2282,9 +2282,20 @@ void IQRouter::Display( ostream & os ) const
 {
   for ( int input = 0; input < _inputs; ++input ) {
     _buf[input]->Display( os );
-    _next_buf[input]->Display( os );
+  }
+  for (int output = 0; output < _outputs; ++output) {
+    _next_buf[output]->Display(os);
   }
 }
+
+/* ==== Power Gate - Begin ==== */
+int IQRouter::GetFreeCredit(int o) const
+{
+  assert((o >= 0) && (o < _outputs));
+  BufferState const * const dest_buf = _next_buf[o];
+  return dest_buf->Size() - dest_buf->Occupancy();
+}
+/* ==== Power Gate - End ==== */
 
 int IQRouter::GetUsedCredit(int o) const
 {

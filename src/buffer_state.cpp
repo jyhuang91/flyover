@@ -603,6 +603,9 @@ BufferState::BufferState( const Configuration& config, Module *parent, const str
 {
   _vcs = config.GetInt( "num_vcs" );
   _size = config.GetInt("buf_size");
+  /* ==== Power Gate - Begin ==== */
+  _full_vc_buf_size = config.GetInt("vc_buf_size");
+  /* ==== Power Gate - End ==== */
   if(_size < 0) {
     _size = _vcs * config.GetInt("vc_buf_size");
   }
@@ -745,8 +748,8 @@ void BufferState::ClearCredits()
   _occupancy += _size;
   for (int vc = 0; vc < _vcs; ++vc) {
     _vc_occupancy[vc] += _size / _vcs;
-    _in_use_by[vc] = -1;
-    _tail_sent[vc] = false;
+    _in_use_by[vc] = _vcs * 4; // intentional to support wait_for_tail_credit
+    _tail_sent[vc] = true;
   }
 }
 
@@ -771,23 +774,34 @@ void BufferState::FillCredits()
 }
 
 void BufferState::ResetVCBufferSize() {
+  _size = _vcs * _full_vc_buf_size;
   _buffer_policy->ResetVCBufferSize();
 }
 
 void BufferState::SetVCBufferSize(int vc_buf_size)
 {
+  if (_size != _vcs * _full_vc_buf_size) {
+    assert(_size == _vcs * vc_buf_size);
+  } else {
+    _size = _vcs * vc_buf_size;
+  }
   _buffer_policy->SetVCBufferSize(vc_buf_size);
 }
 /* ==== Power Gate - End ==== */
 
 void BufferState::Display( ostream & os ) const
 {
-  os << FullName() << " :" << endl;
-  os << " occupied = " << _occupancy << endl;
-  for ( int v = 0; v < _vcs; ++v ) {
-    os << "  VC " << v << ": ";
-    os << "in_use_by = " << _in_use_by[v]
-      << ", tail_sent = " << _tail_sent[v]
-      << ", occupied = " << _vc_occupancy[v] << endl;
+  if (_occupancy) {
+    os << FullName() << " :" << endl;
+    os << " occupied = " << _occupancy;
+    os << ", size = " << _size << endl;
+    for ( int v = 0; v < _vcs; ++v ) {
+      if (_vc_occupancy[v]) {
+        os << "  VC " << v << ": ";
+        os << "in_use_by = " << _in_use_by[v]
+          << ", tail_sent = " << _tail_sent[v]
+          << ", occupied = " << _vc_occupancy[v] << endl;
+      }
+    }
   }
 }

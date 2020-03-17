@@ -34,7 +34,7 @@
 class Handshake;
 /* ==== Power Gate - End ==== */
 
-class NordRouter : public IQRouter {
+class NoRDRouter : public IQRouter {
 
 protected:
 
@@ -49,7 +49,9 @@ protected:
 
   vector<vector<int> > _credit_counter;
   int _pending_credits;
+  vector<int> _outstanding_bypass_packets;
 
+  bool _ReceiveFlits();
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */
 
@@ -65,20 +67,21 @@ protected:
   virtual void _OutputQueuing( );
 
   /* ==== Power Gate - Begin ==== */
+  void _SendFlits();
   void _SendHandshakes( );
 
-  void _NordStep( );  // fly-over operations
+  void _NoRDStep( );  // fly-over operations
   void _HandshakeEvaluate();
   void _HandshakeResponse();
   /* ==== Power Gate - End ==== */
 
 public:
 
-  NordRouter( Configuration const & config,
+  NoRDRouter( Configuration const & config,
           Module *parent, string const & name, int id,
           int inputs, int outputs );
 
-  virtual ~NordRouter( );
+  virtual ~NoRDRouter( );
 
   /* ==== Power Gate - Begin ==== */
   virtual void PowerStateEvaluate( );

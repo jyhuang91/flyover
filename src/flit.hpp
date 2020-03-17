@@ -75,6 +75,8 @@ public:
 
   /* ==== Power Gate - Begin ==== */
   int flov_hops;
+  int misroute_hops;
+  int ring_dest;
   /* ==== Power Gate - End ==== */
   int  hops;
   bool watch;

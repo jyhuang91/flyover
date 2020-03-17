@@ -4,43 +4,54 @@ traffic=uniform
 powergate_auto_config=1
 off_percentile=50
 
-for dim in 6 #6 8 10
+for dim in 8 10
 do
-  #for inj in 0.01 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.5 0.6
-  for inj in `seq -w 0.01 0.01 0.60`
+  for inj in `seq -w 0.01 0.01 0.90`
   do
-    for scheme in flov #baseline rpa rpc nord flov opt_flov #rflov gflov opt_rflov opt_gflov
+    condition=`echo "$inj > 0.75" | bc -l`
+    if [ $dim -gt 6 ] && [ $condition -eq 1 ]; then
+      break
+    fi
+    for scheme in baseline rpa rpc norp nord flov opt_flov
     do
       powergate_type=$scheme
-      #if [ $scheme = "rflov" ] || [ $scheme = "opt_rflov" ]; then
-      #  powergate_type="rflov"
-      #elif [ $scheme = "gflov" ] || [ $scheme = "opt_gflov" ]; then
-      #  powergate_type="flov"
+      mkdir -p ../results/throughput/${scheme}/${dim}dim
+      drain_threshold=20
       if [ $scheme = "flov" ] || [ $scheme = "opt_flov" ]; then
         powergate_type="flov"
-      elif [ $scheme = "baseline" ]; then
+        drain_threshold=200
+      elif [ $scheme = "baseline" ] || [ $scheme = "norp" ]; then
         powergate_type="no_pg"
       fi
+      wait_for_tail_credit=1
+      if [ $scheme = "rpa" ] || [ $scheme = "rpc" ] || [ $scheme = "norp" ]; then
+        wait_for_tail_credit=0
+      else
+        wait_for_tail_credit=1
+      fi
       count=`ps aux | grep booksim | wc -l`
-      while [ $count -eq 26 ]; do
+      while [ $count -ge 26 ]; do
         count=`ps aux | grep booksim | wc -l`
       done
       logfile=../results/throughput/${scheme}/${dim}dim/${traffic}_${inj}inj_${dim}dim_${off_percentile}off.log
-      mkdir -p ../results/throughput/${scheme}/${dim}dim
-        #wait_for_tail_credit=1 \
       ../src/booksim \
         ../runfiles/${scheme}/meshcmp_${off_percentile}off.cfg \
+        k=${dim} injection_rate=${inj} \
+        powergate_type=${powergate_type} \
         converged_threshold=-1 \
         powergate_auto_config=1 \
         traffic=${traffic} \
         powergate_percentile=${off_percentile} \
-        powergate_type=${powergate_type} \
+        priority=age \
         vc_buf_size=5 \
         packet_size=5 \
-        priority=age \
         hold_switch_for_packet=1 \
         routing_deadlock_timeout_threshold=512 \
-        k=${dim} injection_rate=${inj} > ${logfile} &
+        idle_threshold=20 \
+        drain_threshold=${drain_threshold} \
+        nord_power_centric_wakeup_threshold=1 \
+        wait_for_tail_credit=${wait_for_tail_credit} \
+        flov_monitor_epoch=1000 > ${logfile} 2>&1 &
     done
   done
 done

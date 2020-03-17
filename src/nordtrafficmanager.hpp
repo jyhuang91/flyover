@@ -34,7 +34,7 @@
 #include "trafficmanager.hpp"
 #include "buffer.hpp"
 
-class NordTrafficManager : public TrafficManager {
+class NoRDTrafficManager : public TrafficManager {
 
 private:
 
@@ -50,6 +50,7 @@ private:
   int _wakeup_monitor_epoch;
   vector<int> _wakeup_monitor_vc_requests;
   vector<bool> _performance_centric_routers;
+  set<int> _routers_to_watch_power_gating;
   // ============ Internal methods ============
 protected:
 
@@ -62,8 +63,8 @@ protected:
 
 public:
 
-  NordTrafficManager( const Configuration &config, const vector<Network *> & net );
-  virtual ~NordTrafficManager( );
+  NoRDTrafficManager( const Configuration &config, const vector<Network *> & net );
+  virtual ~NoRDTrafficManager( );
 
 };
 

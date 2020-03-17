@@ -165,6 +165,9 @@ public:
   
   void Display( ostream & os = cout ) const;
 
+  /* ==== Power Gate - Begin ==== */
+  virtual int GetFreeCredit(int o) const;
+  /* ==== Power Gate - End ==== */
   virtual int GetUsedCredit(int o) const;
   virtual int GetBufferOccupancy(int i) const;
 
