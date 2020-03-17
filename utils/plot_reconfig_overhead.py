@@ -9,7 +9,7 @@ from easypyplot import format as fmt
 
 def main():
 
-    schemes = ['RP', 'gFLOV']
+    schemes = ['RP', 'FLOV']
     latencies = []
 
     filename = '../results/reconfig/latency.txt'
@@ -30,8 +30,9 @@ def main():
     plt.rc('font', size=14)
     plt.rc('font', weight='bold')
     plt.rc('legend', fontsize=14)
-    colors = ['#8b5742', '#ee0000']
-    linestyles = ['-', '--']
+    colors = ['#f2a900', '#00a9e0']
+    linestyles = ['-', '-']
+    markers = ['o', '^']
 
     figname = 'reconfig_overhead.pdf'
     pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
@@ -40,6 +41,11 @@ def main():
         ax.plot(
             cycles,
             latencies[s],
+            marker=markers[s],
+            markersize=9,
+            markeredgewidth=2,
+            markeredgecolor=colors[s],
+            fillstyle='none',
             color=colors[s],
             linestyle=linestyles[s],
             linewidth=2,

@@ -25,9 +25,11 @@ def main():
     injection_rate_name = {'0.02': '002', '0.08': '008'}
 
     schemes = [
+        #'baseline', 'rpa', 'rpc', 'rflov', 'flov', 'opt_rflov', 'opt_flov'
         'baseline', 'rpa', 'rpc', 'flov', 'opt_flov'
     ]
     paper_schemes = [
+        #'Baseline', 'RP', 'rFLOV', 'gFLOV', 'rFLOVopt', 'gFLOVopt'
         'Baseline', 'RP', 'FLOV', 'FLOV+'
     ]
     off_percentile = [10, 20, 30, 40, 50, 60, 70, 80]
@@ -222,6 +224,138 @@ def main():
     #plt.tight_layout()
     pdf.plot_teardown(pdfpage, fig)
 
+    group_names = []
+    xticks = []
+    for o, off in enumerate(off_percentile):
+        for s, scheme in enumerate(paper_schemes):
+            group_names.append(scheme)
+            xticks.append(o * (len(paper_schemes) + 1) + s)
+
+    # normalized power breakdown
+    colors = ['#a63603','#fee6ce']
+    figname = traffic + injection_rate_name[injection_rate] + 'power_breakdown.pdf'
+    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
+    ax = fig.gca()
+    hdls = barchart.draw(
+        ax,
+        paper_power_breakdown,
+        group_names=group_names,
+        entry_names=power_breakdown_comp,
+        breakdown=True,
+        xticks=xticks,
+        width=0.8,
+        colors=colors,
+        legendloc='upper center',
+        legendncol=5,
+        xticklabelfontsize=11,
+        xticklabelrotation=90)
+    ax.set_ylabel('Power (Watts)')
+    ax.set_xlabel(xlab)
+    ax.xaxis.set_label_coords(0.5, -0.55)
+    ax.yaxis.grid(True, linestyle='--')
+    fmt.resize_ax_box(ax, hratio=0.8)
+    ly = len(off_percentile)
+    scale = 1. / ly
+    ypos = -.5
+    pos = 0
+    for pos in xrange(ly + 1):
+        lxpos = (pos + 0.5) * scale
+        if pos < ly:
+            ax.text(
+                lxpos,
+                ypos,
+                off_percentile[pos],
+                ha='center',
+                transform=ax.transAxes)
+            add_line(ax, pos * scale, ypos)
+    add_line(ax, 1, ypos)
+    # add static power at secondary axis
+    ax2 = ax.twinx()  # ax for allreduce speedup
+    xs = []
+    p = 0.0
+    for g in range(len(off_percentile)):
+        xs.append([])
+        for pos in range(len(paper_schemes)):
+            xs[g].append(p)
+            p = p + 1
+        p = p + 1
+    data = [list(i) for i in zip(*paper_static_power)]
+    data = np.array(data, dtype=np.float64)
+    ax2.set_ylabel('Static Power (Watts)')
+    ax2.set_ylim(0, 0.6)
+    for i in range(len(off_percentile)):
+        tmp = ax2.plot(xs[i],
+                data[i],
+                '-o',
+                markersize=6,
+                color='#004b87',
+                markeredgecolor='#004b87')
+        if i == 0:
+            hdls += tmp
+    ax.legend(
+        hdls,
+        power_breakdown_comp + ['static power'],
+        loc='upper center',
+        bbox_to_anchor=(0.5, 1.2),
+        ncol=len(power_breakdown_comp) + 1,
+        frameon=False,
+        handletextpad=1,
+        columnspacing=2)
+    fig.subplots_adjust(bottom=0.38)
+    pdf.plot_teardown(pdfpage, fig)
+
+    # latency breakdown
+    colors = ['#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#253494']
+    colors = ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0']
+    colors = ['#0570b0', '#000000', '#ffffff', '#fee0d2', '#f7fcf5']
+    figname = traffic + injection_rate_name[injection_rate] + 'lat_breakdown.pdf'
+    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
+    ax = fig.gca()
+    hdls = barchart.draw(
+        ax,
+        paper_latency_breakdown,
+        group_names=group_names,
+        entry_names=breakdown_comp,
+        breakdown=True,
+        xticks=xticks,
+        width=0.8,
+        colors=colors,
+        legendloc='upper center',
+        legendncol=5,
+        xticklabelfontsize=11,
+        xticklabelrotation=90)
+    ax.set_ylabel('Latency (Cycles)')
+    ax.set_xlabel(xlab)
+    ax.xaxis.set_label_coords(0.5, -0.55)
+    ax.yaxis.grid(True, linestyle='--')
+    ax.legend(
+        hdls,
+        breakdown_comp,
+        loc='upper center',
+        bbox_to_anchor=(0.5, 1.2),
+        ncol=5,
+        frameon=False,
+        handletextpad=0.1,
+        columnspacing=0.5)
+    fmt.resize_ax_box(ax, hratio=0.8)
+    ly = len(off_percentile)
+    scale = 1. / ly
+    ypos = -.5
+    pos = 0
+    for pos in xrange(ly + 1):
+        lxpos = (pos + 0.5) * scale
+        if pos < ly:
+            ax.text(
+                lxpos,
+                ypos,
+                off_percentile[pos],
+                ha='center',
+                transform=ax.transAxes)
+            add_line(ax, pos * scale, ypos)
+    add_line(ax, 1, ypos)
+    fig.subplots_adjust(bottom=0.38)
+    pdf.plot_teardown(pdfpage, fig)
+
     '''
     figname = traffic + injection_rate_name[injection_rate] + 'dynamic_power.pdf'
     pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
@@ -331,118 +465,9 @@ def main():
     ax.set_xlim(0, 90)
     fig.subplots_adjust(top=0.8, bottom=0.2)
     pdf.plot_teardown(pdfpage, fig)
-
-    group_names = []
-    xticks = []
-    for o, off in enumerate(off_percentile):
-        for s, scheme in enumerate(paper_schemes):
-            group_names.append(scheme)
-            xticks.append(o * (len(paper_schemes) + 1) + s)
     '''
 
-    # normalized power breakdown
-    colors = ['#a63603','#fee6ce']
-    figname = traffic + injection_rate_name[injection_rate] + 'power_breakdown.pdf'
-    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    ax = fig.gca()
-    hdls = barchart.draw(
-        ax,
-        paper_power_breakdown,
-        group_names=group_names,
-        entry_names=power_breakdown_comp,
-        breakdown=True,
-        xticks=xticks,
-        width=0.8,
-        colors=colors,
-        legendloc='upper center',
-        legendncol=5,
-        xticklabelfontsize=11,
-        xticklabelrotation=90)
-    ax.set_ylabel('Power (Watts)')
-    ax.set_xlabel(xlab)
-    ax.xaxis.set_label_coords(0.5, -0.55)
-    ax.yaxis.grid(True, linestyle='--')
-    ax.legend(
-        hdls,
-        power_breakdown_comp,
-        loc='upper center',
-        bbox_to_anchor=(0.5, 1.2),
-        ncol=5,
-        frameon=False,
-        handletextpad=1,
-        columnspacing=2)
-    fmt.resize_ax_box(ax, hratio=0.8)
-    ly = len(off_percentile)
-    scale = 1. / ly
-    ypos = -.5
-    pos = 0
-    for pos in xrange(ly + 1):
-        lxpos = (pos + 0.5) * scale
-        if pos < ly:
-            ax.text(
-                lxpos,
-                ypos,
-                off_percentile[pos],
-                ha='center',
-                transform=ax.transAxes)
-            add_line(ax, pos * scale, ypos)
-    add_line(ax, 1, ypos)
-    fig.subplots_adjust(bottom=0.38)
-    pdf.plot_teardown(pdfpage, fig)
-
-    # latency breakdown
-    colors = ['#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#253494']
-    colors = ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0']
-    colors = ['#0570b0', '#000000', '#ffffff', '#fee0d2', '#f7fcf5']
-    figname = traffic + injection_rate_name[injection_rate] + 'lat_breakdown.pdf'
-    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    ax = fig.gca()
-    hdls = barchart.draw(
-        ax,
-        paper_latency_breakdown,
-        group_names=group_names,
-        entry_names=breakdown_comp,
-        breakdown=True,
-        xticks=xticks,
-        width=0.8,
-        colors=colors,
-        legendloc='upper center',
-        legendncol=5,
-        xticklabelfontsize=11,
-        xticklabelrotation=90)
-    ax.set_ylabel('Latency (Cycles)')
-    ax.set_xlabel(xlab)
-    ax.xaxis.set_label_coords(0.5, -0.55)
-    ax.yaxis.grid(True, linestyle='--')
-    ax.legend(
-        hdls,
-        breakdown_comp,
-        loc='upper center',
-        bbox_to_anchor=(0.5, 1.2),
-        ncol=5,
-        frameon=False,
-        handletextpad=0.1,
-        columnspacing=0.5)
-    fmt.resize_ax_box(ax, hratio=0.8)
-    ly = len(off_percentile)
-    scale = 1. / ly
-    ypos = -.5
-    pos = 0
-    for pos in xrange(ly + 1):
-        lxpos = (pos + 0.5) * scale
-        if pos < ly:
-            ax.text(
-                lxpos,
-                ypos,
-                off_percentile[pos],
-                ha='center',
-                transform=ax.transAxes)
-            add_line(ax, pos * scale, ypos)
-    add_line(ax, 1, ypos)
-    fig.subplots_adjust(bottom=0.38)
-    pdf.plot_teardown(pdfpage, fig)
-
-    plt.show()
+    #plt.show()
 
 
 if __name__ == '__main__':

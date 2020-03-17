@@ -84,15 +84,15 @@ def main():
                     for l, line in enumerate(infile):
                         if 'Packet latency average' in line and 'samples' in line:
                             line = line.split()
-                            latencies[d][s][i] = line[4]
+                            latencies[d][s][i] = float(line[4])
                             if float(line[4]) > 300 and saturations[d][s] == 0:
                                 saturations[d][s] = float(injection_rate)
                         if 'Total Power:' in line:
                             line = line.split()
-                            powers[d][s][i] = line[3]
+                            powers[d][s][i] = float(line[3])
                             break
                 else:
-                    latencies[d][s][i] = 1000
+                    latencies[d][s][i] = float(1000)
 
     paper_inj_rates = []
     paper_indices = []
@@ -109,6 +109,7 @@ def main():
                 paper_inj_rates[d][s].append("%.2f" % (float(i) / 100))
             inj_rate_set = set(paper_inj_rates[d][s])
             paper_indices[d].append([i for i, ele in enumerate(injection_rates) if ele in inj_rate_set])
+            paper_inj_rates[d][s] = [float(rate) for i, rate in enumerate(paper_inj_rates[d][s])]
 
     # figure generation
     plt.rc('font', size=14)
