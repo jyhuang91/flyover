@@ -60,7 +60,7 @@ BooksimNetwork::BooksimNetwork(const Params *p)
     _net.push_back(nullptr);
     _net[0] = BSNetwork::New(*_booksim_config, name.str());
 
-    _manager = new Gem5TrafficManager( *_booksim_config, _net, m_virtual_networks);
+    _manager = Gem5TrafficManager::New( *_booksim_config, _net, m_virtual_networks);
     trafficManager = _manager;
 
     _next_report_time = 100000;
@@ -81,6 +81,7 @@ BooksimNetwork::~BooksimNetwork()
     // delete manager
     delete _net[0];
     delete _booksim_config;
+    delete _manager;
 }
 
 void BooksimNetwork::checkNetworkAllocation(NodeID id, bool ordered,
@@ -368,8 +369,8 @@ BooksimNetwork::regActivityStats()
         ;
 
     for (int i = 0; i < _net[0]->NumRouters(); i++) {
-    	_router_buffer_reads.subname(i, csprintf("router-%i", i));
-    	_router_buffer_writes.subname(i, csprintf("router-%i", i));
+        _router_buffer_reads.subname(i, csprintf("router-%i", i));
+        _router_buffer_writes.subname(i, csprintf("router-%i", i));
     }
 
     _inject_link_activity
@@ -385,8 +386,8 @@ BooksimNetwork::regActivityStats()
         ;
 
     for (int i = 0; i < m_nodes; i++) {
-    	_inject_link_activity.subname(i, csprintf("inject-link-%i", i));
-    	_eject_link_activity.subname(i, csprintf("eject-link-%i", i));
+        _inject_link_activity.subname(i, csprintf("inject-link-%i", i));
+        _eject_link_activity.subname(i, csprintf("eject-link-%i", i));
     }
 
     _int_link_activity
@@ -396,7 +397,7 @@ BooksimNetwork::regActivityStats()
         ;
 
     for (int i = 0; i < _net[0]->NumChannels(); i++) {
-    	_int_link_activity.subname(i, csprintf("internal-link-%i", i));
+        _int_link_activity.subname(i, csprintf("internal-link-%i", i));
     }
 }
 
@@ -425,35 +426,35 @@ BooksimNetwork::collateStats()
     //RubySystem *rs = params()->ruby_system;
     //double time_delta = double(curCycle() - g_ruby_start);
 
-	vector<Router *> routers = _net[0]->GetRouters();
-	for (size_t r = 0; r < routers.size(); r++) {
-		IQRouter * temp = dynamic_cast<IQRouter*>(routers[r]);
-		_router_buffer_reads[r] = temp->GetBufferReads();
-		_router_buffer_writes[r] = temp->GetBufferWrites();
-	}
+    vector<Router *> routers = _net[0]->GetRouters();
+    for (size_t r = 0; r < routers.size(); r++) {
+        IQRouter * temp = dynamic_cast<IQRouter*>(routers[r]);
+        _router_buffer_reads[r] = temp->GetBufferReads();
+        _router_buffer_writes[r] = temp->GetBufferWrites();
+    }
 
-	vector<FlitChannel *> inject = _net[0]->GetInject();
-	vector<FlitChannel *> eject = _net[0]->GetEject();
-	vector<FlitChannel *> chan = _net[0]->GetChannels();
+    vector<FlitChannel *> inject = _net[0]->GetInject();
+    vector<FlitChannel *> eject = _net[0]->GetEject();
+    vector<FlitChannel *> chan = _net[0]->GetChannels();
 
-	for (int i = 0; i < m_nodes; i++) {
-		const vector<uint64_t> ai = inject[i]->GetActivity();
-		for (int j = 0; j < ai.size(); j++) {
-			_inject_link_activity[i] += ai[j];
-		}
+    for (int i = 0; i < m_nodes; i++) {
+        const vector<uint64_t> ai = inject[i]->GetActivity();
+        for (int j = 0; j < ai.size(); j++) {
+            _inject_link_activity[i] += ai[j];
+        }
 
-		const vector<uint64_t> ae = eject[i]->GetActivity();
-		for (int j = 0; j < ae.size(); j++) {
-			_eject_link_activity[i] += ae[j];
-		}
-	}
+        const vector<uint64_t> ae = eject[i]->GetActivity();
+        for (int j = 0; j < ae.size(); j++) {
+            _eject_link_activity[i] += ae[j];
+        }
+    }
 
-	for (int i = 0; i < _net[0]->NumChannels(); i++) {
-		const vector<uint64_t> ac = chan[i]->GetActivity();
-		for (int j = 0; j < ac.size(); j++) {
-			_int_link_activity[i] += ac[j];
-		}
-	}
+    for (int i = 0; i < _net[0]->NumChannels(); i++) {
+        const vector<uint64_t> ac = chan[i]->GetActivity();
+        for (int j = 0; j < ac.size(); j++) {
+            _int_link_activity[i] += ac[j];
+        }
+    }
 }
 
 void

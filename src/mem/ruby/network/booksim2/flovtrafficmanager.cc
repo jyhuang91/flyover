@@ -7,7 +7,7 @@
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
 
-  Redistributions of source code must retain the above copyright notice, this 
+  Redistributions of source code must retain the above copyright notice, this
   list of conditions and the following disclaimer.
   Redistributions in binary form must reproduce the above copyright notice, this
   list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -44,7 +44,7 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
     : TrafficManager(config, net)
 {
 
-    // ============ Traffic ============ 
+    // ============ Traffic ============
 
     string packet_size_str = config.GetStr("packet_size");
     if(packet_size_str.empty()) {
@@ -83,10 +83,10 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
             _packet_size_max_val.push_back(max_val);
         }
     }
-  
+
     for(int c = 0; c < _classes; ++c) {
         if(_use_read_write[c]) {
-            _packet_size[c] = 
+            _packet_size[c] =
                 vector<int>(1, (_read_request_size[c] + _read_reply_size[c] +
                                 _write_request_size[c] + _write_reply_size[c]) / 2);
             _packet_size_rate[c] = vector<int>(1, 1);
@@ -94,8 +94,8 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
         }
     }
 
-    // ============ Statistics ============ 
-    
+    // ============ Statistics ============
+
     /* ==== Power Gate - Begin ==== */
     _flov_hop_stats.resize(_classes);
     _overall_flov_hop_stats.resize(_classes, 0.0);
@@ -108,7 +108,7 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
         _stats[tmp_name.str()] = _hop_stats[c];
         tmp_name.str("");
     }
-    
+
     _router_idle_periods.resize(_nodes, 0);
     _idle_cycles.resize(_nodes);
     _overall_idle_cycles.resize(_nodes);
@@ -117,6 +117,25 @@ FLOVTrafficManager::FLOVTrafficManager( const Configuration &config,
       _overall_idle_cycles[n].resize(32000, 0);
     }
     _wakeup_handshake_latency.resize(_nodes, false);
+
+    _monitor_counter = 0;
+    _monitor_epoch = config.GetInt("flov_monitor_epoch");
+    double high_watermark = config.GetFloat("high_watermark");
+    double low_watermark = config.GetFloat("low_watermark");
+    double zeroload_latency = config.GetFloat("zeroload_latency");
+    _plat_high_watermark = zeroload_latency * high_watermark;
+    _plat_low_watermark = zeroload_latency * low_watermark;
+
+    _powergate_type = config.GetStr("powergate_type");
+    _power_state_votes.resize(_nodes, 0);
+    _per_node_plat.resize(_nodes);
+    for (int n = 0; n < _nodes; ++n) {
+      ostringstream tmp_name;
+
+      tmp_name << "per_node_plat_stat_" << n;
+      _per_node_plat[n] = new BooksimStats(this, tmp_name.str(), 1.0, 1000);
+      tmp_name.str("");
+    }
     /* ==== Power Gate - End ==== */
 }
 
@@ -136,18 +155,18 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
 
     assert(_total_in_flight_flits[f->cl].count(f->id) > 0);
     _total_in_flight_flits[f->cl].erase(f->id);
-  
+
     if(f->record) {
         assert(_measured_in_flight_flits[f->cl].count(f->id) > 0);
         _measured_in_flight_flits[f->cl].erase(f->id);
     }
 
-    if ( f->watch ) { 
+    if ( f->watch ) {
         *gWatchOut << GetSimTime() << " | "
                    << "node" << dest << " | "
-                   << "Retiring flit " << f->id 
+                   << "Retiring flit " << f->id
                    << " (packet " << f->pid
-                   << ", src = " << f->src 
+                   << ", src = " << f->src
                    << ", dest = " << f->dest
                    << ", hops = " << f->hops
                    /* ==== Power Gate - Begin ==== */
@@ -162,7 +181,7 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
         err << "Flit " << f->id << " arrived at incorrect output " << dest;
         Error( err.str( ) );
     }
-  
+
     if((_slowest_flit[f->cl] < 0) ||
        (_flat_stats[f->cl]->Max() < (f->atime - f->itime)))
         _slowest_flit[f->cl] = f->id;
@@ -170,7 +189,7 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
     if(_pair_stats){
         _pair_flat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - f->itime );
     }
-      
+
     if ( f->tail ) {
         Flit * head;
         if(f->head) {
@@ -183,14 +202,14 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
             assert(head->head);
             assert(f->pid == head->pid);
         }
-        if ( f->watch ) { 
+        if ( f->watch ) {
             *gWatchOut << GetSimTime() << " | "
                        << "node" << dest << " | "
-                       << "Retiring packet " << f->pid 
+                       << "Retiring packet " << f->pid
                        << " (plat = " << f->atime - head->ctime
                        << ", nlat = " << f->atime - head->itime
                        << ", frag = " << (f->atime - head->atime) - (f->id - head->id) // NB: In the spirit of solving problems using ugly hacks, we compute the packet length by taking advantage of the fact that the IDs of flits within a packet are contiguous.
-                       << ", src = " << head->src 
+                       << ", src = " << head->src
                        << ", dest = " << head->dest
                        << ")." << endl;
         }
@@ -209,16 +228,17 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
             } else if(f->type == Flit::ANY_TYPE) {
                 _requestsOutstanding[f->src]--;
             }
-      
+
         }
 
         // Only record statistics once per packet (at tail)
         // and based on the simulation state
         if ( ( _sim_state == warming_up ) || f->record ) {
-      
+
             _hop_stats[f->cl]->AddSample( f->hops );
             /* ==== Power Gate - Begin ==== */
             _flov_hop_stats[f->cl]->AddSample(f->flov_hops);
+            _per_node_plat[dest]->AddSample(f->atime - head->ctime);
             /* ==== Power Gate - End ==== */
 
             if((_slowest_packet[f->cl] < 0) ||
@@ -227,19 +247,19 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
             _plat_stats[f->cl]->AddSample( f->atime - head->ctime);
             _nlat_stats[f->cl]->AddSample( f->atime - head->itime);
             _frag_stats[f->cl]->AddSample( (f->atime - head->atime) - (f->id - head->id) );
-   
+
             if(_pair_stats){
                 _pair_plat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->ctime );
                 _pair_nlat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->itime );
             }
         }
-    
+
         if(f != head) {
             head->Free();
         }
-    
+
     }
-  
+
     if(f->head && !f->tail) {
         _retired_packets[f->cl].insert(make_pair(f->pid, f));
     } else {
@@ -248,7 +268,7 @@ void FLOVTrafficManager::_RetireFlit( Flit *f, int dest )
 }
 
 
-void FLOVTrafficManager::_GeneratePacket( int source, int stype, 
+void FLOVTrafficManager::_GeneratePacket( int source, int stype,
                                       int cl, uint64_t time )
 {
     assert(stype!=0);
@@ -259,7 +279,7 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
     /* ==== Power Gate - End ==== */
 
     Flit::FlitType packet_type = Flit::ANY_TYPE;
-    int size = _GetNextPacketSize(cl); //input size 
+    int size = _GetNextPacketSize(cl); //input size
     int pid = _cur_pid++;
     assert(_cur_pid);
     int packet_destination = _traffic_pattern[cl]->dest(source);
@@ -324,18 +344,18 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         record = _measure_stats[cl];
     }
 
-    int subnetwork = ((packet_type == Flit::ANY_TYPE) ? 
+    int subnetwork = ((packet_type == Flit::ANY_TYPE) ?
                       RandomInt(_subnets-1) :
                       _subnet[packet_type]);
-  
-    if ( watch ) { 
+
+    if ( watch ) {
         *gWatchOut << GetSimTime() << " | "
                    << "node" << source << " | "
                    << "Enqueuing packet " << pid
                    << " at time " << time
                    << "." << endl;
     }
-  
+
     for ( int i = 0; i < size; ++i ) {
         Flit * f  = Flit::New();
         f->id     = _cur_id++;
@@ -352,7 +372,7 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         if(record) {
             _measured_in_flight_flits[f->cl].insert(make_pair(f->id, f));
         }
-    
+
         if(gTrace){
             cout<<"New Flit "<<f->src<<endl;
         }
@@ -387,10 +407,10 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
         } else {
             f->tail = false;
         }
-    
+
         f->vc  = -1;
 
-        if ( f->watch ) { 
+        if ( f->watch ) {
             *gWatchOut << GetSimTime() << " | "
                        << "node" << source << " | "
                        << "Enqueuing flit " << f->id
@@ -423,20 +443,8 @@ void FLOVTrafficManager::_Inject()
                     int stype = _IssuePacket( input, c );
 
                     if ( stype != 0 ) { //generate a packet
-                        /* ==== Power Gate - Begin ==== */
-                        int i = 0;
-                        if (_traffic[c] == "tornado") {
-                            for (i = 0; i < _nodes; ++i) {
-                                int pkt_dest = _traffic_pattern[c]->dest((input+i)%_nodes);
-                                if (core_states[pkt_dest] == true)
-                                    break;
-                            }
-                        }
-                        if (i == _nodes)
-                            break;
-                        /* ==== Power Gate - End ==== */
-                        _GeneratePacket( input, stype, c, 
-                                _include_queuing==1 ? 
+                        _GeneratePacket( input, stype, c,
+                                _include_queuing==1 ?
                                 _qtime[input][c] : _time );
                         generated = true;
                     }
@@ -446,7 +454,7 @@ void FLOVTrafficManager::_Inject()
                     }
                 }
 
-                if ( ( _sim_state == draining ) && 
+                if ( ( _sim_state == draining ) &&
                      ( _qtime[input][c] > _drain_time ) ) {
                     _qdrained[input][c] = true;
                 }
@@ -468,7 +476,7 @@ void FLOVTrafficManager::_Step( )
         cout << GetSimTime() << endl;
         const vector<Router *> routers = _net[0]->GetRouters();
         for (int n = 0; n < _nodes; ++n) {
-            if (n % 8)
+            if (n % gK == 0)
                 cout << endl;
             cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
         }
@@ -480,6 +488,74 @@ void FLOVTrafficManager::_Step( )
     }
 
     /* ==== Power Gate - Begin ==== */
+    // adaptive power-gating
+    if (_powergate_type == "flov" && _monitor_counter / _monitor_epoch > 0) {
+      int turn = _monitor_counter % _monitor_epoch;
+      for (int row = 0; row < gK; ++row) {
+        for (int col = 0; col < gK; ++col) {
+          if (row == turn || col == turn) {
+            int n = row * gK + col;
+            if (_per_node_plat[n]->NumSamples() == 0)
+              continue;
+
+            int vote = 0;
+            double avg_plat = _per_node_plat[n]->Average();
+            if (avg_plat < _plat_low_watermark) {
+              vote = 1;
+            } else if (avg_plat > _plat_high_watermark) {
+              vote = -1;
+            }
+
+            if (row == turn) {
+              for (int c = 0; c < gK; ++c) {
+                if (c == col)
+                  continue;
+
+                int node = row * gK + c;
+                _power_state_votes[node] += vote;
+              }
+            }
+            if (col == turn) {
+              for (int r = 0; r < gK; ++r) {
+                if (r == row)
+                  continue;
+
+                int node = r * gK + col;
+                _power_state_votes[node] += vote;
+              }
+            }
+            _power_state_votes[n] += vote;
+
+            _per_node_plat[n]->Clear();
+          }
+        }
+      }
+
+      if (turn == gK) {
+        vector<Router *> routers = _net[0]->GetRouters();
+        for (int n = 0; n < _nodes; ++n) {
+          if (n >= _nodes - gK) {
+            _power_state_votes[n] = 0;
+            continue;
+          }
+
+          if (_power_state_votes[n] > 0) {
+            routers[n]->AggressPowerGatingPolicy();
+            //cout << GetSimTime() << " | node " << n
+            //  << " | (vote " << _power_state_votes[n]
+            //  << ") can switch off to save more power" << endl;
+          } else if (_power_state_votes[n] < 0) {
+            routers[n]->RegressPowerGatingPolicy();
+            //cout << GetSimTime() << " | node " << n
+            //  << " | (vote " << _power_state_votes[n]
+            //  << ") should switch on for performance" << endl;
+          }
+          _power_state_votes[n] = 0;
+        }
+        _monitor_counter = 0;
+      }
+    }
+
     for (int n = 0; n < _nodes; ++n) {
         bool is_idle = true;
         bool is_inj_busy = false;
@@ -587,12 +663,12 @@ void FLOVTrafficManager::_Step( )
 
             if(_hold_switch_for_packet) {
                 list<Flit *> const & pp = _partial_packets[n][last_class];
-                if(!pp.empty() && !pp.front()->head && 
+                if(!pp.empty() && !pp.front()->head &&
                         !dest_buf->IsFullFor(pp.front()->vc)) {
                     f = pp.front();
                     assert(f->vc == _last_vc[n][subnet][last_class]);
 
-                    // if we're holding the connection, we don't need to check that class 
+                    // if we're holding the connection, we don't need to check that class
                     // again in the for loop
                     --class_limit;
                 }
@@ -661,8 +737,8 @@ void FLOVTrafficManager::_Step( )
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
-                        // NOTE: Because the lookahead is not for injection, but for the 
-                        // first hop, we have to temporarily set cf's VC to be non-negative 
+                        // NOTE: Because the lookahead is not for injection, but for the
+                        // first hop, we have to temporarily set cf's VC to be non-negative
                         // in order to avoid seting of an assertion in the routing function.
                         cf->vc = vc_start;
                         _rf(router, cf, in_channel, &cf->la_route_set, false);
@@ -718,7 +794,7 @@ void FLOVTrafficManager::_Step( )
                         }
                     }
                 }
-	
+
                 if(cf->vc == -1) {
                     if(cf->watch) {
                         *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -857,18 +933,18 @@ void FLOVTrafficManager::_Step( )
                 if(f->watch) {
                     *gWatchOut << GetSimTime() << " | "
                                << "node" << n << " | "
-                               << "Injecting credit for VC " << f->vc 
-                               << " into subnet " << subnet 
+                               << "Injecting credit for VC " << f->vc
+                               << " into subnet " << subnet
                                << "." << endl;
                 }
                 Credit * const c = Credit::New();
                 c->vc.insert(f->vc);
                 _net[subnet]->WriteCredit(c, n);
-	
+
 #ifdef TRACK_FLOWS
                 ++_ejected_flits[f->cl][n];
 #endif
-	
+
                 _RetireFlit(f, n);
             }
         }
@@ -880,6 +956,7 @@ void FLOVTrafficManager::_Step( )
         _net[subnet]->WriteOutputs( );
     }
 
+    ++_monitor_counter;
     ++_time;
     assert(_time);
     if(gTrace){
@@ -942,7 +1019,7 @@ void FLOVTrafficManager::_UpdateOverallStats() {
             continue;
         }
 
-        /* ==== Power Gate - Begin ==== */ 
+        /* ==== Power Gate - Begin ==== */
         _overall_flov_hop_stats[c] += _flov_hop_stats[c]->Average();
         /* ==== Power Gate - End ==== */
     }
@@ -1062,3 +1139,100 @@ void FLOVTrafficManager::WriteStats(ostream & os) const {
 #endif
     }
 }
+
+void FLOVTrafficManager::DisplayOverallStats( ostream & os ) const {
+
+    os << "====== Overall Traffic Statistics ======" << endl;
+    for ( int c = 0; c < _classes; ++c ) {
+
+        if(_measure_stats[c] == 0) {
+            continue;
+        }
+
+        os << "====== Traffic class " << c << " ======" << endl;
+
+        os << "Packet latency average = " << _overall_avg_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Network latency average = " << _overall_avg_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Flit latency average = " << _overall_avg_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Fragmentation average = " << _overall_avg_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected packet rate average = " << _overall_avg_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted packet rate average = " << _overall_avg_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected flit rate average = " << _overall_avg_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted flit rate average = " << _overall_avg_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected packet size average = " << _overall_avg_sent[c] / _overall_avg_sent_packets[c]
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted packet size average = " << _overall_avg_accepted[c] / _overall_avg_accepted_packets[c]
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Hops average = " << _overall_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "FLOV hops average = " << _overall_flov_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+#ifdef TRACK_STALLS
+        os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer conflict stall rate = " << (double)_overall_buffer_conflict_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer full stall rate = " << (double)_overall_buffer_full_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer reserved stall rate = " << (double)_overall_buffer_reserved_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Crossbar conflict stall rate = " << (double)_overall_crossbar_conflict_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+#endif
+
+    }
+
+}
+

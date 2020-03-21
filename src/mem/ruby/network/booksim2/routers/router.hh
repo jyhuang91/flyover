@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -67,21 +67,24 @@ protected:
   static int const STALL_CROSSBAR_CONFLICT;
 
   int _id;
-  
+  /* ==== Power Gate - Begin ==== */
+  int _ring_id;
+  /* ==== Power Gate - End ==== */
+
   int _inputs;
   int _outputs;
-  
+
   int _classes;
 
   int _input_speedup;
   int _output_speedup;
-  
+
   double _internal_speedup;
   double _partial_internal_cycles;
 
   int _crossbar_delay;
   int _credit_delay;
-  
+
   vector<FlitChannel *>   _input_channels;
   vector<CreditChannel *> _input_credits;
   vector<FlitChannel *>   _output_channels;
@@ -140,19 +143,23 @@ protected:
   // routing tables
   vector<int> _rt_tbl;
   vector<int> _esc_rt_tbl;
+  // ring input and output
+  int _ring_in_port;
+  int _ring_out_port;
   // asyncrhonous handshaking
   vector<int> _req_hids;
   vector<int> _resp_hids;
+  bool _watch_power_gating;
   /* ==== Power Gate - End ==== */
 
 public:
   Router( const Configuration& config,
-	  Module *parent, const string & name, int id,
-	  int inputs, int outputs );
+      Module *parent, const string & name, int id,
+      int inputs, int outputs );
 
   static Router *NewRouter( const Configuration& config,
-			    Module *parent, const string & name, int id,
-			    int inputs, int outputs );
+      Module *parent, const string & name, int id,
+      int inputs, int outputs );
 
   virtual void AddInputChannel( FlitChannel *channel, CreditChannel *backchannel );
   virtual void AddOutputChannel( FlitChannel *channel, CreditChannel *backchannel );
@@ -169,6 +176,12 @@ public:
     assert((output >= 0) && (output < _outputs));
     return _output_channels[output];
   }
+  /* ==== Power Gate - Begin ==== */
+  inline FlitChannel * GetRingOutputChannel() const {
+    assert((_ring_out_port >= 0) && (_ring_out_port < _outputs));
+    return _output_channels[_ring_out_port];
+  }
+  /* ==== Power Gate - End ==== */
 
   virtual void ReadInputs( ) = 0;
   virtual void Evaluate( );
@@ -180,6 +193,11 @@ public:
   inline int GetID( ) const {return _id;}
 
 
+  /* ==== Power Gate - Begin ==== */
+  inline int GetRingID( ) const {return _ring_id;}
+
+  virtual int GetFreeCredit(int o) const {return 0;}
+  /* ==== Power Gate - End ==== */
   virtual int GetUsedCredit(int o) const = 0;
   virtual int GetBufferOccupancy(int i) const = 0;
 
@@ -265,7 +283,7 @@ public:
   inline Router::ePowerState GetPowerState() const {return _power_state;}
   inline void SetRouterState(bool state) {_router_state = state;}
   inline string GetRouterState() const {return _router_state ? "On" : "Off";}
-  
+
   inline uint64_t GetPowerOffCycles() const {return _power_off_cycles;}
   inline void ResetPowerOffCycles() {_power_off_cycles = 0;}  // _power_off_cycles is reset when each kernel is finished (GPGPU)
   inline uint64_t GetTotalPowerOffCycles() const {return _total_power_off_cycles;}
@@ -284,12 +302,20 @@ public:
   inline const vector<int> & GetRouteTable() const {return _rt_tbl;}
   inline const vector<int> & GetEscRouteTable() const {return _esc_rt_tbl;}
 
+  inline int GetRingOutput() const {return _ring_out_port;}
+  virtual void SetRingOutputVCBufferSize(int vc_buf_size);
+  inline void SetNeighborPowerState(int output, ePowerState s) {_neighbor_states[output] = s;}
+
   inline Router::ePowerState GetNeighborPowerState(int out_port) const {return _neighbor_states[out_port];}
   inline void SetLogicalNeighbor(int out_port, int id) {_logical_neighbors[out_port] = id;}
   inline int GetLogicalNeighbor(int out_port) const {return _logical_neighbors[out_port];}
+  inline void WatchPowerGating() {_watch_power_gating = true;}
 
   void IdleDetected();
   Router * GetNeighborRouter(int out_port);
+
+  virtual void AggressPowerGatingPolicy() {};
+  virtual void RegressPowerGatingPolicy() {};
   /* ==== Power Gate - End ==== */
 
 };

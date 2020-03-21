@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -47,7 +47,7 @@
 #include "mem/ruby/network/booksim2/power/switch_monitor.hh"
 #include "mem/ruby/network/booksim2/power/buffer_monitor.hh"
 
-IQRouter::IQRouter( Configuration const & config, Module *parent, 
+IQRouter::IQRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
 : Router( config, parent, name, id, inputs, outputs ), _active(false)
 {
@@ -107,9 +107,9 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
     _vc_allocator = NULL;
     _vc_rr_offset.resize(_outputs*_classes, -1);
   } else {
-    _vc_allocator = Allocator::NewAllocator( this, "vc_allocator", 
+    _vc_allocator = Allocator::NewAllocator( this, "vc_allocator",
         vc_alloc_type,
-        _vcs*_inputs, 
+        _vcs*_inputs,
         _vcs*_outputs );
 
     if ( !_vc_allocator ) {
@@ -120,7 +120,7 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   string sw_alloc_type = config.GetStr( "sw_allocator" );
   _sw_allocator = Allocator::NewAllocator( this, "sw_allocator",
       sw_alloc_type,
-      _inputs*_input_speedup, 
+      _inputs*_input_speedup,
       _outputs*_output_speedup );
 
   if ( !_sw_allocator ) {
@@ -131,7 +131,7 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   if ( _speculative && ( spec_sw_alloc_type != "prio" ) ) {
     _spec_sw_allocator = Allocator::NewAllocator( this, "spec_sw_allocator",
         spec_sw_alloc_type,
-        _inputs*_input_speedup, 
+        _inputs*_input_speedup,
         _outputs*_output_speedup );
     if ( !_spec_sw_allocator ) {
       Error("Unknown spec_sw_allocator type: " + spec_sw_alloc_type);
@@ -159,8 +159,8 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
 
   // Output queues
   _output_buffer_size = config.GetInt("output_buffer_size");
-  _output_buffer.resize(_outputs); 
-  _credit_buffer.resize(_inputs); 
+  _output_buffer.resize(_outputs);
+  _credit_buffer.resize(_inputs);
 
   // Switch configuration (when held for multiple cycles)
   _hold_switch_for_packet = (config.GetInt("hold_switch_for_packet") > 0);
@@ -184,10 +184,10 @@ IQRouter::~IQRouter( )
 {
 
   if(gPrintActivity) {
-    cout << Name() << ".bufferMonitor:" << endl ; 
+    cout << Name() << ".bufferMonitor:" << endl ;
     cout << *_bufferMonitor << endl ;
 
-    cout << Name() << ".switchMonitor:" << endl ; 
+    cout << Name() << ".switchMonitor:" << endl ;
     cout << "Inputs=" << _inputs ;
     cout << "Outputs=" << _outputs ;
     cout << *_switchMonitor << endl ;
@@ -296,7 +296,7 @@ void IQRouter::WriteOutputs( )
 bool IQRouter::_ReceiveFlits( )
 {
   bool activity = false;
-  for(int input = 0; input < _inputs; ++input) { 
+  for(int input = 0; input < _inputs; ++input) {
     Flit * const f = _input_channels[input]->Receive();
     if(f) {
 
@@ -320,10 +320,10 @@ bool IQRouter::_ReceiveFlits( )
 bool IQRouter::_ReceiveCredits( )
 {
   bool activity = false;
-  for(int output = 0; output < _outputs; ++output) {  
+  for(int output = 0; output < _outputs; ++output) {
     Credit * const c = _output_credits[output]->Receive();
     if(c) {
-      _proc_credits.push_back(make_pair(GetSimTime() + _credit_delay, 
+      _proc_credits.push_back(make_pair(GetSimTime() + _credit_delay,
             make_pair(c, output)));
       activity = true;
     }
@@ -399,7 +399,7 @@ void IQRouter::_InputQueuing( )
                   -1)));
         }
         if(_vc_allocator) {
-          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                   -1)));
         }
         if(_noq) {
@@ -412,7 +412,7 @@ void IQRouter::_InputQueuing( )
         _sw_hold_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       } else {
-        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       }
     }
@@ -493,7 +493,7 @@ void IQRouter::_RouteEvaluate( )
         << " (front: " << f->id
         << ")." << endl;
     }
-  }    
+  }
 }
 
 void IQRouter::_RouteUpdate( )
@@ -582,7 +582,7 @@ void IQRouter::_VCAllocEvaluate( )
     assert(f->head);
 
     if(f->watch) {
-      *gWatchOut << GetSimTime() << " | " << FullName() << " | " 
+      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
         << "Beginning VC allocation for VC " << vc
         << " at input " << input
         << " (front: " << f->id
@@ -634,10 +634,10 @@ void IQRouter::_VCAllocEvaluate( )
           in_priority += numeric_limits<int>::min();
         }
 
-        // On the input input side, a VC might request several output VCs. 
-        // These VCs can be prioritized by the routing function, and this is 
-        // reflected in "in_priority". On the output side, if multiple VCs are 
-        // requesting the same output VC, the priority of VCs is based on the 
+        // On the input input side, a VC might request several output VCs.
+        // These VCs can be prioritized by the routing function, and this is
+        // reflected in "in_priority". On the output side, if multiple VCs are
+        // requesting the same output VC, the priority of VCs is based on the
         // actual packet priorities, which is reflected in "out_priority".
 
         if(!dest_buf->IsAvailableFor(out_vc)) {
@@ -646,8 +646,8 @@ void IQRouter::_VCAllocEvaluate( )
             int const use_input = use_input_and_vc / _vcs;
             int const use_vc = use_input_and_vc % _vcs;
             *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-              << "  VC " << out_vc 
-              << " at output " << out_port 
+              << "  VC " << out_vc
+              << " at output " << out_port
               << " is in use by VC " << use_vc
               << " at input " << use_input;
             Flit * cf = _buf[use_input]->FrontFlit(use_vc);
@@ -663,8 +663,8 @@ void IQRouter::_VCAllocEvaluate( )
           if(_vc_busy_when_full && dest_buf->IsFullFor(out_vc)) {
             if(f->watch)
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                << "  VC " << out_vc 
-                << " at output " << out_port 
+                << "  VC " << out_vc
+                << " at output " << out_port
                 << " is full." << endl;
             reserved |= !dest_buf->IsFull();
           } else {
@@ -672,7 +672,7 @@ void IQRouter::_VCAllocEvaluate( )
             if(f->watch){
               *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                 << "  Requesting VC " << out_vc
-                << " at output " << out_port 
+                << " at output " << out_port
                 << " (in_pri: " << in_priority
                 << ", out_pri: " << out_priority
                 << ")." << endl;
@@ -680,7 +680,7 @@ void IQRouter::_VCAllocEvaluate( )
             }
             int const input_and_vc
               = _vc_shuffle_requests ? (vc*_inputs + input) : (input*_vcs + vc);
-            _vc_allocator->AddRequest(input_and_vc, out_port*_vcs + out_vc, 
+            _vc_allocator->AddRequest(input_and_vc, out_port*_vcs + out_vc,
                 0, in_priority, out_priority);
           }
         }
@@ -749,7 +749,7 @@ void IQRouter::_VCAllocEvaluate( )
       if(f->watch) {
         *gWatchOut << GetSimTime() << " | " << FullName() << " | "
           << "Assigning VC " << match_vc
-          << " at output " << match_output 
+          << " at output " << match_output
           << " to VC " << vc
           << " at input " << input
           << "." << endl;
@@ -958,7 +958,7 @@ void IQRouter::_SWHoldEvaluate( )
     assert(f->vc == vc);
 
     if(f->watch) {
-      *gWatchOut << GetSimTime() << " | " << FullName() << " | " 
+      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
         << "Beginning held switch allocation for VC " << vc
         << " at input " << input
         << " (front: " << f->id
@@ -1227,8 +1227,8 @@ bool IQRouter::_SWAllocAddReq(int input, int vc, int output)
   assert(vc >= 0 && vc < _vcs);
   assert(output >= 0 && output < _outputs);
 
-  // When input_speedup > 1, the virtual channel buffers are interleaved to 
-  // create multiple input ports to the switch. Similarily, the output ports 
+  // When input_speedup > 1, the virtual channel buffers are interleaved to
+  // create multiple input ports to the switch. Similarily, the output ports
   // are interleaved based on their originating input when output_speedup > 1.
 
   int const expanded_input = input * _input_speedup + vc % _input_speedup;
@@ -1236,14 +1236,14 @@ bool IQRouter::_SWAllocAddReq(int input, int vc, int output)
 
   Buffer const * const cur_buf = _buf[input];
   assert(!cur_buf->Empty(vc));
-  assert((cur_buf->GetState(vc) == VC::active) || 
+  assert((cur_buf->GetState(vc) == VC::active) ||
       (_speculative && (cur_buf->GetState(vc) == VC::vc_alloc)));
 
   Flit const * const f = cur_buf->FrontFlit(vc);
   assert(f);
   assert(f->vc == vc);
 
-  if((_switch_hold_in[expanded_input] < 0) && 
+  if((_switch_hold_in[expanded_input] < 0) &&
       (_switch_hold_out[expanded_output] < 0)) {
 
     Allocator * allocator = _sw_allocator;
@@ -1261,16 +1261,16 @@ bool IQRouter::_SWAllocAddReq(int input, int vc, int output)
     Allocator::sRequest req;
 
     if(allocator->ReadRequest(req, expanded_input, expanded_output)) {
-      if(RoundRobinArbiter::Supersedes(vc, prio, req.label, req.in_pri, 
+      if(RoundRobinArbiter::Supersedes(vc, prio, req.label, req.in_pri,
             _sw_rr_offset[expanded_input], _vcs)) {
         if(f->watch) {
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
             << "  Replacing earlier request from VC " << req.label
-            << " for output " << output 
+            << " for output " << output
             << "." << (expanded_output % _output_speedup)
             << " with priority " << req.in_pri
-            << " (" << ((cur_buf->GetState(vc) == VC::active) ? 
-                  "non-spec" : 
+            << " (" << ((cur_buf->GetState(vc) == VC::active) ?
+                  "non-spec" :
                   "spec")
             << ", pri: " << prio
             << ")." << endl;
@@ -1294,8 +1294,8 @@ bool IQRouter::_SWAllocAddReq(int input, int vc, int output)
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
         << "  Requesting output " << output
         << "." << (expanded_output % _output_speedup)
-        << " (" << ((cur_buf->GetState(vc) == VC::active) ? 
-              "non-spec" : 
+        << " (" << ((cur_buf->GetState(vc) == VC::active) ?
+              "non-spec" :
               "spec")
         << ", pri: " << prio
         << ")." << endl;
@@ -1348,7 +1348,7 @@ void IQRouter::_SWAllocEvaluate( )
 
     Buffer const * const cur_buf = _buf[input];
     assert(!cur_buf->Empty(vc));
-    assert((cur_buf->GetState(vc) == VC::active) || 
+    assert((cur_buf->GetState(vc) == VC::active) ||
         (_speculative && (cur_buf->GetState(vc) == VC::vc_alloc)));
 
     Flit const * const f = cur_buf->FrontFlit(vc);
@@ -1356,7 +1356,7 @@ void IQRouter::_SWAllocEvaluate( )
     assert(f->vc == vc);
 
     if(f->watch) {
-      *gWatchOut << GetSimTime() << " | " << FullName() << " | " 
+      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
         << "Beginning switch allocation for VC " << vc
         << " at input " << input
         << " (front: " << f->id
@@ -1375,8 +1375,8 @@ void IQRouter::_SWAllocEvaluate( )
       if(dest_buf->IsFullFor(dest_vc) || ( _output_buffer_size!=-1  && _output_buffer[dest_output].size()>=(size_t)(_output_buffer_size))) {
         if(f->watch) {
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << "  VC " << dest_vc 
-            << " at output " << dest_output 
+            << "  VC " << dest_vc
+            << " at output " << dest_output
             << " is full." << endl;
         }
         iter->second.second = dest_buf->IsFull() ? STALL_BUFFER_FULL : STALL_BUFFER_RESERVED;
@@ -1389,9 +1389,9 @@ void IQRouter::_SWAllocEvaluate( )
     assert(_speculative && (cur_buf->GetState(vc) == VC::vc_alloc));
     assert(f->head);
 
-    // The following models the speculative VC allocation aspects of the 
-    // pipeline. An input VC with a request in for an egress virtual channel 
-    // will also speculatively bid for the switch regardless of whether the VC  
+    // The following models the speculative VC allocation aspects of the
+    // pipeline. An input VC with a request in for an egress virtual channel
+    // will also speculatively bid for the switch regardless of whether the VC
     // allocation succeeds.
 
     OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
@@ -1408,7 +1408,7 @@ void IQRouter::_SWAllocEvaluate( )
       int const dest_output = iset->output_port;
       assert((dest_output >= 0) && (dest_output < _outputs));
 
-      // for lower levels of speculation, ignore credit availability and always 
+      // for lower levels of speculation, ignore credit availability and always
       // issue requests for all output ports in route set
 
       BufferState const * const dest_buf = _next_buf[dest_output];
@@ -1418,7 +1418,7 @@ void IQRouter::_SWAllocEvaluate( )
 
       if(_spec_check_elig) {
 
-        // for higher levels of speculation, check if at least one suitable VC 
+        // for higher levels of speculation, check if at least one suitable VC
         // is available at the current output
 
         int vc_start;
@@ -1452,14 +1452,14 @@ void IQRouter::_SWAllocEvaluate( )
       if(_spec_check_elig && !elig) {
         if(f->watch) {
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << "  Output " << dest_output 
+            << "  Output " << dest_output
             << " has no suitable VCs available." << endl;
         }
         iter->second.second = STALL_BUFFER_BUSY;
       } else if(_spec_check_cred && !cred) {
         if(f->watch) {
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-            << "  All suitable VCs at output " << dest_output 
+            << "  All suitable VCs at output " << dest_output
             << " are full." << endl;
         }
         iter->second.second = dest_buf->IsFull() ? STALL_BUFFER_FULL : STALL_BUFFER_RESERVED;
@@ -1515,7 +1515,7 @@ void IQRouter::_SWAllocEvaluate( )
 
     Buffer const * const cur_buf = _buf[input];
     assert(!cur_buf->Empty(vc));
-    assert((cur_buf->GetState(vc) == VC::active) || 
+    assert((cur_buf->GetState(vc) == VC::active) ||
         (_speculative && (cur_buf->GetState(vc) == VC::vc_alloc)));
 
     Flit const * const f = cur_buf->FrontFlit(vc);
@@ -1554,7 +1554,7 @@ void IQRouter::_SWAllocEvaluate( )
       expanded_output = _spec_sw_allocator->OutputAssigned(expanded_input);
       if(expanded_output >= 0) {
         assert((expanded_output % _output_speedup) == (input % _output_speedup));
-        if(_spec_mask_by_reqs && 
+        if(_spec_mask_by_reqs &&
             _sw_allocator->OutputHasRequests(expanded_output)) {
           if(f->watch) {
             *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -1579,7 +1579,7 @@ void IQRouter::_SWAllocEvaluate( )
           }
           iter->second.second = STALL_CROSSBAR_CONFLICT;
         } else {
-          int const granted_vc = _spec_sw_allocator->ReadRequest(expanded_input, 
+          int const granted_vc = _spec_sw_allocator->ReadRequest(expanded_input,
               expanded_output);
           if(granted_vc == vc) {
             if(f->watch) {
@@ -1684,7 +1684,7 @@ void IQRouter::_SWAllocEvaluate( )
           if(_switch_hold_in[expanded_input] >= 0) {
             *gWatchOut << "input";
           }
-          if((_switch_hold_in[expanded_input] >= 0) && 
+          if((_switch_hold_in[expanded_input] >= 0) &&
               (_switch_hold_out[expanded_output] >= 0)) {
             *gWatchOut << " and ";
           }
@@ -1700,7 +1700,7 @@ void IQRouter::_SWAllocEvaluate( )
 
         if(_vc_allocator) { // separate VC and switch allocators
 
-          int const input_and_vc = 
+          int const input_and_vc =
             _vc_shuffle_requests ? (vc*_inputs + input) : (input*_vcs + vc);
           int const output_and_vc = _vc_allocator->OutputAssigned(input_and_vc);
 
@@ -1929,19 +1929,19 @@ void IQRouter::_SWAllocUpdate( )
                 vc_prio += numeric_limits<int>::min();
               }
 
-              // FIXME: This check should probably be performed in Evaluate(), 
-              // not Update(), as the latter can cause the outcome to depend on 
+              // FIXME: This check should probably be performed in Evaluate(),
+              // not Update(), as the latter can cause the outcome to depend on
               // the order of evaluation!
-              if(dest_buf->IsAvailableFor(out_vc) && 
+              if(dest_buf->IsAvailableFor(out_vc) &&
                   !dest_buf->IsFullFor(out_vc) &&
-                  ((match_vc < 0) || 
-                   RoundRobinArbiter::Supersedes(out_vc, vc_prio, 
-                     match_vc, match_prio, 
+                  ((match_vc < 0) ||
+                   RoundRobinArbiter::Supersedes(out_vc, vc_prio,
+                     match_vc, match_prio,
                      vc_offset, _vcs))) {
                 match_vc = out_vc;
                 match_prio = vc_prio;
               }
-            }	
+            }
           }
         }
         assert(match_vc >= 0);
@@ -2305,7 +2305,19 @@ void IQRouter::Display( ostream & os ) const
   for ( int input = 0; input < _inputs; ++input ) {
     _buf[input]->Display( os );
   }
+  for (int output = 0; output < _outputs; ++output) {
+    _next_buf[output]->Display(os);
+  }
 }
+
+/* ==== Power Gate - Begin ==== */
+int IQRouter::GetFreeCredit(int o) const
+{
+  assert((o >= 0) && (o < _outputs));
+  BufferState const * const dest_buf = _next_buf[o];
+  return dest_buf->Size() - dest_buf->Occupancy();
+}
+/* ==== Power Gate - End ==== */
 
 int IQRouter::GetUsedCredit(int o) const
 {
@@ -2408,24 +2420,24 @@ void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) {
 
 uint64_t IQRouter::GetBufferReads()
 {
-	uint64_t total_reads = 0;
-	const vector<uint64_t> reads = _bufferMonitor->GetReads();
-	int limits = _bufferMonitor->NumInputs() * _bufferMonitor->NumClasses();
-	for (int i = 0; i < limits; i++) {
-		total_reads += reads[i];
-	}
+  uint64_t total_reads = 0;
+  const vector<uint64_t> reads = _bufferMonitor->GetReads();
+  int limits = _bufferMonitor->NumInputs() * _bufferMonitor->NumClasses();
+  for (int i = 0; i < limits; i++) {
+    total_reads += reads[i];
+  }
 
-	return total_reads;
+  return total_reads;
 }
 
 uint64_t IQRouter::GetBufferWrites()
 {
-	uint64_t total_writes = 0;
-	const vector<uint64_t> writes = _bufferMonitor->GetWrites();
-	int limits = _bufferMonitor->NumInputs() * _bufferMonitor->NumClasses();
-	for (int i = 0; i < limits; i++) {
-		total_writes += writes[i];
-	}
+  uint64_t total_writes = 0;
+  const vector<uint64_t> writes = _bufferMonitor->GetWrites();
+  int limits = _bufferMonitor->NumInputs() * _bufferMonitor->NumClasses();
+  for (int i = 0; i < limits; i++) {
+    total_writes += writes[i];
+  }
 
-	return total_writes;
+  return total_writes;
 }

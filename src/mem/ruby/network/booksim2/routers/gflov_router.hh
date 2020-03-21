@@ -25,8 +25,8 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _FLOV_ROUTER_HPP_
-#define _FLOV_ROUTER_HPP_
+#ifndef _GFLOV_ROUTER_HPP_
+#define _GFLOV_ROUTER_HPP_
 
 #include "mem/ruby/network/booksim2/routers/iq_router.hh"
 
@@ -34,14 +34,7 @@
 class Handshake;
 /* ==== Power Gate - End ==== */
 
-class FLOVRouter : public IQRouter {
-
-/* ==== Power Gate - Begin ==== */
-public:
-  enum eFLOVPolicy { state_min = 0, gflov = state_min, rflov, noflov,
-    state_max = noflov };
-  static const char * const FLOVPOLICY[];
-/* ==== Power Gate - End ==== */
+class GFLOVRouter : public IQRouter {
 
 protected:
 
@@ -55,7 +48,6 @@ protected:
 
   vector<queue<Handshake *> > _handshake_buffer;
 
-  eFLOVPolicy _flov_policy;
 
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */
@@ -77,25 +69,18 @@ protected:
   void _FlovStep( );  // fly-over operations
   void _HandshakeEvaluate();
   void _HandshakeResponse();
-  void _RFLOVPowerStateEvaluate();
-  void _GFLOVPowerStateEvaluate();
-  void _NoFLOVPowerStateEvaluate();
   /* ==== Power Gate - End ==== */
 
 public:
 
-  FLOVRouter( Configuration const & config,
+  GFLOVRouter( Configuration const & config,
       Module *parent, string const & name, int id,
       int inputs, int outputs );
 
-  virtual ~FLOVRouter( );
+  virtual ~GFLOVRouter( );
 
   /* ==== Power Gate - Begin ==== */
   virtual void PowerStateEvaluate( );
-  virtual void AggressFLOVPolicy();
-  virtual void RegressFLOVPolicy();
-  virtual inline void AggressPowerGatingPolicy() { AggressFLOVPolicy(); }
-  virtual inline void RegressPowerGatingPolicy() { RegressFLOVPolicy(); }
   /* ==== Power Gate - End ==== */
 
   virtual void ReadInputs( );

@@ -37,9 +37,12 @@ protected:
     virtual void _Inject();
 
 public:
+    static Gem5TrafficManager *New(Configuration const &config,
+            vector<BSNetwork *> const &net, int vnets);
+
     Gem5TrafficManager(const Configuration &config, const vector<BSNetwork *>
             & net , int vnets);
-    ~Gem5TrafficManager();
+    virtual ~Gem5TrafficManager();
 
     virtual void DisplayStats(ostream& out) const;
     virtual void _Step();

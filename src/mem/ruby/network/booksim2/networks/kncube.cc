@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -39,7 +39,6 @@
 #include "mem/ruby/network/booksim2/networks/kncube.hh"
 #include "mem/ruby/network/booksim2/random_utils.hh"
 #include "mem/ruby/network/booksim2/misc_utils.hh"
-//#include "iq_router.hpp"
 /* ==== Power Gate - Begin ==== */
 #include "mem/ruby/network/booksim2/routetbl.hh"
 /* ==== Power Gate - End ==== */
@@ -70,6 +69,7 @@ void KNCube::_ComputeSize( const Configuration &config )
 void KNCube::RegisterRoutingFunctions() {
 
 }
+
 void KNCube::_BuildNet( const Configuration &config )
 {
   int left_node;
@@ -89,7 +89,7 @@ void KNCube::_BuildNet( const Configuration &config )
 
   for ( int node = 0; node < _size; ++node ) {
 
-    router_name << "router";
+    router_name << "router" << node;
 
     if ( _k > 1 ) {
       for ( int dim_offset = _size / _k; dim_offset >= 1; dim_offset /= _k ) {
@@ -97,7 +97,7 @@ void KNCube::_BuildNet( const Configuration &config )
       }
     }
 
-    _routers[node] = Router::NewRouter( config, this, router_name.str( ), 
+    _routers[node] = Router::NewRouter( config, this, router_name.str( ),
         node, 2*_n + 1, 2*_n + 1 );
     _timed_modules.push_back(_routers[node]);
 
@@ -108,6 +108,9 @@ void KNCube::_BuildNet( const Configuration &config )
     bool is_rp = (type == "rp");
     if (_router_states[node] == false) {
       _routers[node]->SetRouterState(false);
+      if (is_rp) { // TODO: make all dynamic
+        _routers[node]->SetPowerState(Router::power_off);
+      }
     } else if (is_rp) {
       RouteTbl rt = RouteTbl(node, _size, _router_states);
       rt.BuildRoute();
@@ -119,7 +122,7 @@ void KNCube::_BuildNet( const Configuration &config )
 
     for ( int dim = 0; dim < _n; ++dim ) {
 
-      //find the neighbor 
+      //find the neighbor
       left_node  = _LeftNode( node, dim );
       right_node = _RightNode( node, dim );
 
@@ -207,6 +210,11 @@ void KNCube::_BuildNet( const Configuration &config )
     _inject[node]->SetLatency( 1 );
     _eject[node]->SetLatency( 1 );
   }
+
+  vector<int> watch_power_gating_routers = config.GetIntArray("watch_power_gating_routers");
+  for (size_t i = 0; i < watch_power_gating_routers.size(); ++i) {
+    _routers[watch_power_gating_routers[i]]->WatchPowerGating();
+  }
 }
 
 int KNCube::_LeftChannel( int node, int dim )
@@ -223,7 +231,7 @@ int KNCube::_RightChannel( int node, int dim )
 {
   // The base channel for a node is 2*_n*node
   int base = 2*_n*node;
-  // The offset for a right channel is 2*dim 
+  // The offset for a right channel is 2*dim
   int off  = 2*dim;
   return ( base + off );
 }
@@ -352,7 +360,7 @@ void KNCube::InsertRandomFaults( const Configuration &config )
         fail_nodes[_RightNode( node, n )] = true;
       }
 
-      cout << "failure at node " << node << ", channel " 
+      cout << "failure at node " << node << ", channel "
         << chan << endl;
     }
 

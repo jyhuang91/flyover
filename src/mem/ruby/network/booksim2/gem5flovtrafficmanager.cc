@@ -6,7 +6,6 @@
 //#include <ctime>
 
 #include "mem/ruby/network/booksim2/booksim.hh"
-#include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
 #include "mem/ruby/network/booksim2/gem5flovtrafficmanager.hh"
 #include "mem/ruby/network/booksim2/random_utils.hh"
 #include "mem/ruby/network/booksim2/networks/gem5net.hh"
@@ -17,40 +16,53 @@
 
 #define REPORT_INTERVAL 100000
 
-Gem5TrafficManager *Gem5TrafficManager::New(Configuration const &config,
-        vector<BSNetwork *> const &net, int vnets)
-{
-    Gem5TrafficManager *result = nullptr;
-    string sim_type = config.GetStr("sim_type");
-    if (sim_type == "default" || sim_type == "rp") {
-        result = new Gem5TrafficManager(config, net, vnets);
-    } else if (sim_type == "flov") {
-        result = new Gem5FLOVTrafficManager(config, net, vnets);
-    } else {
-        cerr << "Unknown simulation type: " << sim_type << endl;
-    }
-    return result;
-}
-
-Gem5TrafficManager::Gem5TrafficManager(const Configuration &config, const
+Gem5FLOVTrafficManager::Gem5FLOVTrafficManager(const Configuration &config, const
         vector<BSNetwork *> &net, int vnets)
-  : TrafficManager(config, net)
+  : Gem5TrafficManager(config, net, vnets)
 {
-    _vnets = vnets;
-    _last_vnet.resize(_nodes, 0);
-    _flit_size = config.GetInt("channel_width");
-    _network_time = 0;
-    _next_report = REPORT_INTERVAL;
-    _watch_all_pkts = (config.GetInt("watch_all_pkts") > 0);
+    _flov_hop_stats.resize(_classes);
+    _overall_flov_hop_stats.resize(_classes, 0.0);
 
-    _sim_state = running;
+    for (int c = 0; c < _classes; ++c) {
+        ostringstream tmp_name;
+
+        tmp_name << "flov_hop_stat_" << c;
+        _flov_hop_stats[c] = new BooksimStats(this, tmp_name.str(), 1.0, 20);
+        _stats[tmp_name.str()] = _hop_stats[c];
+        tmp_name.str("");
+    }
+
+    _monitor_counter = 0;
+    _monitor_epoch = config.GetInt("flov_monitor_epoch");
+    double high_watermark = config.GetFloat("high_watermark");
+    double low_watermark = config.GetFloat("low_watermark");
+    double zeroload_latency = config.GetFloat("zeroload_latency");
+    _plat_high_watermark = zeroload_latency * high_watermark;
+    _plat_low_watermark = zeroload_latency * low_watermark;
+
+    _powergate_type = config.GetStr("powergate_type");
+    _power_state_votes.resize(_nodes, 0);
+    _per_node_plat.resize(_nodes);
+    for (int n = 0; n < _routers; ++n) {
+      ostringstream tmp_name;
+
+      tmp_name << "per_node_plat_stat_" << n;
+      _per_node_plat[n] = new BooksimStats(this, tmp_name.str(), 1.0, 1000);
+      tmp_name.str("");
+    }
 }
 
-Gem5TrafficManager::~Gem5TrafficManager()
+Gem5FLOVTrafficManager::~Gem5FLOVTrafficManager()
 {
+    for ( int c = 0; c < _classes; ++c ) {
+        delete _flov_hop_stats[c];
+    }
+    for (int n = 0; n < _routers; ++n) {
+        delete _per_node_plat[n];
+    }
 }
 
-void Gem5TrafficManager::_RetireFlit(Flit *f, int dest)
+void Gem5FLOVTrafficManager::_RetireFlit(Flit *f, int dest)
 {
     _deadlock_timer = 0;
 
@@ -90,171 +102,14 @@ void Gem5TrafficManager::_RetireFlit(Flit *f, int dest)
         _net_ptr->increment_qlat(
                 Cycles(head->ctime - _net_ptr->ticksToCycles(head->msg_ptr->getTime())),
                 head->gem5_vnet);
+
+        _per_node_plat[head->dest_router]->AddSample(f->atime - head->ctime);
     }
 
     TrafficManager::_RetireFlit(f, dest);
 }
 
-void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64_t time)
-{
-    int cl = 0;
-
-    MsgPtr msg_ptr = _input_buffer[source][vnet]->peekMsgPtr();
-    NetworkMessage *net_msg_ptr = safe_cast<NetworkMessage *>(msg_ptr.get());
-    NetDest net_msg_dest = net_msg_ptr->getInternalDestination();
-
-    // get all the destinations associated with this message
-    vector<NodeID> dest_nodes = net_msg_dest.getAllDest();
-
-    // bytes
-    int size = (int) ceil((double) _net_ptr->MessageSizeType_to_int(
-                net_msg_ptr->getMessageSize())*8 / _flit_size);
-
-    for (int ctr = 0; ctr < dest_nodes.size(); ctr++) {
-        Flit::FlitType packet_type = Flit::ANY_TYPE;
-
-        int packet_dest = dest_nodes[ctr];
-        bool record = false;
-
-        if ((packet_dest < 0) || (packet_dest >= _nodes)) {
-            ostringstream err;
-            err << "Incorrect packet destination " << packet_dest
-                << " for stype " << packet_type << "!" << endl;
-            Error(err.str());
-        }
-
-        record = true;
-
-        int subnetwork = ((packet_type == Flit::ANY_TYPE) ?
-                RandomInt(_subnets-1) :
-                _subnet[packet_type]);
-
-        bool watch = gWatchOut && (_packets_to_watch.count(_cur_pid) > 0);
-
-        // for debugging
-        watch = watch | _watch_all_pkts;
-
-        if (watch) {
-            *gWatchOut << GetSimTime() << " | "
-                << "node " << source << " | "
-                << "Enqueuing packet " << _cur_pid
-                << " at time " << time
-                << " through router " << Gem5Net::NodeToRouter(source)
-                << " (to node " << packet_dest
-                << " attached to router " << Gem5Net::NodeToRouter(packet_dest)
-                << ")." << endl;
-        }
-
-        MsgPtr new_msg_ptr = msg_ptr->clone();
-        int pid = _cur_pid++;
-
-        for (int i = 0; i < size; i++) {
-            Flit * f = Flit::New();
-            f->id = _cur_id++;
-            assert(_cur_id);
-            f->pid = pid;
-            f->watch = watch | (gWatchOut && (_flits_to_watch.count(f->id) > 0));
-            f->subnetwork = subnetwork;
-            f->src = source;
-            f->ctime = time;
-            f->record = record;
-            f->cl = cl;
-            f->src_router = Gem5Net::NodeToRouter(source);
-            f->gem5_vnet = vnet;
-            //f->vc = vnet; // why assign it?
-            f->msg_ptr = new_msg_ptr;
-
-            _total_in_flight_flits[f->cl].insert(make_pair(f->id, f));
-            if (record) {
-                _measured_in_flight_flits[f->cl].insert(make_pair(f->id, f));
-            }
-
-            if (gTrace) {
-                cout << "New Flit " << f->src << endl;
-            }
-
-            if (i == 0) { // Head flit
-                f->head = true;
-                // packets are only generated to nodes smaller or equal to limit
-                f->dest = packet_dest;
-                f->dest_router = Gem5Net::NodeToRouter(packet_dest);
-            } else {
-                f->head = false;
-                f->dest = -1;
-                f->dest_router = -1;
-            }
-            switch (_pri_type) {
-            case class_based:
-                f->pri = cl;
-                assert(f->pri >= 0);
-                break;
-            case age_based:
-                f->pri = numeric_limits<int>::max() - time;
-                assert(f->pri >= 0);
-                break;
-            case sequence_based:
-                f->pri = numeric_limits<int>::max() - _packet_seq_no[source];
-                assert(f->pri >= 0);
-                break;
-            default:
-                f->pri = 0;
-            }
-            if (i == (size - 1)) { // Tail flit
-                f->tail = true;
-            } else {
-                f->tail = false;
-            }
-
-            f->vc = -1;
-
-            if (f->watch) {
-                *gWatchOut << GetSimTime() << " | "
-                      << "node " << source << " | "
-                      << "Enqueueing flit " << f->id
-                      << " (packet " << f->pid
-                      << ") through router " << f->src_router
-                      << " at time " << time
-                      << "." << endl;
-            }
-
-            _partial_packets[source][cl].push_back(f);
-        }
-        assert(_cur_pid);
-    }
-}
-
-void Gem5TrafficManager::_Inject()
-{
-    for (int input = 0; input < _nodes; input++) {
-        if (_partial_packets[input][0].empty()) {
-
-            int const last_vnet = _last_vnet[input];
-
-            for (int v = 1; v <= _vnets; v++) {
-
-                int vnet = (last_vnet + v) % _vnets;
-                if (_input_buffer[input][vnet] == nullptr) {
-                    continue;
-                }
-
-                if (_input_buffer[input][vnet]->isReady()) {
-                    _GeneratePacket(input, 1, vnet, _time);
-                    if (_watch_all_pkts) {
-                        *gWatchOut << GetSimTime() << " | " << FullName()
-                            << " | " << *(_input_buffer[input][vnet])
-                            << " generate new packets." << endl;
-                    }
-                    _input_buffer[input][vnet]->dequeue();
-                    _last_vnet[input] = vnet;
-                }
-            }
-        } else {
-            //??
-        }
-    }
-}
-
-void Gem5TrafficManager::_Step()
+void Gem5FLOVTrafficManager::_Step()
 {
     _time = _net_ptr->curCycle();
 
@@ -266,19 +121,81 @@ void Gem5TrafficManager::_Step()
         _deadlock_timer = 0;
         cout << "WARNING: Possible network deadlock.\n";
         /* ==== Power Gate Debug - Begin ==== */
-//        cout << GetSimTime() << endl;
-//        const vector<Router *> routers = _net[0]->GetRouters();
-//        for (int n = 0; n < routers.size(); ++n) {
-//            if (n % 8 == 0) {
-//                cout << endl;
-//            }
-//            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
-//        }
-//        cout << endl;
-//        for (int n = 0; n < routers.size(); ++n)
-//            routers[n]->Display(cout);
-//        cout << endl << endl;
+        cout << GetSimTime() << endl;
+        const vector<Router *> routers = _net[0]->GetRouters();
+        for (int n = 0; n < routers.size(); ++n) {
+            if (n % gK == 0) {
+                cout << endl;
+            }
+            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+        }
+        cout << endl;
+        for (int n = 0; n < routers.size(); ++n)
+            routers[n]->Display(cout);
+        cout << endl << endl;
         /* ==== Power Gate Debug - End ==== */
+    }
+
+    // adaptive power-gating
+    if (_powergate_type == "flov" && _monitor_counter / _monitor_epoch > 0) {
+      int turn = _monitor_counter % _monitor_epoch;
+      for (int row = 0; row < gK; ++row) {
+        for (int col = 0; col < gK; ++col) {
+          if (row == turn || col == turn) {
+            int n = row * gK + col;
+            if (_per_node_plat[n]->NumSamples() == 0)
+              continue;
+
+            int vote = 0;
+            double avg_plat = _per_node_plat[n]->Average();
+            if (avg_plat < _plat_low_watermark) {
+              vote = 1;
+            } else if (avg_plat > _plat_high_watermark) {
+              vote = -1;
+            }
+
+            if (row == turn) {
+              for (int c = 0; c < gK; ++c) {
+                if (c == col)
+                  continue;
+
+                int node = row * gK + c;
+                _power_state_votes[node] += vote;
+              }
+            }
+            if (col == turn) {
+              for (int r = 0; r < gK; ++r) {
+                if (r == row)
+                  continue;
+
+                int node = r * gK + col;
+                _power_state_votes[node] += vote;
+              }
+            }
+            _power_state_votes[n] += vote;
+
+            _per_node_plat[n]->Clear();
+          }
+        }
+      }
+
+      if (turn == gK) {
+        vector<Router *> routers = _net[0]->GetRouters();
+        for (int n = 0; n < _nodes; ++n) {
+          if (n >= _nodes - gK) {
+            _power_state_votes[n] = 0;
+            continue;
+          }
+
+          if (_power_state_votes[n] > 0) {
+            routers[n]->AggressPowerGatingPolicy();
+          } else if (_power_state_votes[n] < 0) {
+            routers[n]->RegressPowerGatingPolicy();
+          }
+          _power_state_votes[n] = 0;
+        }
+        _monitor_counter = 0;
+      }
     }
 
     vector<map<int, Flit *> > flits(_subnets);
@@ -591,6 +508,7 @@ void Gem5TrafficManager::_Step()
         _net[subnet]->WriteOutputs();
     }
 
+    ++_monitor_counter;
     _network_time++;
 
     //if (_time > _next_report) {
@@ -608,66 +526,4 @@ void Gem5TrafficManager::_Step()
         cout << "TIME " << _time << endl;
     }
 }
-
-void Gem5TrafficManager::RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
-                                                vector<vector<MessageBuffer *> >& out)
-{
-    _input_buffer = in;
-    _output_buffer = out;
-}
-
-bool Gem5TrafficManager::functionalRead(Packet *pkt)
-{
-    for (int subnet = 0; subnet < _subnets; subnet++) {
-        if (_net[subnet]->functionalRead(pkt))
-            return true;
-    }
-
-    return false;
-}
-
-uint32_t Gem5TrafficManager::functionalWrite(Packet *pkt)
-{
-    uint32_t num_functional_writes = 0;
-
-    for (int subnet = 0; subnet < _subnets; subnet++) {
-        num_functional_writes += _net[subnet]->functionalWrite(pkt);
-    }
-
-    return num_functional_writes;
-}
-
-int Gem5TrafficManager::in_flight()
-{
-    int num_in_flight_flits = 0;
-    for (int c = 0; c < _classes; c++) {
-        num_in_flight_flits += _total_in_flight_flits[c].size();
-    }
-    return num_in_flight_flits;
-}
-
-bool Gem5TrafficManager::router_power_state_transition()
-{
-    for (int subnet = 0; subnet < _subnets; subnet++) {
-        const vector<Router *> routers = _net[subnet]->GetRouters();
-        for (int r = 0; r < routers.size(); r++) {
-            Router::ePowerState ps = routers[r]->GetPowerState();
-            if (ps == Router::draining || ps == Router::wakeup)
-                return true;
-        }
-    }
-
-    return false;
-}
-
-bool Gem5TrafficManager::credit_outstanding()
-{
-    return (Credit::OutStanding() > 0);
-}
-
-void Gem5TrafficManager::DisplayStats(ostream& out) const
-{
-//  double max_latency_change = 0.0;
-}
-
 

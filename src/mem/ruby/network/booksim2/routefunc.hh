@@ -37,6 +37,20 @@ typedef void (*tRoutingFunction)( const Router *, const Flit *, int in_channel, 
 
 void InitializeRoutingMap( const Configuration & config );
 
+/* ==== Power Gate - Begin ==== */
+enum Direction {
+    DIR_EAST = 0,
+    DIR_WEST,
+    DIR_SOUTH,
+    DIR_NORTH,
+    DIR_NI,
+    DIR_INVALID,
+};
+
+extern int gRoutingDeadlockTimeoutThreshold;
+extern int gMissRouteThreshold;
+/* ==== Power Gate - End ==== */
+
 extern map<string, tRoutingFunction> gRoutingFunctionMap;
 
 extern int gNumVCs;

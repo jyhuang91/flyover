@@ -7,7 +7,7 @@
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
 
-  Redistributions of source code must retain the above copyright notice, this 
+  Redistributions of source code must retain the above copyright notice, this
   list of conditions and the following disclaimer.
   Redistributions in binary form must reproduce the above copyright notice, this
   list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -45,7 +45,7 @@ RPTrafficManager::RPTrafficManager( const Configuration &config,
     : TrafficManager(config, net)
 {
 
-    // ============ Traffic ============ 
+    // ============ Traffic ============
 
     string packet_size_str = config.GetStr("packet_size");
     if(packet_size_str.empty()) {
@@ -84,10 +84,10 @@ RPTrafficManager::RPTrafficManager( const Configuration &config,
             _packet_size_max_val.push_back(max_val);
         }
     }
-  
+
     for(int c = 0; c < _classes; ++c) {
         if(_use_read_write[c]) {
-            _packet_size[c] = 
+            _packet_size[c] =
                 vector<int>(1, (_read_request_size[c] + _read_reply_size[c] +
                                 _write_request_size[c] + _write_reply_size[c]) / 2);
             _packet_size_rate[c] = vector<int>(1, 1);
@@ -95,7 +95,7 @@ RPTrafficManager::RPTrafficManager( const Configuration &config,
         }
     }
 
-    // ============ Statistics ============ 
+    // ============ Statistics ============
 
 }
 
@@ -106,7 +106,7 @@ RPTrafficManager::~RPTrafficManager( )
 
 
 
-void RPTrafficManager::_GeneratePacket( int source, int stype, 
+void RPTrafficManager::_GeneratePacket( int source, int stype,
                                       int cl, uint64_t time )
 {
     assert(stype!=0);
@@ -117,17 +117,13 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
     /* ==== Power Gate - End ==== */
 
     Flit::FlitType packet_type = Flit::ANY_TYPE;
-    int size = _GetNextPacketSize(cl); //input size 
+    int size = _GetNextPacketSize(cl); //input size
     int pid = _cur_pid++;
     assert(_cur_pid);
     int packet_destination = _traffic_pattern[cl]->dest(source);
     /* ==== Power Gate - Begin ==== */
-    if (_traffic[cl] == "tornado") {
-        for (int i = 1; i < _nodes; ++i) {
-            packet_destination = _traffic_pattern[cl]->dest((source+i)%_nodes);
-            if (core_states[packet_destination] == true)
-                break;
-        }
+    if (_traffic[cl] == "tornado" && core_states[packet_destination] == false) {
+        packet_destination = source;
     } else {
         while (core_states[packet_destination] != true)
             packet_destination = _traffic_pattern[cl]->dest(source);
@@ -182,18 +178,18 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
         record = _measure_stats[cl];
     }
 
-    int subnetwork = ((packet_type == Flit::ANY_TYPE) ? 
+    int subnetwork = ((packet_type == Flit::ANY_TYPE) ?
                       RandomInt(_subnets-1) :
                       _subnet[packet_type]);
-  
-    if ( watch ) { 
+
+    if ( watch ) {
         *gWatchOut << GetSimTime() << " | "
                    << "node" << source << " | "
                    << "Enqueuing packet " << pid
                    << " at time " << time
                    << "." << endl;
     }
-  
+
     for ( int i = 0; i < size; ++i ) {
         Flit * f  = Flit::New();
         f->id     = _cur_id++;
@@ -210,7 +206,7 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
         if(record) {
             _measured_in_flight_flits[f->cl].insert(make_pair(f->id, f));
         }
-    
+
         if(gTrace){
             cout<<"New Flit "<<f->src<<endl;
         }
@@ -245,10 +241,10 @@ void RPTrafficManager::_GeneratePacket( int source, int stype,
         } else {
             f->tail = false;
         }
-    
+
         f->vc  = -1;
 
-        if ( f->watch ) { 
+        if ( f->watch ) {
             *gWatchOut << GetSimTime() << " | "
                        << "node" << source << " | "
                        << "Enqueuing flit " << f->id
@@ -279,22 +275,10 @@ void RPTrafficManager::_Inject()
                 bool generated = false;
                 while( !generated && ( _qtime[input][c] <= _time ) ) {
                     int stype = _IssuePacket( input, c );
-	  
+
                     if ( stype != 0 ) { //generate a packet
-                        /* ==== Power Gate - Begin ==== */
-                        int i = 0;
-                        if (_traffic[c] == "tornado") {
-                            for (i = 0; i < _nodes; ++i) {
-                                int pkt_dest = _traffic_pattern[c]->dest((input+i)%_nodes);
-                                if (core_states[pkt_dest] == true)
-                                    break;
-                            }
-                        }
-                        if (i == _nodes)
-                            break;
-                        /* ==== Power Gate - End ==== */
-                        _GeneratePacket( input, stype, c, 
-                                         _include_queuing==1 ? 
+                        _GeneratePacket( input, stype, c,
+                                         _include_queuing==1 ?
                                          _qtime[input][c] : _time );
                         generated = true;
                     }
@@ -303,8 +287,8 @@ void RPTrafficManager::_Inject()
                         ++_qtime[input][c];
                     }
                 }
-	
-                if ( ( _sim_state == draining ) && 
+
+                if ( ( _sim_state == draining ) &&
                      ( _qtime[input][c] > _drain_time ) ) {
                     _qdrained[input][c] = true;
                 }
@@ -338,7 +322,7 @@ void RPTrafficManager::_Step( )
     }
 
     vector<map<int, Flit *> > flits(_subnets);
-  
+
     for ( int subnet = 0; subnet < _subnets; ++subnet ) {
         for ( int n = 0; n < _nodes; ++n ) {
             Flit * const f = _net[subnet]->ReadFlit( n );
@@ -378,7 +362,7 @@ void RPTrafficManager::_Step( )
         }
         _net[subnet]->ReadInputs( );
     }
-  
+
     if ( !_empty_network ) {
         _Inject();
     }
@@ -397,12 +381,12 @@ void RPTrafficManager::_Step( )
 
             if(_hold_switch_for_packet) {
                 list<Flit *> const & pp = _partial_packets[n][last_class];
-                if(!pp.empty() && !pp.front()->head && 
+                if(!pp.empty() && !pp.front()->head &&
                    !dest_buf->IsFullFor(pp.front()->vc)) {
                     f = pp.front();
                     assert(f->vc == _last_vc[n][subnet][last_class]);
 
-                    // if we're holding the connection, we don't need to check that class 
+                    // if we're holding the connection, we don't need to check that class
                     // again in the for loop
                     --class_limit;
                 }
@@ -421,7 +405,7 @@ void RPTrafficManager::_Step( )
                 Flit * const cf = pp.front();
                 assert(cf);
                 assert(cf->cl == c);
-	
+
                 if(cf->subnetwork != subnet) {
                     continue;
                 }
@@ -448,8 +432,8 @@ void RPTrafficManager::_Step( )
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
-                        // NOTE: Because the lookahead is not for injection, but for the 
-                        // first hop, we have to temporarily set cf's VC to be non-negative 
+                        // NOTE: Because the lookahead is not for injection, but for the
+                        // first hop, we have to temporarily set cf's VC to be non-negative
                         // in order to avoid seting of an assertion in the routing function.
                         cf->vc = vc_start;
                         _rf(router, cf, in_channel, &cf->la_route_set, false);
@@ -505,7 +489,7 @@ void RPTrafficManager::_Step( )
                         }
                     }
                 }
-	
+
                 if(cf->vc == -1) {
                     if(cf->watch) {
                         *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -533,7 +517,7 @@ void RPTrafficManager::_Step( )
                 int const c = f->cl;
 
                 if(f->head) {
-	  
+
                     if (_lookahead_routing) {
                         if(!_noq) {
                             const FlitChannel * inject = _net[subnet]->GetInject(n);
@@ -560,7 +544,7 @@ void RPTrafficManager::_Step( )
                     dest_buf->TakeBuffer(f->vc);
                     _last_vc[n][subnet][c] = f->vc;
                 }
-	
+
                 _last_class[n][subnet] = c;
 
                 _partial_packets[n][c].pop_front();
@@ -571,12 +555,12 @@ void RPTrafficManager::_Step( )
 #endif
 
                 dest_buf->SendingFlit(f);
-	
+
                 if(_pri_type == network_age_based) {
                     f->pri = numeric_limits<int>::max() - _time;
                     assert(f->pri >= 0);
                 }
-	
+
                 if(f->watch) {
                     *gWatchOut << GetSimTime() << " | "
                                << "node" << n << " | "
@@ -593,20 +577,20 @@ void RPTrafficManager::_Step( )
                     Flit * const nf = _partial_packets[n][c].front();
                     nf->vc = f->vc;
                 }
-	
+
                 if((_sim_state == warming_up) || (_sim_state == running)) {
                     ++_sent_flits[c][n];
                     if(f->head) {
                         ++_sent_packets[c][n];
                     }
                 }
-	
+
 #ifdef TRACK_FLOWS
                 ++_injected_flits[c][n];
 #endif
-	
+
                 _net[subnet]->WriteFlit(f, n);
-	
+
             }
         }
     }
@@ -621,22 +605,25 @@ void RPTrafficManager::_Step( )
                 if(f->watch) {
                     *gWatchOut << GetSimTime() << " | "
                                << "node" << n << " | "
-                               << "Injecting credit for VC " << f->vc 
-                               << " into subnet " << subnet 
+                               << "Injecting credit for VC " << f->vc
+                               << " into subnet " << subnet
                                << "." << endl;
                 }
                 Credit * const c = Credit::New();
                 c->vc.insert(f->vc);
                 _net[subnet]->WriteCredit(c, n);
-	
+
 #ifdef TRACK_FLOWS
                 ++_ejected_flits[f->cl][n];
 #endif
-	
+
                 _RetireFlit(f, n);
             }
         }
         flits[subnet].clear();
+        /* ==== Power Gate - Begin ==== */
+        _net[subnet]->PowerStateEvaluate();
+        /* ==== Power Gate - End ==== */
         _net[subnet]->Evaluate( );
         _net[subnet]->WriteOutputs( );
     }
@@ -648,4 +635,4 @@ void RPTrafficManager::_Step( )
     }
 
 }
- 
+

@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -30,7 +30,7 @@
  *The base class of either iq router or event router
  *contains a list of channels and other router configuration variables
  *
- *The older version of the simulator uses an array of flits and credit to 
+ *The older version of the simulator uses an array of flits and credit to
  *simulate the channels. Newer version ueses flitchannel and credit channel
  *which can better model channel delay
  *
@@ -49,14 +49,16 @@
 #include "mem/ruby/network/booksim2/routers/chaos_router.hh"
 /* ==== Power Gate - Begin ==== */
 #include "mem/ruby/network/booksim2/routers/rflov_router.hh"
+#include "mem/ruby/network/booksim2/routers/gflov_router.hh"
 #include "mem/ruby/network/booksim2/routers/flov_router.hh"
 #include "mem/ruby/network/booksim2/routers/rp_router.hh"
+#include "mem/ruby/network/booksim2/routers/nord_router.hh"
 /* ==== Power Gate - End ==== */
 ///////////////////////////////////////////////////////
 
 /* ==== Power Gate - Begin ==== */
-const char * const Router::POWERSTATE[] = {"power_off",
-  "power_on", "draining", "wakeup", "invalid"};
+const char * const Router::POWERSTATE[] = {"power-off",
+  "power-on", "draining", "wakeup", "invalid"};
 
 int const Router::STALL_BUFFER_BUSY = -2;
 int const Router::STALL_BUFFER_CONFLICT = -3;
@@ -65,13 +67,13 @@ int const Router::STALL_BUFFER_RESERVED = -5;
 int const Router::STALL_CROSSBAR_CONFLICT = -6;
 
 Router::Router( const Configuration& config,
-		Module *parent, const string & name, int id,
-		int inputs, int outputs ) :
+    Module *parent, const string & name, int id,
+    int inputs, int outputs ) :
 TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
    _partial_internal_cycles(0.0)
 {
-  _crossbar_delay   = ( config.GetInt( "st_prepare_delay" ) + 
-			config.GetInt( "st_final_delay" ) );
+  _crossbar_delay   = ( config.GetInt( "st_prepare_delay" ) +
+      config.GetInt( "st_final_delay" ) );
   _credit_delay     = config.GetInt( "credit_delay" );
   _input_speedup    = config.GetInt( "input_speedup" );
   _output_speedup   = config.GetInt( "output_speedup" );
@@ -146,6 +148,7 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   _router_state = true;
   _req_hids.resize(4, -1);
   _resp_hids.resize(4, -1);
+  _watch_power_gating = false;
   /* ==== Power Gate - End ==== */
 }
 
@@ -201,8 +204,8 @@ bool Router::IsFaultyOutput( int c ) const
 
 /*Router constructor*/
 Router *Router::NewRouter( const Configuration& config,
-			   Module *parent, const string & name, int id,
-			   int inputs, int outputs )
+    Module *parent, const string & name, int id,
+    int inputs, int outputs )
 {
   const string type = config.GetStr( "router" );
   Router *r = NULL;
@@ -213,19 +216,23 @@ Router *Router::NewRouter( const Configuration& config,
   } else if ( type == "chaos" ) {
     r = new ChaosRouter( config, parent, name, id, inputs, outputs );
     /* ==== Power Gate - Begin ==== */
-  } else if ( type == "rflov" ) {
-    r = new RFLOVRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "flov" ) {
     r = new FLOVRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "rflov" ) {
+    r = new RFLOVRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "gflov" ) {
+    r = new GFLOVRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "rp" ) {
     r = new RPRouter( config, parent, name, id, inputs, outputs );
+  } else if ( type == "nord" ) {
+    r = new NoRDRouter( config, parent, name, id, inputs, outputs );
     /* ==== Power Gate - End ==== */
   } else {
     cerr << "Unknown router type: " << type << endl;
   }
   /*For additional router, add another else if statement*/
   /*Original booksim specifies the router using "flow_control"
-   *we now simply call these types. 
+   *we now simply call these types.
    */
 
   return r;
@@ -249,6 +256,8 @@ Router * Router::GetNeighborRouter(int out_port)
 
   return router;
 }
+
+void Router::SetRingOutputVCBufferSize(int vc_buf_size) {};
 /* ==== Power Gate - End ==== */
 
 

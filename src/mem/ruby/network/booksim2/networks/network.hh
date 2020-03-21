@@ -71,6 +71,10 @@ protected:
 
   /* ==== Power Gate - Begin ==== */
   int _fabric_manager;  // RP
+  bool _powergate_auto_config;
+  int _powergate_seed;
+  int _powergate_percentile;
+  string _powergate_type;
   vector<bool> _core_states;
   vector<bool> _router_states;
   vector<int> _off_cores;

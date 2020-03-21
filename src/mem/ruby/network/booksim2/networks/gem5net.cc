@@ -22,6 +22,7 @@ Gem5Net::Gem5Net( const Configuration &config, const string & name) :
 {
     _ComputeSize(config);
     _Alloc();
+    gNodes = _size;
     _BuildNet(config);
 }
 
@@ -70,7 +71,7 @@ void Gem5Net::_BuildNet(const Configuration &config)
 
     for (int router = 0; router < _size; router++) {
 
-        router_name << config.GetStr("router") << "_router";
+        router_name << config.GetStr("router") << "_router_" << router;
 
         if (_k > 1) {
             for (int dim_offset = _size / _k; dim_offset >= 1; dim_offset /=
