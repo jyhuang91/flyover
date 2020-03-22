@@ -80,9 +80,6 @@ void Gem5Net::_BuildNet(const Configuration &config)
         }
 
         int radix = 2 * _n + node_port_map[router].size();
-        if (_powergate_type == "nord" && radix == 2 * _n) {
-            radix++; // add for bypassing
-        }
 
         _routers[router] = Router::NewRouter(config, this, router_name.str(),
                 router, radix, radix);

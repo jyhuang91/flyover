@@ -192,7 +192,7 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
                 assert(f->pri >= 0);
                 break;
             case age_based:
-                f->pri = numeric_limits<int>::max() - time;
+                f->pri = numeric_limits<int>::max() - time % numeric_limits<int>::max();
                 assert(f->pri >= 0);
                 break;
             case sequence_based:
@@ -517,7 +517,7 @@ void Gem5TrafficManager::_Step()
                  dest_buf->SendingFlit(f);
 
                  if (_pri_type == network_age_based) {
-                     f->pri = numeric_limits<int>::max() - _time;
+                     f->pri = numeric_limits<int>::max() - _time % numeric_limits<int>::max();
                      assert(f->pri >= 0);
                  }
 

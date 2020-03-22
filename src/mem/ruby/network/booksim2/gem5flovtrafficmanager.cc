@@ -431,7 +431,7 @@ void Gem5FLOVTrafficManager::_Step()
                  dest_buf->SendingFlit(f);
 
                  if (_pri_type == network_age_based) {
-                     f->pri = numeric_limits<int>::max() - _time;
+                     f->pri = numeric_limits<int>::max() - _time % numeric_limits<int>::max();
                      assert(f->pri >= 0);
                  }
 

@@ -175,7 +175,7 @@ void Gem5NoRDTrafficManager::_GeneratePacket(int source, int stype, int vnet, ui
                 assert(f->pri >= 0);
                 break;
             case age_based:
-                f->pri = numeric_limits<int>::max() - time;
+                f->pri = numeric_limits<int>::max() - time % numeric_limits<int>::max();
                 assert(f->pri >= 0);
                 break;
             case sequence_based:
@@ -269,7 +269,7 @@ void Gem5NoRDTrafficManager::_Step()
                 }
                 flits[subnet].insert(make_pair(n, f));
 
-                if (f->dest == n) { // if not bypassing
+                if (!_bypass_nodes[n]) {
                     NetworkMessage *net_msg_ptr =
                         safe_cast<NetworkMessage *>(f->msg_ptr.get());
                     bool is_data = _net_ptr->isDataMsg(
@@ -433,7 +433,7 @@ void Gem5NoRDTrafficManager::_Step()
                                             << " | flit " << f->id << " is selected for hold switch bypass"
                                             << endl;
                                     }
-                                    f->vc = _buffers[n][subnet]->GetOutputVC(vc);
+                                    f->vc = out_vc;
                                     bypass_vc = vc;
                                     vc_limit--;
                                     break;
@@ -458,7 +458,7 @@ void Gem5NoRDTrafficManager::_Step()
                         continue;
                     }
 
-                    if(f && (f->pri >= cf->pri)) {
+                    if (f && (f->pri >= cf->pri)) {
                         assert(!f->head);
                         assert(f->vc != -1);
                         assert(_buffers[n][subnet]->GetState(bypass_vc) == VC::active);
@@ -474,7 +474,7 @@ void Gem5NoRDTrafficManager::_Step()
 
                         if (_performance_centric_wakeup_threshold > 0 &&
                                 _power_centric_wakeup_threshold > 0) {
-                            int wakeup_threshold = _performance_centric_routers[n] ?
+                            int wakeup_threshold = _performance_centric_routers[r] ?
                                 _performance_centric_wakeup_threshold :
                                 _power_centric_wakeup_threshold;
                             ++_wakeup_monitor_vc_requests[r];
@@ -617,7 +617,7 @@ void Gem5NoRDTrafficManager::_Step()
                 dest_buf->SendingFlit(f);
 
                 if (_pri_type == network_age_based) {
-                    f->pri = numeric_limits<int>::max() - _time;
+                    f->pri = numeric_limits<int>::max() - _time % numeric_limits<int>::max();
                     assert(f->pri >= 0);
                 }
 
@@ -703,7 +703,7 @@ void Gem5NoRDTrafficManager::_Step()
             if (iter != flits[subnet].end()) {
                 Flit * const f = iter->second;
 
-                if (f->dest == n) {
+                if (!_bypass_nodes[n]) {
                     f->atime = _time;
                     if (f->watch) {
                         *gWatchOut << GetSimTime() << " | "
