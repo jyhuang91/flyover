@@ -13,7 +13,7 @@ logfile=log/rpc/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_${datasize}
 mkdir -p log/rpc
 
 ./build/${system}/gem5.opt \
-  -d m5out/restoret_rpc/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
+  -d m5out/restore_rpc/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
   configs/example/fs_booksim2.py \
   --checkpoint-dir=m5out/checkpoints/${benchmark}${numthread}_${numcpu}cpu_sim${datasize}/ \
   --checkpoint-restore=1 \

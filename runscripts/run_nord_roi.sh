@@ -9,11 +9,11 @@ system=ALPHA_MESI_Two_Level
 l2size=256kB
 meshrows=8;
 
-logfile=log/rpa/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_${datasize}.log
-mkdir -p log/rpa
+logfile=log/nord/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_${datasize}.log
+mkdir -p log/nord
 
 ./build/${system}/gem5.opt \
-  -d m5out/restore_rpa/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
+  -d m5out/restore_nord/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
   configs/example/fs_booksim2.py \
   --checkpoint-dir=m5out/checkpoints/${benchmark}${numthread}_${numcpu}cpu_sim${datasize}/ \
   --checkpoint-restore=1 \
@@ -33,5 +33,5 @@ mkdir -p log/rpa
   --mesh-rows=${meshrows} \
   --booksim-network \
   --noc-pg \
-  --booksim-config=configs/ruby_booksim2/gem5booksimrpa.cfg \
+  --booksim-config=configs/ruby_booksim2/gem5booksimnord.cfg \
   > ${logfile} 2>&1 &

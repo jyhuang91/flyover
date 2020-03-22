@@ -13,7 +13,7 @@ logfile=log/flov/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_${datasize
 mkdir -p log/flov
 
 ./build/${system}/gem5.opt \
-  -d m5out/restoret_flov/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
+  -d m5out/restore_flov/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
   configs/example/fs_booksim2.py \
   --checkpoint-dir=m5out/checkpoints/${benchmark}${numthread}_${numcpu}cpu_sim${datasize}/ \
   --checkpoint-restore=1 \
