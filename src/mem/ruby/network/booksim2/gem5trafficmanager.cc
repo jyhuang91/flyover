@@ -8,6 +8,7 @@
 #include "mem/ruby/network/booksim2/booksim.hh"
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
 #include "mem/ruby/network/booksim2/gem5flovtrafficmanager.hh"
+#include "mem/ruby/network/booksim2/gem5nordtrafficmanager.hh"
 #include "mem/ruby/network/booksim2/random_utils.hh"
 #include "mem/ruby/network/booksim2/networks/gem5net.hh"
 #include "mem/ruby/slicc_interface/NetworkMessage.hh"
@@ -26,6 +27,8 @@ Gem5TrafficManager *Gem5TrafficManager::New(Configuration const &config,
         result = new Gem5TrafficManager(config, net, vnets);
     } else if (sim_type == "flov") {
         result = new Gem5FLOVTrafficManager(config, net, vnets);
+    } else if (sim_type == "nord") {
+        result = new Gem5NoRDTrafficManager(config, net, vnets);
     } else {
         cerr << "Unknown simulation type: " << sim_type << endl;
     }
@@ -225,7 +228,7 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
 
 void Gem5TrafficManager::_Inject()
 {
-    for (int input = 0; input < _nodes; input++) {
+    for (int input = 0; input < _input_buffer.size(); input++) {
         if (_partial_packets[input][0].empty()) {
 
             int const last_vnet = _last_vnet[input];

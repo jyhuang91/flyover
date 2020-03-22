@@ -9,6 +9,7 @@
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
 #include "mem/ruby/network/booksim2/booksim_config.hh"
 #include "mem/ruby/network/booksim2/routers/iq_router.hh"
+#include "mem/ruby/network/booksim2/misc_utils.hh"
 
 extern TrafficManager * trafficManager;
 
@@ -50,8 +51,21 @@ BooksimNetwork::BooksimNetwork(const Params *p)
     ostringstream node_router_map;
     node_router_map << "{";
     int nodes = p->attached_router_id.size();
-    for (int n = 0; n < nodes-1; n++)
+    int routers = powi(_booksim_config->GetInt("k"), _booksim_config->GetInt("n"));
+    vector<bool> router_states;
+    router_states.resize(routers, false);
+    for (int n = 0; n < nodes-1; n++) {
         node_router_map << p->attached_router_id[n] << ",";
+        router_states[p->attached_router_id[n]] = true;
+    }
+    if (_booksim_config->GetStr("powergate_type") == "nord") {
+        for (int r = 0; r < routers; r++) {
+            if (router_states[r] == false) {
+                // add a fake node for bypassing
+                node_router_map << r << ",";
+            }
+        }
+    }
     node_router_map << p->attached_router_id[nodes-1] << "}";
     _booksim_config->AddStrField("node_router_map", node_router_map.str());
 
@@ -374,18 +388,18 @@ BooksimNetwork::regActivityStats()
     }
 
     _inject_link_activity
-        .init(m_nodes)
+        .init(_net[0]->NumNodes())
         .name(name() + ".inject_link_activity")
         .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
         ;
 
     _eject_link_activity
-        .init(m_nodes)
+        .init(_net[0]->NumNodes())
         .name(name() + ".eject_link_activity")
         .flags(Stats::dist | Stats::total | Stats::nozero | Stats::oneline)
         ;
 
-    for (int i = 0; i < m_nodes; i++) {
+    for (int i = 0; i < _net[0]->NumNodes(); i++) {
         _inject_link_activity.subname(i, csprintf("inject-link-%i", i));
         _eject_link_activity.subname(i, csprintf("eject-link-%i", i));
     }

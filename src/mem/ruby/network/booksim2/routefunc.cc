@@ -3014,7 +3014,7 @@ void nord_gem5net( const Router *r, const Flit *f, int in_channel,
     return;
   } else if (r->GetID() == f->dest_router) {
     // ejection can also use all VCs
-    out_port = 2*gN;
+    out_port = Gem5Net::NodeToPort(f->dest);
     outputs->AddRange(out_port, vcBegin, vcEnd);
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "

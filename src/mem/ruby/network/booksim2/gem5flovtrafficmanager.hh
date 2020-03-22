@@ -46,5 +46,5 @@ public:
     virtual void _Step();
 };
 
-#endif // #define _GEM5_TRAFFICMANAGER_HH_
+#endif // #define _GEM5_FLOV_TRAFFICMANAGER_HH_
 
