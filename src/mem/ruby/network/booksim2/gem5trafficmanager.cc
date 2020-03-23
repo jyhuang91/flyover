@@ -14,7 +14,9 @@
 #include "mem/ruby/slicc_interface/NetworkMessage.hh"
 #include "mem/ruby/network/Network.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
+#include "mem/ruby/common/Global.hh"
 #include "sim/clocked_object.hh"
+#include "base/callback.hh"
 
 #define REPORT_INTERVAL 100000
 
@@ -47,6 +49,10 @@ Gem5TrafficManager::Gem5TrafficManager(const Configuration &config, const
     _watch_all_pkts = (config.GetInt("watch_all_pkts") > 0);
 
     _sim_state = running;
+
+    Callback *cb = new MakeCallback<Gem5TrafficManager,
+             &Gem5TrafficManager::PrintStats>(this);
+    registerExitCallback(cb);
 }
 
 Gem5TrafficManager::~Gem5TrafficManager()
@@ -676,4 +682,19 @@ void Gem5TrafficManager::DisplayStats(ostream& out) const
 //  double max_latency_change = 0.0;
 }
 
+void Gem5TrafficManager::PrintStats()
+{
+  uint64_t cycles = _time - g_ruby_start;
+  cout.setf(ios::fixed, ios::floatfield);
+  cout.precision(1);
+  cout << "Total cycles: " << cycles
+    << " (start: " << g_ruby_start << ", end: " << _time << ")" << endl;
+  const vector<Router *> routers = _net[0]->GetRouters();
+  for (int r = 0; r < routers.size(); r++) {
+    int power_off_cycles = routers[r]->GetPowerOffCycles();
+    cout << routers[r]->Name() << " | off cycles: " << power_off_cycles
+      << " (" << ((double) power_off_cycles * 100.0 / (double) cycles)
+      << "% " << "off cycles)" << endl;
+  }
+}
 

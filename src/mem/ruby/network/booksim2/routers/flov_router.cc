@@ -308,6 +308,7 @@ void FLOVRouter::_GFLOVPowerStateEvaluate()
         assert(cur_buf->GetState(vc) == VC::idle);
       }
     }
+    ++_off_timer;
     ++_power_off_cycles;
     ++_total_power_off_cycles;
     break;
@@ -609,8 +610,8 @@ void FLOVRouter::_RFLOVPowerStateEvaluate()
     }
     ++_power_off_cycles;
     ++_total_power_off_cycles;
+    ++_off_timer;
     if (_router_state || _wakeup_signal) {
-      ++_off_timer;
       bool neighbor_wakeup = false;
       bool neighbor_draining = false;
       for (int out = 0; out < 4; ++out) {
@@ -2442,16 +2443,6 @@ void FLOVRouter::_FlovStep() {
   assert(_sw_alloc_vcs.empty());
   assert(_crossbar_flits.empty());
   if (_power_state == power_off && _off_timer == 1) {
-      if (!_in_queue_flits.empty()) {
-          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-              << "Has bypass flits:" << endl;
-          for (map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
-                  iter != _in_queue_flits.end(); ++iter) {
-              *gWatchOut << "Bypass flit " << iter->second->id << " (pid: "
-                  << iter->second->pid << ") from input " << iter->first
-                  << " to next router" << endl;
-          }
-      }
       assert(_in_queue_flits.empty());
   }
 

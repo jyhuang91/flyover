@@ -176,6 +176,11 @@ void Gem5Net::_BuildNet(const Configuration &config)
             _eject[router]->SetLatency(1);
         }
     }
+
+    vector<int> watch_power_gating_routers = config.GetIntArray("watch_power_gating_routers");
+    for (size_t i = 0; i < watch_power_gating_routers.size(); ++i) {
+      _routers[watch_power_gating_routers[i]]->WatchPowerGating();
+    }
 }
 
 int Gem5Net::_LeftChannel(int router, int dim)

@@ -45,6 +45,7 @@ public:
     virtual ~Gem5TrafficManager();
 
     virtual void DisplayStats(ostream& out) const;
+    void PrintStats();
     virtual void Step();
     void RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
                                 vector<vector<MessageBuffer *> >& out);

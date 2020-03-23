@@ -264,7 +264,9 @@ void Router::SynchronizeCycle(uint64_t cycles)
     if (_power_state == power_on) {
         _idle_timer += cycles;
     } else if (_power_state == power_off) {
+        int prev_off_timer = _off_timer;
         _off_timer += cycles;
+        assert(_off_timer > prev_off_timer);
         _power_off_cycles += cycles;
         _total_power_off_cycles += cycles;
     }
