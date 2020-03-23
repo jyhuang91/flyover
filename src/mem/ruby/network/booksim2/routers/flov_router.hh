@@ -96,6 +96,7 @@ public:
   virtual void RegressFLOVPolicy();
   virtual inline void AggressPowerGatingPolicy() { AggressFLOVPolicy(); }
   virtual inline void RegressPowerGatingPolicy() { RegressFLOVPolicy(); }
+  virtual int NextPowerEventCycle();
   /* ==== Power Gate - End ==== */
 
   virtual void ReadInputs( );

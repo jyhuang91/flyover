@@ -119,6 +119,10 @@ void Flit::FreeAll() {
   }
 }
 
+int Flit::OutStanding(){
+  return _all.size() - _free.size();
+}
+
 bool Flit::functionalRead(Packet *pkt)
 {
     Message *msg = msg_ptr.get();

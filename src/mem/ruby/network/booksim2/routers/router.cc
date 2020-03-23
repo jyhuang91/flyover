@@ -258,6 +258,17 @@ Router * Router::GetNeighborRouter(int out_port)
 }
 
 void Router::SetRingOutputVCBufferSize(int vc_buf_size) {};
+
+void Router::SynchronizeCycle(uint64_t cycles)
+{
+    if (_power_state == power_on) {
+        _idle_timer += cycles;
+    } else if (_power_state == power_off) {
+        _off_timer += cycles;
+        _power_off_cycles += cycles;
+        _total_power_off_cycles += cycles;
+    }
+}
 /* ==== Power Gate - End ==== */
 
 

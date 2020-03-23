@@ -141,11 +141,14 @@ BooksimNetwork::setFromNetQueue(NodeID id, bool ordered, int network_num,
 void
 BooksimNetwork::wakeup()
 {
-    _manager->_Step();
-    if (_manager->in_flight() ||
-        _manager->router_power_state_transition() ||
-        _manager->credit_outstanding()) {
+    _manager->Step();
+    if (_manager->EventsOutstanding()) {
         scheduleEventAbsolute(clockEdge(Cycles(1)));
+    } else {
+        int cycle = _manager->NextPowerEventCycle();
+        if (cycle > 0) {
+            scheduleEventAbsolute(clockEdge(Cycles(cycle)));
+        }
     }
 }
 

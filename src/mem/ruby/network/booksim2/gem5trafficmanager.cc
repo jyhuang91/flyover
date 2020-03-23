@@ -257,30 +257,37 @@ void Gem5TrafficManager::_Inject()
     }
 }
 
-void Gem5TrafficManager::_Step()
+void Gem5TrafficManager::Step()
 {
+    uint64_t prev_time = _time;
     _time = _net_ptr->curCycle();
+    if (_time > prev_time + 1) {
+        vector<Router *> routers = _net[0]->GetRouters();
+        for (int r = 0; r < routers.size(); r++) {
+            routers[r]->SynchronizeCycle(_time - prev_time - 1);
+        }
+    }
 
     bool flits_in_flight = false;
     for (int c = 0; c < _classes; c++) {
         flits_in_flight |= !_total_in_flight_flits[c].empty();
     }
-    if(flits_in_flight && (_deadlock_timer++ >= _deadlock_warn_timeout)){
+    if (flits_in_flight && (_deadlock_timer++ >= _deadlock_warn_timeout)) {
         _deadlock_timer = 0;
         cout << "WARNING: Possible network deadlock.\n";
         /* ==== Power Gate Debug - Begin ==== */
-//        cout << GetSimTime() << endl;
-//        const vector<Router *> routers = _net[0]->GetRouters();
-//        for (int n = 0; n < routers.size(); ++n) {
-//            if (n % 8 == 0) {
-//                cout << endl;
-//            }
-//            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
-//        }
-//        cout << endl;
-//        for (int n = 0; n < routers.size(); ++n)
-//            routers[n]->Display(cout);
-//        cout << endl << endl;
+        cout << GetSimTime() << endl;
+        const vector<Router *> routers = _net[0]->GetRouters();
+        for (int n = 0; n < routers.size(); ++n) {
+            if (n % gK == 0) {
+                cout << endl;
+            }
+            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+        }
+        cout << endl;
+        for (int n = 0; n < routers.size(); ++n)
+            routers[n]->Display(cout);
+        cout << endl << endl;
         /* ==== Power Gate Debug - End ==== */
     }
 
@@ -640,16 +647,15 @@ uint32_t Gem5TrafficManager::functionalWrite(Packet *pkt)
     return num_functional_writes;
 }
 
-int Gem5TrafficManager::in_flight()
+bool Gem5TrafficManager::EventsOutstanding()
 {
-    int num_in_flight_flits = 0;
-    for (int c = 0; c < _classes; c++) {
-        num_in_flight_flits += _total_in_flight_flits[c].size();
-    }
-    return num_in_flight_flits;
+    bool have_events = Flit::OutStanding() || Credit::OutStanding() ||
+        Handshake::OutStanding() || RouterPowerStateTransition();
+
+    return have_events;
 }
 
-bool Gem5TrafficManager::router_power_state_transition()
+bool Gem5TrafficManager::RouterPowerStateTransition()
 {
     for (int subnet = 0; subnet < _subnets; subnet++) {
         const vector<Router *> routers = _net[subnet]->GetRouters();
@@ -657,15 +663,12 @@ bool Gem5TrafficManager::router_power_state_transition()
             Router::ePowerState ps = routers[r]->GetPowerState();
             if (ps == Router::draining || ps == Router::wakeup)
                 return true;
+            if (ps == Router::power_off && routers[r]->GetWakeUpSignal())
+                return true;
         }
     }
 
     return false;
-}
-
-bool Gem5TrafficManager::credit_outstanding()
-{
-    return (Credit::OutStanding() > 0);
 }
 
 void Gem5TrafficManager::DisplayStats(ostream& out) const

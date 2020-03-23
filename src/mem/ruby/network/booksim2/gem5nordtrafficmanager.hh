@@ -33,7 +33,8 @@ public:
             & net , int vnets);
     ~Gem5NoRDTrafficManager();
 
-    virtual void _Step();
+    virtual void Step();
+    virtual int  NextPowerEventCycle();
 };
 
 #endif // #define _GEM5_NORD_TRAFFICMANAGER_HH_

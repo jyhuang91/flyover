@@ -109,9 +109,16 @@ void Gem5FLOVTrafficManager::_RetireFlit(Flit *f, int dest)
     TrafficManager::_RetireFlit(f, dest);
 }
 
-void Gem5FLOVTrafficManager::_Step()
+void Gem5FLOVTrafficManager::Step()
 {
+    uint64_t prev_time = _time;
     _time = _net_ptr->curCycle();
+    if (_time > prev_time + 1) {
+        vector<Router *> routers = _net[0]->GetRouters();
+        for (int r = 0; r < routers.size(); r++) {
+            routers[r]->SynchronizeCycle(_time - prev_time - 1);
+        }
+    }
 
     bool flits_in_flight = false;
     for (int c = 0; c < _classes; c++) {
@@ -527,3 +534,15 @@ void Gem5FLOVTrafficManager::_Step()
     }
 }
 
+int Gem5FLOVTrafficManager::NextPowerEventCycle()
+{
+    int cycle = 0;
+    const vector<Router *> routers = _net[0]->GetRouters();
+    for (int r = 0; r < routers.size(); r++) {
+        int next_event_cycle = routers[r]->NextPowerEventCycle();
+        if (cycle > 0 && next_event_cycle > 0 && next_event_cycle < cycle)
+            cycle = next_event_cycle;
+    }
+
+    return cycle;
+}

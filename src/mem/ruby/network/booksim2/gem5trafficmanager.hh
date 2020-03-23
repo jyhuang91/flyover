@@ -45,7 +45,7 @@ public:
     virtual ~Gem5TrafficManager();
 
     virtual void DisplayStats(ostream& out) const;
-    virtual void _Step();
+    virtual void Step();
     void RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
                                 vector<vector<MessageBuffer *> >& out);
 
@@ -53,9 +53,9 @@ public:
     uint32_t functionalWrite(Packet *pkt);
 
     void init_net_ptr(BooksimNetwork* net_ptr) { _net_ptr = net_ptr; }
-    int in_flight();
-    bool router_power_state_transition();
-    bool credit_outstanding();
+    bool EventsOutstanding();
+    bool RouterPowerStateTransition();
+    virtual int NextPowerEventCycle() {return 0;}
 
     //inline
     int getNetworkTime() {

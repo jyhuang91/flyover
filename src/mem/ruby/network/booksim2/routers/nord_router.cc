@@ -393,6 +393,19 @@ void NoRDRouter::PowerStateEvaluate()
       Error(err.str());
   }
 }
+
+int NoRDRouter::NextPowerEventCycle()
+{
+    int cycle = 0;
+    if (_power_state == power_on && _router_state == false) {
+        if (_idle_timer > _idle_threshold)
+            cycle = 1;
+        else
+            cycle = _idle_threshold - _idle_timer + 1;
+    }
+
+    return cycle;
+}
 /* ==== Power Gate - End ==== */
 
 

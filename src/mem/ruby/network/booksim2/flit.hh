@@ -109,6 +109,7 @@ public:
   static Flit * New();
   void Free();
   static void FreeAll();
+  static int OutStanding();
 
 private:
 

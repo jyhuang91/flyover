@@ -992,8 +992,45 @@ void FLOVRouter::RegressFLOVPolicy()
     }
   }
 }
-/* ==== Power Gate - End ==== */
 
+int FLOVRouter::NextPowerEventCycle()
+{
+    int cycle = 0;
+
+    switch (_flov_policy) {
+        case noflov:
+            break;
+
+        case rflov:
+            if (_power_state == power_on && _router_state == false) {
+                for (int out = 0; out < 4; ++out) {
+                    if ((out == DIR_EAST && _id % gK == gK-1) ||
+                            (out == DIR_WEST && _id % gK == 0) ||
+                            (out == DIR_SOUTH && _id / gK == gK-1) ||
+                            (out == DIR_NORTH && _id / gK == 0))
+                        continue;
+                    if (_neighbor_states[out] == power_off) {
+                        cycle = 1;
+                        break;
+                    }
+                }
+            }
+            break;
+
+        case gflov:
+            if (_power_state == power_on && _router_state == false)
+                cycle = 1;
+            break;
+
+        default:
+            ostringstream err;
+            err << "FLOV policy " << _flov_policy << " not defined";
+            Error(err.str());
+    }
+
+    return cycle;
+}
+/* ==== Power Gate - End ==== */
 
 
 void FLOVRouter::_InternalStep( )
@@ -2404,8 +2441,19 @@ void FLOVRouter::_FlovStep() {
   assert(_sw_hold_vcs.empty());
   assert(_sw_alloc_vcs.empty());
   assert(_crossbar_flits.empty());
-  if (_power_state == power_off && _off_timer == 1)
-    assert(_in_queue_flits.empty());
+  if (_power_state == power_off && _off_timer == 1) {
+      if (!_in_queue_flits.empty()) {
+          *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+              << "Has bypass flits:" << endl;
+          for (map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
+                  iter != _in_queue_flits.end(); ++iter) {
+              *gWatchOut << "Bypass flit " << iter->second->id << " (pid: "
+                  << iter->second->pid << ") from input " << iter->first
+                  << " to next router" << endl;
+          }
+      }
+      assert(_in_queue_flits.empty());
+  }
 
   // process flits
   for (map<int, Flit *>::const_iterator iter = _in_queue_flits.begin();
@@ -2422,7 +2470,7 @@ void FLOVRouter::_FlovStep() {
 
     if (f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-      << "Bypass flit " << f->id << " to next router" << endl;
+        << "Bypass flit " << f->id << " to next router" << endl;
     }
 
     int output = input;

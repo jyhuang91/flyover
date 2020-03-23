@@ -43,7 +43,8 @@ public:
             & net , int vnets);
     ~Gem5FLOVTrafficManager();
 
-    virtual void _Step();
+    virtual void Step();
+    virtual int  NextPowerEventCycle();
 };
 
 #endif // #define _GEM5_FLOV_TRAFFICMANAGER_HH_

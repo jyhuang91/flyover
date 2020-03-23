@@ -156,6 +156,7 @@ public:
   Router( const Configuration& config,
       Module *parent, const string & name, int id,
       int inputs, int outputs );
+  virtual ~Router() {};
 
   static Router *NewRouter( const Configuration& config,
       Module *parent, const string & name, int id,
@@ -279,6 +280,7 @@ public:
   inline void PowerOn() {_power_state = power_on;}
   inline void PowerOff() {_power_state = power_off;}
   inline void WakeUp() {_wakeup_signal = true;}
+  inline bool GetWakeUpSignal() {return _wakeup_signal;}
   inline void SetPowerState( ePowerState s ) {_power_state = s;}
   inline Router::ePowerState GetPowerState() const {return _power_state;}
   inline void SetRouterState(bool state) {_router_state = state;}
@@ -316,6 +318,9 @@ public:
 
   virtual void AggressPowerGatingPolicy() {};
   virtual void RegressPowerGatingPolicy() {};
+
+  virtual int NextPowerEventCycle() {return 0;}
+  virtual void SynchronizeCycle(uint64_t cycles);
   /* ==== Power Gate - End ==== */
 
 };

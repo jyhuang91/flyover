@@ -86,6 +86,7 @@ public:
   /* ==== Power Gate - Begin ==== */
   virtual void PowerStateEvaluate( );
   virtual void SetRingOutputVCBufferSize(int vc_buf_size);
+  virtual int NextPowerEventCycle();
   /* ==== Power Gate - End ==== */
 
   virtual void ReadInputs( );
