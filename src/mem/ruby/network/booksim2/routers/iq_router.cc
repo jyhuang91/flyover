@@ -2441,3 +2441,15 @@ uint64_t IQRouter::GetBufferWrites()
 
   return total_writes;
 }
+
+uint64_t IQRouter::GetSwitchActivities()
+{
+  uint64_t total_activities;
+  const vector<uint64_t> activity = _switchMonitor->GetActivity();
+  int limits = _switchMonitor->NumInputs() * _switchMonitor->NumOutputs();
+  for (int i = 0; i < limits; i++) {
+    total_activities += activity[i];
+  }
+
+  return total_activities;
+}

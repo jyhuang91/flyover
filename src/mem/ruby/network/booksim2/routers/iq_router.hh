@@ -186,8 +186,9 @@ public:
   SwitchMonitor const * GetSwitchMonitor() const {return _switchMonitor;}
   BufferMonitor const * GetBufferMonitor() const {return _bufferMonitor;}
 
-  uint64_t GetBufferReads();
-  uint64_t GetBufferWrites();
+  virtual uint64_t GetBufferReads();
+  virtual uint64_t GetBufferWrites();
+  virtual uint64_t GetSwitchActivities();
 
 };
 

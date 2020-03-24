@@ -37,12 +37,15 @@ private:
 
 protected:
     virtual void _RetireFlit(Flit *f, int dest);
+    virtual void _UpdateOverallStats();
 
 public:
     Gem5FLOVTrafficManager(const Configuration &config, const vector<BSNetwork *>
             & net , int vnets);
     ~Gem5FLOVTrafficManager();
 
+    virtual void DisplayOverallStats(ostream& os) const;
+    virtual void DumpStats();
     virtual void Step();
     virtual int  NextPowerEventCycle();
 };

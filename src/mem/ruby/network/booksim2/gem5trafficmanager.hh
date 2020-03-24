@@ -45,8 +45,8 @@ public:
             & net , int vnets);
     virtual ~Gem5TrafficManager();
 
-    virtual void DisplayStats(ostream& out) const;
-    void DumpStats();
+    virtual void DisplayOverallStats(ostream& os) const;
+    virtual void DumpStats();
     virtual void Step();
     void RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
                                 vector<vector<MessageBuffer *> >& out);

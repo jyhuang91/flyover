@@ -321,6 +321,10 @@ public:
 
   virtual int NextPowerEventCycle() {return 0;}
   virtual void SynchronizeCycle(uint64_t cycles);
+
+  virtual uint64_t GetBufferReads() {return 0;}
+  virtual uint64_t GetBufferWrites() {return 0;}
+  virtual uint64_t GetSwitchActivities() {return 0;}
   /* ==== Power Gate - End ==== */
 
 };

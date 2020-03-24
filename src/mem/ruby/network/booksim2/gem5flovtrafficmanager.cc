@@ -12,6 +12,7 @@
 #include "mem/ruby/slicc_interface/NetworkMessage.hh"
 #include "mem/ruby/network/Network.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
+#include "mem/ruby/common/Global.hh"
 #include "sim/clocked_object.hh"
 
 #define REPORT_INTERVAL 100000
@@ -84,6 +85,7 @@ void Gem5FLOVTrafficManager::_RetireFlit(Flit *f, int dest)
 
         _net_ptr->increment_hops(f->hops, f->gem5_vnet);
         _net_ptr->increment_flov_hops(f->flov_hops, f->gem5_vnet);
+        _flov_hop_stats[f->cl]->AddSample(f->flov_hops);
 
         Flit * head;
         if (f->head) {
@@ -545,4 +547,199 @@ int Gem5FLOVTrafficManager::NextPowerEventCycle()
     }
 
     return cycle;
+}
+
+void Gem5FLOVTrafficManager::_UpdateOverallStats() {
+    TrafficManager::_UpdateOverallStats();
+
+    for ( int c = 0; c < _classes; ++c ) {
+
+        if(_measure_stats[c] == 0) {
+            continue;
+        }
+
+        /* ==== Power Gate - Begin ==== */
+        _overall_flov_hop_stats[c] += _flov_hop_stats[c]->Average();
+        /* ==== Power Gate - End ==== */
+    }
+}
+
+void Gem5FLOVTrafficManager::DisplayOverallStats(ostream& os) const
+{
+    os << "====== BookSim Overall Traffic Statistics ======" << endl;
+    for ( int c = 0; c < _classes; ++c ) {
+
+        if(_measure_stats[c] == 0) {
+            continue;
+        }
+
+        os << "====== Traffic class " << c << " ======" << endl;
+
+        os << "Packet latency average = " << _overall_avg_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_plat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Network latency average = " << _overall_avg_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Flit latency average = " << _overall_avg_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_flat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Fragmentation average = " << _overall_avg_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected packet rate average = " << _overall_avg_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_sent_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted packet rate average = " << _overall_avg_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_accepted_packets[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected flit rate average = " << _overall_avg_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_sent[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted flit rate average = " << _overall_avg_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_accepted[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Injected packet size average = " << _overall_avg_sent[c] / _overall_avg_sent_packets[c]
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Accepted packet size average = " << _overall_avg_accepted[c] / _overall_avg_accepted_packets[c]
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Hops average = " << _overall_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "FLOV hops average = " << _overall_flov_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+#ifdef TRACK_STALLS
+        os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer conflict stall rate = " << (double)_overall_buffer_conflict_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer full stall rate = " << (double)_overall_buffer_full_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Buffer reserved stall rate = " << (double)_overall_buffer_reserved_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl
+           << "Crossbar conflict stall rate = " << (double)_overall_crossbar_conflict_stalls[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+#endif
+    }
+}
+
+void Gem5FLOVTrafficManager::DumpStats()
+{
+    uint64_t cycles = _time - g_ruby_start;
+    cout << "Total cycles: " << cycles
+        << " (start: " << g_ruby_start << ", end: " << _time << ")" << endl;
+
+    _UpdateOverallStats();
+    DisplayOverallStats(cout);
+
+    const vector<Router *> routers = _net[0]->GetRouters();
+
+    string outfile = _outdir + string("/booksimstats.json");
+    ofstream statsout(outfile.c_str(), ofstream::out);
+
+    statsout << "{" << endl;
+    statsout << "    \"start\": " << g_ruby_start << "," << endl;
+    statsout << "    \"end\": " << _time << "," << endl;
+    statsout << "    \"cycles\": " << cycles << "," << endl;
+    statsout << "    \"routers\": {" << endl;
+    for (int r = 0; r < routers.size(); r++) {
+        int power_off_cycles = routers[r]->GetPowerOffCycles();
+        double power_off_percentile = (double) power_off_cycles / (double) cycles;
+        uint64_t reads = routers[r]->GetBufferReads();
+        uint64_t writes = routers[r]->GetBufferWrites();
+        uint64_t activities = routers[r]->GetSwitchActivities();
+        statsout << "        \"router_" << r << "\": {" << endl;
+        statsout << "            \"inputs\": " << routers[r]->NumInputs() << "," << endl;
+        statsout << "            \"outputs\": " << routers[r]->NumOutputs() << "," << endl;
+        statsout << "            \"reads\": " << reads << "," << endl;
+        statsout << "            \"writes\": " << writes << "," << endl;
+        statsout << "            \"switches\": " << activities << "," << endl;
+        statsout << "            \"power-off-cycles\": " << power_off_cycles << "," << endl;
+        statsout << "            \"power-off-percentile\": " << power_off_percentile << "," << endl;
+        statsout << "            \"power-on-percentile\": " << 1.0 - power_off_percentile << endl;
+        statsout << "        }," << endl;
+    }
+    statsout << "    }," << endl;
+    statsout << "    \"packet-latency\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_plat[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_plat[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_plat[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"network-latency\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_nlat[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_nlat[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_nlat[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"flit-latency\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_flat[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_flat[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_flat[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"fragmentation\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_frag[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_frag[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_frag[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"injected-packet-rate\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_sent_packets[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_sent_packets[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_sent_packets[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"accepted-packet-rate\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_accepted_packets[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_accepted_packets[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_accepted_packets[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"injected-flit-rate\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_sent[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_sent[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_sent[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"accepted-flit-rate\": {" << endl;
+    statsout << "        \"average\": " << _overall_avg_accepted[0] << "," << endl;
+    statsout << "        \"minimum\": " << _overall_min_accepted[0] << "," << endl;
+    statsout << "        \"maximum\": " << _overall_max_accepted[0] << "," << endl;
+    statsout << "    }," << endl;
+    statsout << "    \"injected-packet-size-average\": " << _overall_avg_sent[0] / _overall_avg_sent_packets[0] << "," << endl;
+    statsout << "    \"accpeted-packet-size-average\": " << _overall_avg_accepted[0] / _overall_avg_accepted_packets[0] << "," << endl;
+    statsout << "    \"hops-average\": " << _overall_hop_stats[0] << "," << endl;
+    statsout << "    \"flov-hops-average\": " << _overall_flov_hop_stats[0] << endl;
+    statsout << "}" << endl;
+
+    statsout.close();
 }
