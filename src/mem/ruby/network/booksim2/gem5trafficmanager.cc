@@ -47,11 +47,12 @@ Gem5TrafficManager::Gem5TrafficManager(const Configuration &config, const
     _network_time = 0;
     _next_report = REPORT_INTERVAL;
     _watch_all_pkts = (config.GetInt("watch_all_pkts") > 0);
+    _outdir = config.GetStr("outdir");
 
     _sim_state = running;
 
     Callback *cb = new MakeCallback<Gem5TrafficManager,
-             &Gem5TrafficManager::PrintStats>(this);
+             &Gem5TrafficManager::DumpStats>(this);
     registerExitCallback(cb);
 }
 
@@ -682,7 +683,7 @@ void Gem5TrafficManager::DisplayStats(ostream& out) const
 //  double max_latency_change = 0.0;
 }
 
-void Gem5TrafficManager::PrintStats()
+void Gem5TrafficManager::DumpStats()
 {
   uint64_t cycles = _time - g_ruby_start;
   cout.setf(ios::fixed, ios::floatfield);

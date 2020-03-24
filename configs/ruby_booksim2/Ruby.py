@@ -130,7 +130,7 @@ def create_system(options, system, piobus = None, dma_ports = []):
         RouterClass = GarnetRouter
         InterfaceClass = GarnetNetworkInterface
 
-    # booksim2 
+    # booksim2
     elif options.booksim_network:
         NetworkClass = BooksimNetwork
         IntLinkClass = None
@@ -152,6 +152,7 @@ def create_system(options, system, piobus = None, dma_ports = []):
     # booksim2, Jiayi 09/22/16
     if options.booksim_network:
         network.booksim_config = options.booksim_config
+        network.outdir = m5.options.outdir
     ruby.network = network
 
     protocol = buildEnv['PROTOCOL']

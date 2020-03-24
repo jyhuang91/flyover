@@ -29,6 +29,7 @@ protected:
 
     int _vnets;
     vector<int> _last_vnet; // no subnet used in gem5
+    string _outdir;
 
 protected:
     virtual void _RetireFlit(Flit *f, int dest);
@@ -45,7 +46,7 @@ public:
     virtual ~Gem5TrafficManager();
 
     virtual void DisplayStats(ostream& out) const;
-    void PrintStats();
+    void DumpStats();
     virtual void Step();
     void RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
                                 vector<vector<MessageBuffer *> >& out);
