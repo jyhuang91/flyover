@@ -26,6 +26,7 @@
 
 from ConfigParser import ConfigParser
 import string, sys, subprocess, os, re
+import json
 
 
 # Shell command ignore CalledProcessError
@@ -149,12 +150,14 @@ def computeLinkPower(link, stats_file, config, sim_seconds, num_bits,
     return power
 
 
-def parseStats(stats_file, config, router_config_file, link_config_file,
+def parseStats(stats_dir, config, router_config_file, link_config_file,
                attached_router_id, number_of_virtual_networks, vcs_per_vnet,
                buffers_per_vc, flit_size_bits, booksim_config):
 
     # Open the stats.txt file and parse it to for the required numbers
     # and the number of routers.
+    stats_file = stats_dir + "/stats.txt"
+    booksim_stats_file = stats_dir + "/booksimstats.json"
     try:
         stats_handle = open(stats_file, 'r')
         stats_handle.close()
@@ -231,18 +234,20 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
         subprocess.check_output(["grep", pattern, stats_file]), '\n', -1)
     flov_hops = [int(s) for s in lines[0].split() if s.isdigit()]
     flov_hops = sum(flov_hops)
-    print flov_hops
+    #print flov_hops
     pattern = "network.hops"
     lines = string.split(
         subprocess.check_output(["grep", pattern, stats_file]), '\n', -1)
     hops = [int(s) for s in lines[0].split() if s.isdigit()]
     hops = sum(hops)
-    print hops
+    #print hops
 
     # Initialize DSENT with a configuration file
     dsent.initialize(router_config_file)
 
     # Compute the power consumed by the routers
+    with open(booksim_stats_file) as json_file:
+        booksim_stats = json.load(json_file)
     router_dynamic_power = 0.0
     router_static_power = 0.0
     for (r, inj) in enumerate(inject_rate):
@@ -254,8 +259,7 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
             r, stats_file, config, number_of_virtual_networks, vcs_per_vnet,
             buffers_per_vc, attached_router_id, flit_size_bits, inj)
         router_dynamic_power += rpower[2][1]
-        if r not in off_routers:
-            router_static_power += rpower[3][1]
+        router_static_power += rpower[3][1] * booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
 
     # Finalize DSENT
     dsent.finalize()
@@ -320,7 +324,7 @@ def getPowerAndEnergy(sim_directory, router_config_file, link_config_file):
      booksim_config) = parseConfig(config_file)
 
     (dynamic_power, static_power, dynamic_energy, static_energy) = parseStats(
-        stats_file, config, router_config_file, link_config_file,
+        sim_directory, config, router_config_file, link_config_file,
         attached_router_id, number_of_virtual_networks, vcs_per_vnet,
         buffers_per_vc, flit_size_bits, booksim_config)
 
@@ -342,8 +346,7 @@ def main():
      flit_size_bits, attached_router_id, booksim_config) = parseConfig(
          "%s/%s/config.ini" % (sys.argv[1], sys.argv[2]))
 
-    parseStats("%s/%s/stats.txt" % (sys.argv[1],
-                                    sys.argv[2]), config, sys.argv[3],
+    parseStats("%s/%s" % (sys.argv[1], sys.argv[2]), config, sys.argv[3],
                sys.argv[4], attached_router_id, number_of_virtual_networks,
                vcs_per_vnet, buffers_per_vc, flit_size_bits, booksim_config)
 

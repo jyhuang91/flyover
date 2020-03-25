@@ -2444,7 +2444,7 @@ uint64_t IQRouter::GetBufferWrites()
 
 uint64_t IQRouter::GetSwitchActivities()
 {
-  uint64_t total_activities;
+  uint64_t total_activities = 0;
   const vector<uint64_t> activity = _switchMonitor->GetActivity();
   int limits = _switchMonitor->NumInputs() * _switchMonitor->NumOutputs();
   for (int i = 0; i < limits; i++) {
