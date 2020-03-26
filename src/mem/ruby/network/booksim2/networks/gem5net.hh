@@ -53,7 +53,7 @@ public:
     virtual void InsertRandomFaults(const Configuration &config) {}
 };
 
-//void dor_gem5mesh(const Router *r, const Flit *f, int in_channel, OutputSet
+//void dor_gem5mesh(const BSRouter *r, const Flit *f, int in_channel, OutputSet
 //        *outputs, int inject);
 
 #endif

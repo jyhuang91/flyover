@@ -261,9 +261,8 @@ void GFLOVRouter::PowerStateEvaluate()
     _drain_tags.clear();
     _drain_tags.resize(4, false);
     for (int in_port = 0; in_port < _inputs; ++in_port) {
-      Buffer const * const cur_buf = _buf[in_port];
       for (int vc = 0; vc < _vcs; ++vc) {
-        assert(cur_buf->GetState(vc) == VC::idle);
+        assert(_buf[in_port]->GetState(vc) == VC::idle);
       }
     }
     ++_power_off_cycles;
@@ -314,9 +313,8 @@ void GFLOVRouter::PowerStateEvaluate()
 
   case wakeup: {
     for (int in_port = 0; in_port < _inputs; ++in_port) {
-      Buffer const * const cur_buf = _buf[in_port];
       for (int vc = 0; vc < _vcs; ++vc) {
-        assert(cur_buf->GetState(vc) == VC::idle);
+        assert(_buf[in_port]->GetState(vc) == VC::idle);
       }
     }
     for (int out = 0; out < 4; ++out) {
@@ -672,7 +670,7 @@ void GFLOVRouter::_RouteUpdate( )
         int const out_port = iset->output_port;
         assert((out_port >= 0) && (out_port < _outputs));
         const FlitChannel * channel = _output_channels[out_port];
-        Router * router = channel->GetSink();
+        BSRouter * router = channel->GetSink();
         assert(router);
         if (f->dest_router == router->GetID()) {
           if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
@@ -756,7 +754,7 @@ void GFLOVRouter::_VCAllocUpdate( )
       /* ==== Power Gate - Begin ==== */
       bool back_to_route = false;
       const FlitChannel * channel = _output_channels[match_output];
-      Router * router = channel->GetSink();
+      BSRouter * router = channel->GetSink();
       if (router) {
         const bool is_mc = (router->GetID() >= gNodes - gK);
         if (!is_mc && (_downstream_states[match_output] == draining ||
@@ -848,7 +846,7 @@ void GFLOVRouter::_VCAllocUpdate( )
         assert((out_port >= 0) && (out_port < _outputs));
 
         const FlitChannel * channel = _output_channels[out_port];
-        Router * router = channel->GetSink();
+        BSRouter * router = channel->GetSink();
         if (router) {
           const bool is_mc = (router->GetID() >= gNodes - gK);
           if (!is_mc && (_downstream_states[out_port] == draining ||
@@ -994,7 +992,7 @@ void GFLOVRouter::_SWHoldUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -1274,7 +1272,7 @@ void GFLOVRouter::_SWAllocUpdate( )
         if (f->head) {
           bool back_to_route = false;
           const FlitChannel * channel = _output_channels[output];
-          Router * router = channel->GetSink();
+          BSRouter * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_downstream_states[output] == draining ||
@@ -1340,7 +1338,7 @@ void GFLOVRouter::_SWAllocUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -1474,7 +1472,7 @@ void GFLOVRouter::_SWAllocUpdate( )
             assert((out_port >= 0) && (out_port < _outputs));
 
             const FlitChannel * channel = _output_channels[out_port];
-            Router * router = channel->GetSink();
+            BSRouter * router = channel->GetSink();
             if (router) {
               const bool is_mc = (router->GetID() >= gNodes - gK);
               if (!is_mc && (_downstream_states[out_port] == draining ||
@@ -1508,7 +1506,7 @@ void GFLOVRouter::_SWAllocUpdate( )
           assert(output >= 0 && output < _outputs);
           assert(match_vc >= 0 && match_vc < _vcs);
           const FlitChannel * channel = _output_channels[output];
-          Router * router = channel->GetSink();
+          BSRouter * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && (_downstream_states[output] == draining ||
@@ -1577,10 +1575,8 @@ void GFLOVRouter::_SWAllocUpdate( )
           cur_buf->SetState(vc, VC::routing);
         } else {
           assert(cur_buf->GetState(vc) == VC::vc_alloc);
-          int const dest_output = cur_buf->GetOutputPort(vc);
-          assert(dest_output == -1);
-          int const dest_vc = cur_buf->GetOutputVC(vc);
-          assert(dest_vc == -1);
+          assert(cur_buf->GetOutputPort(vc) == -1);
+          assert(cur_buf->GetOutputVC(vc) == -1);
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
             pair<uint64_t, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];
@@ -1819,13 +1815,12 @@ void GFLOVRouter::_HandshakeEvaluate() {
     Handshake * h = item.second;
     assert(h);
     int src_state = h->src_state;
-    int new_state = h->new_state;
 
     switch (_power_state) {
     case power_on: {  // power on
       if (src_state >= 0) {
         if (src_state == power_on) { // drain->on or wakeup->on
-          assert(new_state == power_on);
+          assert(h->new_state == power_on);
           assert(_downstream_states[input] == draining ||
               _downstream_states[input] == wakeup);
           if (_downstream_states[input] == wakeup) {// wakeup->on
@@ -2116,8 +2111,7 @@ void GFLOVRouter::_HandshakeResponse() {
       if (drain_done)
         for (deque<pair<uint64_t, pair<Flit *, pair<int, int> > > >::iterator iter =
              _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
-          uint64_t const time = iter->first;
-          assert(time == -1 || time < GetSimTime());
+          assert(iter->first == -1 || iter->first < GetSimTime());
           int const expanded_output = iter->second.second.second;
           int const output = expanded_output / _output_speedup;
           assert((output >= 0) && (output < _outputs));

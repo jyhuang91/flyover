@@ -308,11 +308,11 @@ void RPTrafficManager::_Step( )
         cout << "WARNING: Possible network deadlock.\n";
         /* ==== Power Gate Debug - Begin ==== */
         cout << GetSimTime() << endl;
-        const vector<Router *> routers = _net[0]->GetRouters();
+        const vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int n = 0; n < _nodes; ++n) {
             if (n % 8)
                 cout << endl;
-            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+            cout << BSRouter::POWERSTATE[routers[n]->GetPowerState()] << "\t";
         }
         cout << endl;
         for (int n = 0; n < _nodes; ++n)
@@ -428,7 +428,7 @@ void RPTrafficManager::_Step( )
                     if(_noq) {
                         assert(_lookahead_routing);
                         const FlitChannel * inject = _net[subnet]->GetInject(n);
-                        const Router * router = inject->GetSink();
+                        const BSRouter * router = inject->GetSink();
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
@@ -521,7 +521,7 @@ void RPTrafficManager::_Step( )
                     if (_lookahead_routing) {
                         if(!_noq) {
                             const FlitChannel * inject = _net[subnet]->GetInject(n);
-                            const Router * router = inject->GetSink();
+                            const BSRouter * router = inject->GetSink();
                             assert(router);
                             int in_channel = inject->GetSinkPort();
                             _rf(router, f, in_channel, &f->la_route_set, false);

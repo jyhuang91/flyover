@@ -162,7 +162,7 @@ void Gem5NoRDTrafficManager::_GeneratePacket(int source, int stype, int vnet, ui
                 // packets are only generated to nodes smaller or equal to limit
                 f->dest = packet_dest;
                 f->dest_router = Gem5Net::NodeToRouter(packet_dest);
-                const vector<Router *> routers = _net[0]->GetRouters();
+                const vector<BSRouter *> routers = _net[0]->GetRouters();
                 f->ring_dest = routers[f->dest_router]->GetRingID();
             } else {
                 f->head = false;
@@ -214,7 +214,7 @@ void Gem5NoRDTrafficManager::Step()
     uint64_t prev_time = _time;
     _time = _net_ptr->curCycle();
     if (_time > prev_time + 1) {
-        vector<Router *> routers = _net[0]->GetRouters();
+        vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int r = 0; r < routers.size(); r++) {
             routers[r]->SynchronizeCycle(_time - prev_time - 1);
         }
@@ -229,12 +229,12 @@ void Gem5NoRDTrafficManager::Step()
         cout << "WARNING: Possible network deadlock.\n";
         /* ==== Power Gate Debug - Begin ==== */
         cout << GetSimTime() << endl;
-        const vector<Router *> routers = _net[0]->GetRouters();
+        const vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int n = 0; n < routers.size(); ++n) {
             if (n % gK == 0) {
                 cout << endl;
             }
-            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+            cout << BSRouter::POWERSTATE[routers[n]->GetPowerState()] << "\t";
         }
         cout << endl;
         for (int n = 0; n < routers.size(); ++n)
@@ -243,7 +243,7 @@ void Gem5NoRDTrafficManager::Step()
         /* ==== Power Gate Debug - End ==== */
     }
 
-    const vector<Router *> routers = _net[0]->GetRouters();
+    const vector<BSRouter *> routers = _net[0]->GetRouters();
     if (_performance_centric_wakeup_threshold > 0 &&
             _power_centric_wakeup_threshold > 0) {
         for (int n = 0; n < _bypass_routers.size(); ++n) {
@@ -251,7 +251,7 @@ void Gem5NoRDTrafficManager::Step()
                 _performance_centric_wakeup_threshold :
                 _power_centric_wakeup_threshold;
             if (_wakeup_monitor_vc_requests[n] > wakeup_threshold &&
-                    routers[n]->GetPowerState() == Router::power_on) {
+                    routers[n]->GetPowerState() == BSRouter::power_on) {
                 assert(_bypass_routers[n] == true);
                 _wakeup_monitor_vc_requests[n] = 0;
                 // fake off node won't inject flits, only bypass
@@ -476,7 +476,7 @@ void Gem5NoRDTrafficManager::Step()
 
                         assert(cf->head);
 
-                        const vector<Router *> routers = _net[0]->GetRouters();
+                        const vector<BSRouter *> routers = _net[0]->GetRouters();
                         int const r = Gem5Net::NodeToRouter(n);
 
                         if (_performance_centric_wakeup_threshold > 0 &&
@@ -592,7 +592,7 @@ void Gem5NoRDTrafficManager::Step()
                     if (_lookahead_routing) {
                         assert(!_noq);
                         const FlitChannel * inject = _net[subnet]->GetInject(n);
-                        const Router * router = inject->GetSink();
+                        const BSRouter * router = inject->GetSink();
                         assert(router);
                         int in_channel = inject->GetSinkPort();
                         _rf(router, f, in_channel, &f->la_route_set, false);
@@ -783,7 +783,7 @@ void Gem5NoRDTrafficManager::Step()
 int Gem5NoRDTrafficManager::NextPowerEventCycle()
 {
     int cycle = 0;
-    const vector<Router *> routers = _net[0]->GetRouters();
+    const vector<BSRouter *> routers = _net[0]->GetRouters();
     for (int r = 0; r < routers.size(); r++) {
         int next_event_cycle = routers[r]->NextPowerEventCycle();
         if (cycle > 0 && next_event_cycle > 0 && next_event_cycle < cycle)

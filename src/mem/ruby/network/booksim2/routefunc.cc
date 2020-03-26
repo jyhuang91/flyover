@@ -81,7 +81,7 @@ int gWriteReplyBeginVC, gWriteReplyEndVC;
 // ============================================================
 //  QTree: Nearest Common Ancestor
 // ===
-void qtree_nca( const Router *r, const Flit *f,
+void qtree_nca( const BSRouter *r, const Flit *f,
 		int in_channel, OutputSet* outputs, bool inject)
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -132,7 +132,7 @@ void qtree_nca( const Router *r, const Flit *f,
 // ============================================================
 //  Tree4: Nearest Common Ancestor w/ Adaptive Routing Up
 // ===
-void tree4_anca( const Router *r, const Flit *f,
+void tree4_anca( const BSRouter *r, const Flit *f,
 		 int in_channel, OutputSet* outputs, bool inject)
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -188,7 +188,7 @@ void tree4_anca( const Router *r, const Flit *f,
       }
     }
 
-    //  cout << "Router("<<rH<<","<<rP<<"): id= " << f->id << " dest= " << f->dest << " out_port = "
+    //  cout << "BSRouter("<<rH<<","<<rP<<"): id= " << f->id << " dest= " << f->dest << " out_port = "
     //       << out_port << endl;
 
   }
@@ -202,7 +202,7 @@ void tree4_anca( const Router *r, const Flit *f,
 // ============================================================
 //  Tree4: Nearest Common Ancestor w/ Random Routing Up
 // ===
-void tree4_nca( const Router *r, const Flit *f,
+void tree4_nca( const BSRouter *r, const Flit *f,
 		int in_channel, OutputSet* outputs, bool inject)
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -252,7 +252,7 @@ void tree4_nca( const Router *r, const Flit *f,
 	out_port = gK + RandomInt(1);
     }
 
-    //  cout << "Router("<<rH<<","<<rP<<"): id= " << f->id << " dest= " << f->dest << " out_port = "
+    //  cout << "BSRouter("<<rH<<","<<rP<<"): id= " << f->id << " dest= " << f->dest << " out_port = "
     //       << out_port << endl;
 
   }
@@ -265,7 +265,7 @@ void tree4_nca( const Router *r, const Flit *f,
 // ============================================================
 //  FATTREE: Nearest Common Ancestor w/ Random  Routing Up
 // ===
-void fattree_nca( const Router *r, const Flit *f,
+void fattree_nca( const BSRouter *r, const Flit *f,
                int in_channel, OutputSet* outputs, bool inject)
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -329,7 +329,7 @@ void fattree_nca( const Router *r, const Flit *f,
 // ============================================================
 //  FATTREE: Nearest Common Ancestor w/ Adaptive Routing Up
 // ===
-void fattree_anca( const Router *r, const Flit *f,
+void fattree_anca( const BSRouter *r, const Flit *f,
                 int in_channel, OutputSet* outputs, bool inject)
 {
 
@@ -410,7 +410,7 @@ void fattree_anca( const Router *r, const Flit *f,
 
 int dor_next_mesh( int cur, int dest, bool descending = false );
 
-void adaptive_xy_yx_mesh( const Router *r, const Flit *f,
+void adaptive_xy_yx_mesh( const BSRouter *r, const Flit *f,
 		 int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -482,7 +482,7 @@ void adaptive_xy_yx_mesh( const Router *r, const Flit *f,
 
 }
 
-void xy_yx_mesh( const Router *r, const Flit *f,
+void xy_yx_mesh( const BSRouter *r, const Flit *f,
 		 int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -649,7 +649,7 @@ void dor_next_torus( int cur, int dest, int in_port,
 
 //=============================================================
 
-void dim_order_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void dim_order_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int out_port = inject ? -1 : dor_next_mesh( r->GetID( ), f->dest );
 
@@ -688,7 +688,7 @@ void dim_order_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *
 
 //=============================================================
 
-void dim_order_ni_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void dim_order_ni_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int out_port = inject ? -1 : dor_next_mesh( r->GetID( ), f->dest );
 
@@ -738,7 +738,7 @@ void dim_order_ni_mesh( const Router *r, const Flit *f, int in_channel, OutputSe
 
 //=============================================================
 
-void dim_order_pni_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void dim_order_pni_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int out_port = inject ? -1 : dor_next_mesh( r->GetID(), f->dest );
 
@@ -820,7 +820,7 @@ int rand_min_intr_mesh( int src, int dest )
 
 //=============================================================
 
-void romm_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void romm_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -881,7 +881,7 @@ void romm_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outpu
 
 //=============================================================
 
-void romm_ni_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void romm_ni_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -938,7 +938,7 @@ void romm_ni_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *ou
 
 //=============================================================
 
-void min_adapt_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void min_adapt_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -1038,7 +1038,7 @@ void min_adapt_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *
 
 //=============================================================
 
-void planar_adapt_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void planar_adapt_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -1213,7 +1213,7 @@ FIXME: This is broken (note that f->dr is never actually modified).
 Even if it were, this should really use f->ph instead of introducing a single-
 use field.
 
-void limited_adapt_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void limited_adapt_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
 outputs->Clear( );
 
@@ -1282,7 +1282,7 @@ outputs->AddRange( 2*gN, vcBegin, vcEnd );
 */
 //=============================================================
 
-void valiant_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void valiant_mesh( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -1343,7 +1343,7 @@ void valiant_mesh( const Router *r, const Flit *f, int in_channel, OutputSet *ou
 
 //=============================================================
 
-void valiant_torus( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void valiant_torus( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -1421,7 +1421,7 @@ void valiant_torus( const Router *r, const Flit *f, int in_channel, OutputSet *o
 
 //=============================================================
 
-void valiant_ni_torus( const Router *r, const Flit *f, int in_channel,
+void valiant_ni_torus( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1523,7 +1523,7 @@ void valiant_ni_torus( const Router *r, const Flit *f, int in_channel,
 
 //=============================================================
 
-void dim_order_torus( const Router *r, const Flit *f, int in_channel,
+void dim_order_torus( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1591,7 +1591,7 @@ void dim_order_torus( const Router *r, const Flit *f, int in_channel,
 
 //=============================================================
 
-void dim_order_ni_torus( const Router *r, const Flit *f, int in_channel,
+void dim_order_ni_torus( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1656,7 +1656,7 @@ void dim_order_ni_torus( const Router *r, const Flit *f, int in_channel,
 
 //=============================================================
 
-void dim_order_bal_torus( const Router *r, const Flit *f, int in_channel,
+void dim_order_bal_torus( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1724,7 +1724,7 @@ void dim_order_bal_torus( const Router *r, const Flit *f, int in_channel,
 
 //=============================================================
 
-void min_adapt_torus( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void min_adapt_torus( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
   if ( f->type == Flit::READ_REQUEST ) {
@@ -1804,7 +1804,7 @@ void min_adapt_torus( const Router *r, const Flit *f, int in_channel, OutputSet 
 
 //=============================================================
 
-void dest_tag_fly( const Router *r, const Flit *f, int in_channel,
+void dest_tag_fly( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1851,7 +1851,7 @@ void dest_tag_fly( const Router *r, const Flit *f, int in_channel,
 
 //=============================================================
 
-void chaos_torus( const Router *r, const Flit *f,
+void chaos_torus( const BSRouter *r, const Flit *f,
     int in_channel, OutputSet *outputs, bool inject )
 {
   outputs->Clear( );
@@ -1890,7 +1890,7 @@ void chaos_torus( const Router *r, const Flit *f,
 
 //=============================================================
 
-void chaos_mesh( const Router *r, const Flit *f,
+void chaos_mesh( const BSRouter *r, const Flit *f,
     int in_channel, OutputSet *outputs, bool inject )
 {
   outputs->Clear( );
@@ -1924,7 +1924,7 @@ void chaos_mesh( const Router *r, const Flit *f,
 //=============================================================
 
 /* ==== Power Gate - Begin ==== */
-void flov_mesh( const Router *r, const Flit *f, int in_channel,
+void flov_mesh( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1974,14 +1974,14 @@ void flov_mesh( const Router *r, const Flit *f, int in_channel,
 
   int out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
 
-  if(r->GetNeighborPowerState(out_port) != Router::power_on)
+  if(r->GetNeighborPowerState(out_port) != BSRouter::power_on)
     out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
 
   if (GetSimTime() - f->rtime > 300)
     escape = true;
 
   if ((cur % gK != dest % gK) && (cur / gK != dest / gK)
-      && r->GetNeighborPowerState(out_port) != Router::power_on) // not in same row/col
+      && r->GetNeighborPowerState(out_port) != BSRouter::power_on) // not in same row/col
     escape = true;
 
   if (escape == true) {
@@ -2008,7 +2008,7 @@ void flov_mesh( const Router *r, const Flit *f, int in_channel,
 }
 
 
-void opt_rflov_mesh( const Router *r, const Flit *f, int in_channel,
+void opt_rflov_mesh( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -2058,14 +2058,14 @@ void opt_rflov_mesh( const Router *r, const Flit *f, int in_channel,
 
   int out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
 
-  if(r->GetNeighborPowerState(out_port) != Router::power_on)
+  if(r->GetNeighborPowerState(out_port) != BSRouter::power_on)
     out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
 
   if (GetSimTime() - f->rtime > 300)
     escape = true;
 
   if ((cur % gK != dest % gK) && (cur / gK != dest / gK)
-      && r->GetNeighborPowerState(out_port) != Router::power_on) {// not in same row/col
+      && r->GetNeighborPowerState(out_port) != BSRouter::power_on) {// not in same row/col
     if (dest % gK > cur % gK + 1) {
       out_port = 0;
     } else if (dest % gK < cur % gK - 1) {
@@ -2104,7 +2104,7 @@ void opt_rflov_mesh( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void opt_flov_mesh( const Router *r, const Flit *f, int in_channel,
+void opt_flov_mesh( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -2166,14 +2166,14 @@ void opt_flov_mesh( const Router *r, const Flit *f, int in_channel,
 
   int out_port = dor_next_mesh(r->GetID(), f->dest); // XY
 
-  if(r->GetNeighborPowerState(out_port) != Router::power_on)
+  if(r->GetNeighborPowerState(out_port) != BSRouter::power_on)
     out_port = dor_next_mesh(r->GetID(), f->dest, true); // YX
 
   if (GetSimTime() - f->rtime > 300)
     escape = true;
 
   if ((cur % gK != dest % gK) && (cur / gK != dest / gK)
-      && r->GetNeighborPowerState(out_port) != Router::power_on) {// not in same row/col
+      && r->GetNeighborPowerState(out_port) != BSRouter::power_on) {// not in same row/col
     if (logical_neighbors_x[0] != -1 && dest_x >= logical_neighbors_x[0]) {
       out_port = 0;
     } else if (logical_neighbors_x[1] != -1 && dest_x <= logical_neighbors_x[1]) {
@@ -2214,7 +2214,7 @@ void opt_flov_mesh( const Router *r, const Flit *f, int in_channel,
 }
 
 
-void rp_mesh( const Router *r, const Flit *f, int in_channel,
+void rp_mesh( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs - 1;
@@ -2290,7 +2290,7 @@ void rp_mesh( const Router *r, const Flit *f, int in_channel,
 /**********************************************************
  * Routing functions for Gem5Net
  *********************************************************/
-void dor_gem5net(const Router *r, const Flit *f, int in_channel, OutputSet
+void dor_gem5net(const BSRouter *r, const Flit *f, int in_channel, OutputSet
         *outputs, bool inject)
 {
     int vcBegin = f->gem5_vnet * gNumVCperVnet;
@@ -2325,7 +2325,7 @@ void dor_gem5net(const Router *r, const Flit *f, int in_channel, OutputSet
     outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void flov_gem5net( const Router *r, const Flit *f, int in_channel,
+void flov_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   assert(gNumVCperVnet > 1);
@@ -2363,11 +2363,11 @@ void flov_gem5net( const Router *r, const Flit *f, int in_channel,
 
     // output port for xy
     xport = dor_next_mesh(cur_router, dest_router);
-    if (r->GetNeighborPowerState(xport) != Router::power_on)
+    if (r->GetNeighborPowerState(xport) != BSRouter::power_on)
         xneighbor_on = false;
     // output port for yx
     yport = dor_next_mesh(cur_router, dest_router, true);
-    if (r->GetNeighborPowerState(yport) != Router::power_on)
+    if (r->GetNeighborPowerState(yport) != BSRouter::power_on)
         yneighbor_on = false;
 
     if (GetSimTime() - f->rtime > 300)
@@ -2437,7 +2437,7 @@ void flov_gem5net( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void opt_rflov_gem5net( const Router *r, const Flit *f, int in_channel,
+void opt_rflov_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   assert(gNumVCperVnet > 1);
@@ -2470,11 +2470,11 @@ void opt_rflov_gem5net( const Router *r, const Flit *f, int in_channel,
 
     out_port = dor_next_mesh(cur_router, dest_router); // XY
 
-    //if (r->GetNeighborPowerState(out_port) != Router::power_on)
+    //if (r->GetNeighborPowerState(out_port) != BSRouter::power_on)
     //  out_port = dor_next_mesh(cur_router, dest_router, true); // YX
 
     if ((cur_router % gK != dest_router % gK) && (cur_router / gK != dest_router / gK) &&
-        r->GetNeighborPowerState(out_port) != Router::power_on) {// not in same row/col
+        r->GetNeighborPowerState(out_port) != BSRouter::power_on) {// not in same row/col
       if (dest_router % gK > cur_router % gK + 1) {
         out_port = 0;
       } else if (dest_router % gK < cur_router % gK - 1) {
@@ -2522,7 +2522,7 @@ void opt_rflov_gem5net( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void opt_flov_gem5net( const Router *r, const Flit *f, int in_channel,
+void opt_flov_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = f->gem5_vnet * gNumVCperVnet;
@@ -2567,11 +2567,11 @@ void opt_flov_gem5net( const Router *r, const Flit *f, int in_channel,
 
     out_port = dor_next_mesh(cur_router, dest_router); // XY
 
-    //if (r->GetNeighborPowerState(out_port) != Router::power_on)
+    //if (r->GetNeighborPowerState(out_port) != BSRouter::power_on)
     //  out_port = dor_next_mesh(cur_router, dest_router, true); // YX
 
     if ((cur_router % gK != dest_router % gK) && (cur_router / gK != dest_router / gK) &&
-        r->GetNeighborPowerState(out_port) != Router::power_on) { // not in same row/col
+        r->GetNeighborPowerState(out_port) != BSRouter::power_on) { // not in same row/col
       if (logical_neighbors_x[0] != -1 && dest_x >= logical_neighbors_x[0]) {
         out_port = 0;
       } else if (logical_neighbors_x[1] != -1 && dest_x <= logical_neighbors_x[1]) {
@@ -2620,7 +2620,7 @@ void opt_flov_gem5net( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void flovesc_gem5net( const Router *r, const Flit *f, int in_channel,
+void flovesc_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   assert(gNumVCperVnet > 1);
@@ -2664,7 +2664,7 @@ void flovesc_gem5net( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void rp_gem5net( const Router *r, const Flit *f, int in_channel,
+void rp_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   assert(gNumVCperVnet > 1);
@@ -2725,7 +2725,7 @@ void rp_gem5net( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void min_adaptive_gem5net( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
+void min_adaptive_gem5net( const BSRouter *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = f->gem5_vnet * gNumVCperVnet;
   int vcEnd = vcBegin + gNumVCperVnet - 1;
@@ -2809,7 +2809,7 @@ void min_adaptive_gem5net( const Router *r, const Flit *f, int in_channel, Outpu
   }
 }
 
-void adaptive_flov_gem5net( const Router *r, const Flit *f, int in_channel,
+void adaptive_flov_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = f->gem5_vnet * gNumVCperVnet;
@@ -2898,14 +2898,14 @@ void adaptive_flov_gem5net( const Router *r, const Flit *f, int in_channel,
             << "." << endl;
         }
     } else {
-      bool xy_avaiable = (r->GetNeighborPowerState(xy_out_port) == Router::power_on);
-      bool yx_avaiable = (r->GetNeighborPowerState(yx_out_port) == Router::power_on);
-      if ((r->GetNeighborPowerState(xy_out_port) == Router::power_off) &&
+      bool xy_avaiable = (r->GetNeighborPowerState(xy_out_port) == BSRouter::power_on);
+      bool yx_avaiable = (r->GetNeighborPowerState(yx_out_port) == BSRouter::power_on);
+      if ((r->GetNeighborPowerState(xy_out_port) == BSRouter::power_off) &&
           ((logical_neighbors_x[0] != -1 && dest_x >= logical_neighbors_x[0]) ||
            (logical_neighbors_x[1] != -1 && dest_x <= logical_neighbors_x[1]))) {
         xy_avaiable = true;
       }
-      if ((r->GetNeighborPowerState(yx_out_port) == Router::power_off) &&
+      if ((r->GetNeighborPowerState(yx_out_port) == BSRouter::power_off) &&
          (logical_neighbors_y[3] != -1 && dest_y <= logical_neighbors_y[3])) {
         yx_avaiable = true;
       }
@@ -2944,7 +2944,7 @@ void adaptive_flov_gem5net( const Router *r, const Flit *f, int in_channel,
   }
 }
 
-void nord_gem5net( const Router *r, const Flit *f, int in_channel,
+void nord_gem5net( const BSRouter *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
   int vcBegin = f->gem5_vnet * gNumVCperVnet;
@@ -3053,10 +3053,10 @@ void nord_gem5net( const Router *r, const Flit *f, int in_channel,
     if (xy_out_port == yx_out_port)
       yx_pri = xy_pri;
     bool xy_avaiable = (xy_out_port != in_channel &&
-        (r->GetNeighborPowerState(xy_out_port) == Router::power_on ||
+        (r->GetNeighborPowerState(xy_out_port) == BSRouter::power_on ||
          xy_out_port == ring_out_port));
     bool yx_avaiable = (yx_out_port != in_channel &&
-        (r->GetNeighborPowerState(yx_out_port) == Router::power_on ||
+        (r->GetNeighborPowerState(yx_out_port) == BSRouter::power_on ||
          yx_out_port == ring_out_port));
 
     // Add escape channel with low priority

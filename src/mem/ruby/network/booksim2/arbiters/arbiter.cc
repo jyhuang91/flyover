@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -27,7 +27,7 @@
 
 // ----------------------------------------------------------------------
 //
-//  Arbiter: Base class for Matrix and Round Robin Arbiter
+//  BSArbiter: Base class for Matrix and Round Robin BSArbiter
 //
 // ----------------------------------------------------------------------
 
@@ -41,17 +41,17 @@
 
 using namespace std ;
 
-Arbiter::Arbiter( Module *parent, const string &name, int size )
+BSArbiter::BSArbiter( Module *parent, const string &name, int size )
   : Module( parent, name ),
     _size(size), _selected(-1), _highest_pri(numeric_limits<int>::min()),
     _best_input(-1), _num_reqs(0)
 {
   _request.resize(size);
-  for ( int i = 0 ; i < size ; i++ ) 
+  for ( int i = 0 ; i < size ; i++ )
     _request[i].valid = false ;
 }
 
-void Arbiter::AddRequest( int input, int id, int pri )
+void BSArbiter::AddRequest( int input, int id, int pri )
 {
   assert( 0 <= input && input < _size ) ;
   assert( !_request[input].valid );
@@ -62,7 +62,7 @@ void Arbiter::AddRequest( int input, int id, int pri )
   _request[input].pri = pri ;
 }
 
-int Arbiter::Arbitrate( int* id, int* pri )
+int BSArbiter::Arbitrate( int* id, int* pri )
 {
   if ( _selected != -1 ) {
     if ( id )
@@ -76,10 +76,10 @@ int Arbiter::Arbitrate( int* id, int* pri )
   return _selected ;
 }
 
-void Arbiter::Clear()
+void BSArbiter::Clear()
 {
   if(_num_reqs > 0) {
-    
+
     // clear the request vector
     for ( int i = 0; i < _size ; i++ )
       _request[i].valid = false ;
@@ -88,14 +88,14 @@ void Arbiter::Clear()
   }
 }
 
-Arbiter *Arbiter::NewArbiter( Module *parent, const string& name,
+BSArbiter *BSArbiter::NewArbiter( Module *parent, const string& name,
 			      const string &arb_type, int size)
 {
-  Arbiter *a = NULL;
+  BSArbiter *a = NULL;
   if(arb_type == "round_robin") {
     a = new RoundRobinArbiter( parent, name, size );
   } else if(arb_type == "matrix") {
-    a = new MatrixArbiter( parent, name, size );
+    a = new BSMatrixArbiter( parent, name, size );
   } else if(arb_type.substr(0, 5) == "tree(") {
     size_t left = 4;
     size_t middle = arb_type.find_first_of(',');

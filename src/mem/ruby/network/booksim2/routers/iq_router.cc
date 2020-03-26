@@ -49,7 +49,7 @@
 
 IQRouter::IQRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
-: Router( config, parent, name, id, inputs, outputs ), _active(false)
+: BSRouter( config, parent, name, id, inputs, outputs ), _active(false)
 {
   _vcs         = config.GetInt( "num_vcs" );
 
@@ -213,7 +213,7 @@ void IQRouter::AddOutputChannel(FlitChannel * channel, CreditChannel * backchann
   int alloc_delay = _speculative ? max(_vc_alloc_delay, _sw_alloc_delay) : (_vc_alloc_delay + _sw_alloc_delay);
   int min_latency = 1 + _crossbar_delay + channel->GetLatency() + _routing_delay + alloc_delay + backchannel->GetLatency()  + _credit_delay;
   _next_buf[_output_channels.size()]->SetMinLatency(min_latency);
-  Router::AddOutputChannel(channel, backchannel);
+  BSRouter::AddOutputChannel(channel, backchannel);
 }
 
 void IQRouter::ReadInputs( )
@@ -1081,7 +1081,7 @@ void IQRouter::_SWHoldUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -1991,7 +1991,7 @@ void IQRouter::_SWAllocUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -2388,7 +2388,7 @@ void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) {
   assert(sl.size() == 1);
   int out_port = sl.begin()->output_port;
   const FlitChannel * channel = _output_channels[out_port];
-  const Router * router = channel->GetSink();
+  const BSRouter * router = channel->GetSink();
   if(router) {
     int in_channel = channel->GetSinkPort();
     OutputSet nos;

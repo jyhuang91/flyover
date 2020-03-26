@@ -444,7 +444,7 @@ BooksimNetwork::collateStats()
     //RubySystem *rs = params()->ruby_system;
     //double time_delta = double(curCycle() - g_ruby_start);
 
-    vector<Router *> routers = _net[0]->GetRouters();
+    vector<BSRouter *> routers = _net[0]->GetRouters();
     for (size_t r = 0; r < routers.size(); r++) {
         IQRouter * temp = dynamic_cast<IQRouter*>(routers[r]);
         _router_buffer_reads[r] = temp->GetBufferReads();

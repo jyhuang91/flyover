@@ -81,7 +81,7 @@ void Gem5Net::_BuildNet(const Configuration &config)
 
         int radix = 2 * _n + node_port_map[router].size();
 
-        _routers[router] = Router::NewRouter(config, this, router_name.str(),
+        _routers[router] = BSRouter::NewRouter(config, this, router_name.str(),
                 router, radix, radix);
         _timed_modules.push_back(_routers[router]);
 
@@ -93,7 +93,7 @@ void Gem5Net::_BuildNet(const Configuration &config)
         if (_router_states[router] == false) {
           _routers[router]->SetRouterState(false);
           if (is_rp) {
-              _routers[router]->SetPowerState(Router::power_off);
+              _routers[router]->SetPowerState(BSRouter::power_off);
           }
         } else if (is_rp) {
           RouteTbl rt = RouteTbl(router, _size, _router_states);

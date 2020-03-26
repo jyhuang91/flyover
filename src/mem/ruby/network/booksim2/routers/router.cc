@@ -57,16 +57,16 @@
 ///////////////////////////////////////////////////////
 
 /* ==== Power Gate - Begin ==== */
-const char * const Router::POWERSTATE[] = {"power-off",
+const char * const BSRouter::POWERSTATE[] = {"power-off",
   "power-on", "draining", "wakeup", "invalid"};
 
-int const Router::STALL_BUFFER_BUSY = -2;
-int const Router::STALL_BUFFER_CONFLICT = -3;
-int const Router::STALL_BUFFER_FULL = -4;
-int const Router::STALL_BUFFER_RESERVED = -5;
-int const Router::STALL_CROSSBAR_CONFLICT = -6;
+int const BSRouter::STALL_BUFFER_BUSY = -2;
+int const BSRouter::STALL_BUFFER_CONFLICT = -3;
+int const BSRouter::STALL_BUFFER_FULL = -4;
+int const BSRouter::STALL_BUFFER_RESERVED = -5;
+int const BSRouter::STALL_CROSSBAR_CONFLICT = -6;
 
-Router::Router( const Configuration& config,
+BSRouter::BSRouter( const Configuration& config,
     Module *parent, const string & name, int id,
     int inputs, int outputs ) :
 TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
@@ -152,14 +152,14 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   /* ==== Power Gate - End ==== */
 }
 
-void Router::AddInputChannel( FlitChannel *channel, CreditChannel *backchannel )
+void BSRouter::AddInputChannel( FlitChannel *channel, CreditChannel *backchannel )
 {
   _input_channels.push_back( channel );
   _input_credits.push_back( backchannel );
   channel->SetSink( this, _input_channels.size() - 1 ) ;
 }
 
-void Router::AddOutputChannel( FlitChannel *channel, CreditChannel *backchannel )
+void BSRouter::AddOutputChannel( FlitChannel *channel, CreditChannel *backchannel )
 {
   _output_channels.push_back( channel );
   _output_credits.push_back( backchannel );
@@ -168,18 +168,18 @@ void Router::AddOutputChannel( FlitChannel *channel, CreditChannel *backchannel 
 }
 
 /* ==== Power Gate - Begin ==== */
-void Router::AddInputHandshake( HandshakeChannel *channel )
+void BSRouter::AddInputHandshake( HandshakeChannel *channel )
 {
   _input_handshakes.push_back(channel);
 }
 
-void Router::AddOutputHandshake( HandshakeChannel *channel )
+void BSRouter::AddOutputHandshake( HandshakeChannel *channel )
 {
   _output_handshakes.push_back(channel);
 }
 /* ==== Power Gate - End ==== */
 
-void Router::Evaluate( )
+void BSRouter::Evaluate( )
 {
   _partial_internal_cycles += _internal_speedup;
   while( _partial_internal_cycles >= 1.0 ) {
@@ -188,27 +188,27 @@ void Router::Evaluate( )
   }
 }
 
-void Router::OutChannelFault( int c, bool fault )
+void BSRouter::OutChannelFault( int c, bool fault )
 {
   assert( ( c >= 0 ) && ( (size_t)c < _channel_faults.size( ) ) );
 
   _channel_faults[c] = fault;
 }
 
-bool Router::IsFaultyOutput( int c ) const
+bool BSRouter::IsFaultyOutput( int c ) const
 {
   assert( ( c >= 0 ) && ( (size_t)c < _channel_faults.size( ) ) );
 
   return _channel_faults[c];
 }
 
-/*Router constructor*/
-Router *Router::NewRouter( const Configuration& config,
+/*BSRouter constructor*/
+BSRouter *BSRouter::NewRouter( const Configuration& config,
     Module *parent, const string & name, int id,
     int inputs, int outputs )
 {
   const string type = config.GetStr( "router" );
-  Router *r = NULL;
+  BSRouter *r = NULL;
   if ( type == "iq" ) {
     r = new IQRouter( config, parent, name, id, inputs, outputs );
   } else if ( type == "event" ) {
@@ -239,7 +239,7 @@ Router *Router::NewRouter( const Configuration& config,
 }
 
 /* ==== Power Gate - Begin ==== */
-void Router::IdleDetected()
+void BSRouter::IdleDetected()
 {
   if (_power_state == power_on)
     ++_idle_timer;
@@ -249,24 +249,23 @@ void Router::IdleDetected()
     ++_off_timer;
 }
 
-Router * Router::GetNeighborRouter(int out_port)
+BSRouter * BSRouter::GetNeighborRouter(int out_port)
 {
   const FlitChannel * channel = _output_channels[out_port];
-  Router * router = channel->GetSink();
+  BSRouter * router = channel->GetSink();
 
   return router;
 }
 
-void Router::SetRingOutputVCBufferSize(int vc_buf_size) {};
+void BSRouter::SetRingOutputVCBufferSize(int vc_buf_size) {};
 
-void Router::SynchronizeCycle(uint64_t cycles)
+void BSRouter::SynchronizeCycle(uint64_t cycles)
 {
     if (_power_state == power_on) {
         _idle_timer += cycles;
     } else if (_power_state == power_off) {
-        int prev_off_timer = _off_timer;
+        assert((_off_timer + cycles) > _timer);
         _off_timer += cycles;
-        assert(_off_timer > prev_off_timer);
         _power_off_cycles += cycles;
         _total_power_off_cycles += cycles;
     }

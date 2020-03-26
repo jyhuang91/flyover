@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -47,7 +47,7 @@
 #include "mem/ruby/network/booksim2/power/switch_monitor.hh"
 #include "mem/ruby/network/booksim2/power/buffer_monitor.hh"
 
-RPRouter::RPRouter( Configuration const & config, Module *parent, 
+RPRouter::RPRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
 : IQRouter( config, parent, name, id, inputs, outputs )
 {
@@ -202,7 +202,7 @@ void RPRouter::_InputQueuing( )
                   -1)));
         }
         if(_vc_allocator) {
-          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                   -1)));
         }
         if(_noq) {
@@ -215,7 +215,7 @@ void RPRouter::_InputQueuing( )
         _sw_hold_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       } else {
-        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       }
     }
@@ -506,7 +506,7 @@ void RPRouter::_SWHoldUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -745,19 +745,19 @@ void RPRouter::_SWAllocUpdate( )
                 vc_prio += numeric_limits<int>::min();
               }
 
-              // FIXME: This check should probably be performed in Evaluate(), 
-              // not Update(), as the latter can cause the outcome to depend on 
+              // FIXME: This check should probably be performed in Evaluate(),
+              // not Update(), as the latter can cause the outcome to depend on
               // the order of evaluation!
-              if(dest_buf->IsAvailableFor(out_vc) && 
+              if(dest_buf->IsAvailableFor(out_vc) &&
                   !dest_buf->IsFullFor(out_vc) &&
-                  ((match_vc < 0) || 
-                   RoundRobinArbiter::Supersedes(out_vc, vc_prio, 
-                     match_vc, match_prio, 
+                  ((match_vc < 0) ||
+                   RoundRobinArbiter::Supersedes(out_vc, vc_prio,
+                     match_vc, match_prio,
                      vc_offset, _vcs))) {
                 match_vc = out_vc;
                 match_prio = vc_prio;
               }
-            }	
+            }
           }
         }
         assert(match_vc >= 0);
@@ -807,7 +807,7 @@ void RPRouter::_SWAllocUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -961,10 +961,8 @@ void RPRouter::_SWAllocUpdate( )
           }
         } else { // should have recomputed routing in VC evaluate
           assert(cur_buf->GetState(vc) == VC::vc_alloc);
-          int const dest_output = cur_buf->GetOutputPort(vc);
-          assert(dest_output == -1);
-          int const dest_vc = cur_buf->GetOutputVC(vc);
-          assert(dest_vc == -1);
+          assert(cur_buf->GetOutputPort(vc) == -1);
+          assert(cur_buf->GetOutputVC(vc) == -1);
           pair<int, int> input_vc = make_pair(input, vc);
           for (unsigned i = 0; i < _vc_alloc_vcs.size(); ++i) {
             pair<uint64_t, pair<pair<int, int>, int> > item = _vc_alloc_vcs[i];

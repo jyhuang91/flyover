@@ -41,7 +41,7 @@
 #include "mem/ruby/network/booksim2/pipefifo.hh"
 #include "mem/ruby/network/booksim2/vc.hh"
 
-class ChaosRouter : public Router {
+class ChaosRouter : public BSRouter {
 
   tRoutingFunction   _rf;
 

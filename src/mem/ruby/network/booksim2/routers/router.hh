@@ -49,7 +49,7 @@ typedef Channel<Credit> CreditChannel;
 typedef Channel<Handshake> HandshakeChannel;
 /* ==== Power Gate - End ==== */
 
-class Router : public TimedModule {
+class BSRouter : public TimedModule {
 
 /* ==== Power Gate - Begin ==== */
 public:
@@ -153,12 +153,12 @@ protected:
   /* ==== Power Gate - End ==== */
 
 public:
-  Router( const Configuration& config,
+  BSRouter( const Configuration& config,
       Module *parent, const string & name, int id,
       int inputs, int outputs );
-  virtual ~Router() {};
+  virtual ~BSRouter() {};
 
-  static Router *NewRouter( const Configuration& config,
+  static BSRouter *NewRouter( const Configuration& config,
       Module *parent, const string & name, int id,
       int inputs, int outputs );
 
@@ -282,7 +282,7 @@ public:
   inline void WakeUp() {_wakeup_signal = true;}
   inline bool GetWakeUpSignal() {return _wakeup_signal;}
   inline void SetPowerState( ePowerState s ) {_power_state = s;}
-  inline Router::ePowerState GetPowerState() const {return _power_state;}
+  inline BSRouter::ePowerState GetPowerState() const {return _power_state;}
   inline void SetRouterState(bool state) {_router_state = state;}
   inline string GetRouterState() const {return _router_state ? "On" : "Off";}
 
@@ -308,13 +308,13 @@ public:
   virtual void SetRingOutputVCBufferSize(int vc_buf_size);
   inline void SetNeighborPowerState(int output, ePowerState s) {_neighbor_states[output] = s;}
 
-  inline Router::ePowerState GetNeighborPowerState(int out_port) const {return _neighbor_states[out_port];}
+  inline BSRouter::ePowerState GetNeighborPowerState(int out_port) const {return _neighbor_states[out_port];}
   inline void SetLogicalNeighbor(int out_port, int id) {_logical_neighbors[out_port] = id;}
   inline int GetLogicalNeighbor(int out_port) const {return _logical_neighbors[out_port];}
   inline void WatchPowerGating() {_watch_power_gating = true;}
 
   void IdleDetected();
-  Router * GetNeighborRouter(int out_port);
+  BSRouter * GetNeighborRouter(int out_port);
 
   virtual void AggressPowerGatingPolicy() {};
   virtual void RegressPowerGatingPolicy() {};

@@ -61,7 +61,7 @@ protected:
   int _vcs;
 
   vector<BSNetwork *> _net;
-  vector<vector<Router *> > _router;
+  vector<vector<BSRouter *> > _router;
 
   // ============ Traffic ============
 

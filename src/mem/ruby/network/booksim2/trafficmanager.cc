@@ -1106,7 +1106,7 @@ void TrafficManager::_Step( )
                     if(_noq) {
                         assert(_lookahead_routing);
                         const FlitChannel * inject = _net[subnet]->GetInject(n);
-                        const Router * router = inject->GetSink();
+                        const BSRouter * router = inject->GetSink();
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
@@ -1199,7 +1199,7 @@ void TrafficManager::_Step( )
                     if (_lookahead_routing) {
                         if(!_noq) {
                             const FlitChannel * inject = _net[subnet]->GetInject(n);
-                            const Router * router = inject->GetSink();
+                            const BSRouter * router = inject->GetSink();
                             assert(router);
                             int in_channel = inject->GetSinkPort();
                             _rf(router, f, in_channel, &f->la_route_set, false);
@@ -1952,7 +1952,7 @@ void TrafficManager::UpdateStats() {
             if(_stored_flits_out) *_stored_flits_out << vector<int>(_nodes, 0) << ',';
 #endif
             for(int router = 0; router < _routers; ++router) {
-                Router * const r = _router[subnet][router];
+                BSRouter * const r = _router[subnet][router];
 #ifdef TRACK_FLOWS
                 char trail_char =
                     ((router == _routers - 1) && (subnet == _subnets - 1) && (c == _classes - 1)) ? '\n' : ',';
@@ -1996,7 +1996,7 @@ void TrafficManager::UpdateStats() {
             }
         }
         for(int r = 0; r < _routers; ++r) {
-            Router const * const rtr = _router[s][r];
+            BSRouter const * const rtr = _router[s][r];
             char trail_char =
                 ((r == _routers - 1) && (s == _subnets - 1)) ? '\n' : ',';
             if(_used_credits_out) *_used_credits_out << rtr->UsedCredits() << trail_char;

@@ -474,11 +474,11 @@ void FLOVTrafficManager::_Step( )
         cout << "WARNING: Possible network deadlock.\n";
         /* ==== Power Gate Debug - Begin ==== */
         cout << GetSimTime() << endl;
-        const vector<Router *> routers = _net[0]->GetRouters();
+        const vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int n = 0; n < _nodes; ++n) {
             if (n % gK == 0)
                 cout << endl;
-            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+            cout << BSRouter::POWERSTATE[routers[n]->GetPowerState()] << "\t";
         }
         cout << endl;
         for (int n = 0; n < _nodes; ++n)
@@ -532,7 +532,7 @@ void FLOVTrafficManager::_Step( )
       }
 
       if (turn == gK) {
-        vector<Router *> routers = _net[0]->GetRouters();
+        vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int n = 0; n < _nodes; ++n) {
           if (n >= _nodes - gK) {
             _power_state_votes[n] = 0;
@@ -575,7 +575,7 @@ void FLOVTrafficManager::_Step( )
         }
         if (is_idle == true) {  // found an idle cycle
             for (int subnet = 0; subnet < _subnets; ++subnet) {
-                vector<Router *> routers = _net[subnet]->GetRouters();
+                vector<BSRouter *> routers = _net[subnet]->GetRouters();
                 routers[n]->IdleDetected();
             }
             ++_router_idle_periods[n];
@@ -594,9 +594,9 @@ void FLOVTrafficManager::_Step( )
             ++_idle_cycles[n][cur_idle_cycles];
             ++_overall_idle_cycles[n][cur_idle_cycles];
             _router_idle_periods[n] = 0;
-            // Power on Router
+            // Power on BSRouter
             for (int subnet = 0; subnet < _subnets; ++subnet) {
-                vector<Router *> routers = _net[subnet]->GetRouters();
+                vector<BSRouter *> routers = _net[subnet]->GetRouters();
                 routers[n]->WakeUp();
             }
         }
@@ -701,9 +701,9 @@ void FLOVTrafficManager::_Step( )
                     /* ==== Power Gate - Begin ==== */
                     // should not send if router is sleeping, wake it up
                     const FlitChannel * inject = _net[subnet]->GetInject(n);
-                    Router * router = inject->GetSink();
+                    BSRouter * router = inject->GetSink();
                     assert(router);
-                    if (router->GetPowerState() != Router::power_on) {
+                    if (router->GetPowerState() != BSRouter::power_on) {
                         if (_wakeup_handshake_latency[n]) {
                             router->WakeUp();
                             _wakeup_handshake_latency[n] = false;
@@ -733,7 +733,7 @@ void FLOVTrafficManager::_Step( )
                     if(_noq) {
                         assert(_lookahead_routing);
                         const FlitChannel * inject = _net[subnet]->GetInject(n);
-                        const Router * router = inject->GetSink();
+                        const BSRouter * router = inject->GetSink();
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
@@ -826,9 +826,9 @@ void FLOVTrafficManager::_Step( )
                     /* ==== Power Gate - Begin ==== */
                     // should not send if router is sleeping, wake it up
                     const FlitChannel * inject = _net[subnet]->GetInject(n);
-                    Router * router = inject->GetSink();
+                    BSRouter * router = inject->GetSink();
                     assert(router);
-                    if (router->GetPowerState() != Router::power_on) {
+                    if (router->GetPowerState() != BSRouter::power_on) {
                         if (_wakeup_handshake_latency[n]) {
                             router->WakeUp();
                             _wakeup_handshake_latency[n] = false;
@@ -849,7 +849,7 @@ void FLOVTrafficManager::_Step( )
                     if (_lookahead_routing) {
                         if(!_noq) {
                             const FlitChannel * inject = _net[subnet]->GetInject(n);
-                            const Router * router = inject->GetSink();
+                            const BSRouter * router = inject->GetSink();
                             assert(router);
                             int in_channel = inject->GetSinkPort();
                             _rf(router, f, in_channel, &f->la_route_set, false);

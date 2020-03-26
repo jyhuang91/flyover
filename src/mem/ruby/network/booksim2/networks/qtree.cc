@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -36,7 +36,7 @@
 //  $Author: jbalfour $
 //  $Date: 2007/05/17 17:14:07 $
 //  $Id$
-// 
+//
 ////////////////////////////////////////////////////////////////////////
 
 #include "mem/ruby/network/booksim2/booksim.hh"
@@ -84,21 +84,21 @@ void QTree::_BuildNet( const Configuration& config )
 {
   for (int h = 0; h < _n; h++) {
     for (int pos = 0 ; pos < powi( _k, h ) ; ++pos ) {
-      
-      int id = h * 256 + pos;  
+
+      int id = h * 256 + pos;
       int r = _RouterIndex( h, pos );
 
       ostringstream routerName("router_");
       routerName << h << "_" << pos;
 
       int d = ( h == 0 ) ? _k : _k + 1;
-      _routers[r] = Router::NewRouter( config, this,
+      _routers[r] = BSRouter::NewRouter( config, this,
 				       routerName.str( ),
 				       id, d, d);
       _timed_modules.push_back(_routers[r]);
     }
   }
-  
+
   // Injection & Ejection Channels
   for ( int pos = 0 ; pos < powi( _k, _n-1 ) ; ++pos ) {
     int r = _RouterIndex( _n-1, pos );
@@ -124,11 +124,11 @@ void QTree::_BuildNet( const Configuration& config )
 	if ( h < _n-1 ) {
 	  // Channels to Children Nodes
 	  c = _InputIndex( h , pos, port );
-	  _routers[r]->AddInputChannel( _chan[c], 
+	  _routers[r]->AddInputChannel( _chan[c],
 					_chan_cred[c] );
 
 	  c = _OutputIndex( h, pos, port );
-	  _routers[r]->AddOutputChannel( _chan[c], 
+	  _routers[r]->AddOutputChannel( _chan[c],
 					 _chan_cred[c] );
 
 	}
@@ -146,11 +146,11 @@ void QTree::_BuildNet( const Configuration& config )
     }
   }
 }
- 
-int QTree::_RouterIndex( int height, int pos ) 
+
+int QTree::_RouterIndex( int height, int pos )
 {
   int r = 0;
-  for ( int h = 0; h < height; h++ ) 
+  for ( int h = 0; h < height; h++ )
     r += powi( _k, h );
   return (r + pos);
 }
@@ -159,7 +159,7 @@ int QTree::_InputIndex( int height, int pos, int port )
 {
   assert( height >= 0 && height < powi( _k,_n-1 ) );
   int c = 0;
-  for ( int h = 0; h < height; h++) 
+  for ( int h = 0; h < height; h++)
     c += powi( _k, h+1 );
   return ( c + _k * pos + port );
 }
@@ -168,13 +168,13 @@ int QTree::_OutputIndex( int height, int pos, int port )
 {
   assert( height >= 0 && height < powi( _k,_n-1 ) );
   int c = _channels / 2;
-  for ( int h = 0; h < height; h++) 
+  for ( int h = 0; h < height; h++)
     c += powi( _k, h+1 );
   return ( c + _k * pos + port );
 }
 
 
-int QTree::HeightFromID( int id ) 
+int QTree::HeightFromID( int id )
 {
   return id / 256;
 }

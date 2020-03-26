@@ -269,7 +269,7 @@ void Gem5TrafficManager::Step()
     uint64_t prev_time = _time;
     _time = _net_ptr->curCycle();
     if (_time > prev_time + 1) {
-        vector<Router *> routers = _net[0]->GetRouters();
+        vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int r = 0; r < routers.size(); r++) {
             routers[r]->SynchronizeCycle(_time - prev_time - 1);
         }
@@ -284,12 +284,12 @@ void Gem5TrafficManager::Step()
         cout << "WARNING: Possible network deadlock.\n";
         /* ==== Power Gate Debug - Begin ==== */
         cout << GetSimTime() << endl;
-        const vector<Router *> routers = _net[0]->GetRouters();
+        const vector<BSRouter *> routers = _net[0]->GetRouters();
         for (int n = 0; n < routers.size(); ++n) {
             if (n % gK == 0) {
                 cout << endl;
             }
-            cout << Router::POWERSTATE[routers[n]->GetPowerState()] << "\t";
+            cout << BSRouter::POWERSTATE[routers[n]->GetPowerState()] << "\t";
         }
         cout << endl;
         for (int n = 0; n < routers.size(); ++n)
@@ -406,7 +406,7 @@ void Gem5TrafficManager::Step()
                     if (_noq) {
                         assert(_lookahead_routing);
                         const FlitChannel * inject = _net[subnet]->GetInject(n);
-                        const Router * router = inject->GetSink();
+                        const BSRouter * router = inject->GetSink();
                         assert(router);
                         int in_channel = inject->GetSinkPort();
 
@@ -497,7 +497,7 @@ void Gem5TrafficManager::Step()
                      if (_lookahead_routing) {
                          if (!_noq) {
                              const FlitChannel * inject = _net[subnet]->GetInject(n);
-                             const Router * router = inject->GetSink();
+                             const BSRouter * router = inject->GetSink();
                              assert(router);
                              int in_channel = inject->GetSinkPort();
                              _rf(router, f, in_channel, &f->la_route_set, false);
@@ -665,12 +665,12 @@ bool Gem5TrafficManager::EventsOutstanding()
 bool Gem5TrafficManager::RouterPowerStateTransition()
 {
     for (int subnet = 0; subnet < _subnets; subnet++) {
-        const vector<Router *> routers = _net[subnet]->GetRouters();
+        const vector<BSRouter *> routers = _net[subnet]->GetRouters();
         for (int r = 0; r < routers.size(); r++) {
-            Router::ePowerState ps = routers[r]->GetPowerState();
-            if (ps == Router::draining || ps == Router::wakeup)
+            BSRouter::ePowerState ps = routers[r]->GetPowerState();
+            if (ps == BSRouter::draining || ps == BSRouter::wakeup)
                 return true;
-            if (ps == Router::power_off && routers[r]->GetWakeUpSignal())
+            if (ps == BSRouter::power_off && routers[r]->GetWakeUpSignal())
                 return true;
         }
     }
@@ -778,7 +778,7 @@ void Gem5TrafficManager::DumpStats()
     _UpdateOverallStats();
     DisplayOverallStats(cout);
 
-    const vector<Router *> routers = _net[0]->GetRouters();
+    const vector<BSRouter *> routers = _net[0]->GetRouters();
 
     string outfile = _outdir + string("/booksimstats.json");
     ofstream statsout(outfile.c_str(), ofstream::out);

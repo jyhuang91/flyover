@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -27,7 +27,7 @@
 
 // ----------------------------------------------------------------------
 //
-//  Matrix: Matrix Arbiter
+//  Matrix: Matrix BSArbiter
 //
 // ----------------------------------------------------------------------
 
@@ -35,8 +35,8 @@
 #include <iostream>
 using namespace std ;
 
-MatrixArbiter::MatrixArbiter( Module *parent, const string &name, int size )
-  : Arbiter( parent, name, size ), _last_req(-1) {
+BSMatrixArbiter::BSMatrixArbiter( Module *parent, const string &name, int size )
+  : BSArbiter( parent, name, size ), _last_req(-1) {
   _matrix.resize(size);
   for ( int i = 0 ; i < size ; i++ ) {
     _matrix[i].resize(size);
@@ -46,7 +46,7 @@ MatrixArbiter::MatrixArbiter( Module *parent, const string &name, int size )
   }
 }
 
-void MatrixArbiter::PrintState() const  {
+void BSMatrixArbiter::PrintState() const  {
   cout << "Priority Matrix: " << endl ;
   for ( int r = 0; r < _size ; r++ ) {
     for ( int c = 0 ; c < _size ; c++ ) {
@@ -57,7 +57,7 @@ void MatrixArbiter::PrintState() const  {
   cout << endl ;
 }
 
-void MatrixArbiter::UpdateState() {
+void BSMatrixArbiter::UpdateState() {
   // update priority matrix using last grant
   if ( _selected > -1 ) {
     for ( int i = 0; i < _size ; i++ ) {
@@ -69,27 +69,27 @@ void MatrixArbiter::UpdateState() {
   }
 }
 
-void MatrixArbiter::AddRequest( int input, int id, int pri )
+void BSMatrixArbiter::AddRequest( int input, int id, int pri )
 {
   _last_req = input;
-  Arbiter::AddRequest(input, id, pri);
+  BSArbiter::AddRequest(input, id, pri);
 }
 
-int MatrixArbiter::Arbitrate( int* id, int* pri ) {
-  
+int BSMatrixArbiter::Arbitrate( int* id, int* pri ) {
+
   // avoid running arbiter if it has not recevied at least two requests
   // (in this case, requests and grants are identical)
   if ( _num_reqs < 2 ) {
-    
+
     _selected = _last_req ;
-    
+
   } else {
-    
+
     _selected = -1 ;
 
     for ( int input = 0 ; input < _size ; input++ ) {
       if(_request[input].valid) {
-	
+
 	bool grant = true;
 	for ( int i = 0 ; i < _size ; i++ ) {
 	  if ( _request[i].valid &&
@@ -101,21 +101,21 @@ int MatrixArbiter::Arbitrate( int* id, int* pri ) {
 	    break ;
 	  }
 	}
-	
+
 	if ( grant ) {
 	  _selected = input ;
-	  break ; 
+	  break ;
 	}
       }
-      
+
     }
   }
-    
-  return Arbiter::Arbitrate(id, pri);
+
+  return BSArbiter::Arbitrate(id, pri);
 }
 
-void MatrixArbiter::Clear()
+void BSMatrixArbiter::Clear()
 {
   _last_req = -1;
-  Arbiter::Clear();
+  BSArbiter::Clear();
 }

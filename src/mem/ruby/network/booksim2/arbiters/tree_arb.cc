@@ -7,7 +7,7 @@
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
 
- Redistributions of source code must retain the above copyright notice, this 
+ Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
  Redistributions in binary form must reproduce the above copyright notice, this
  list of conditions and the following disclaimer in the documentation and/or
@@ -15,7 +15,7 @@
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -38,8 +38,8 @@
 using namespace std ;
 
 TreeArbiter::TreeArbiter( Module *parent, const string &name,
-			  int size, int groups, const string & arb_type ) 
-  : Arbiter( parent, name, size ) {
+			  int size, int groups, const string & arb_type )
+  : BSArbiter( parent, name, size ) {
   assert(size % groups == 0);
   _group_arbiters.resize(groups);
   _group_reqs.resize(groups, 0);
@@ -47,9 +47,9 @@ TreeArbiter::TreeArbiter( Module *parent, const string &name,
   for(int i = 0; i < groups; ++i) {
     ostringstream group_arb_name;
     group_arb_name << "group_arb" << i;
-    _group_arbiters[i] = Arbiter::NewArbiter(this, group_arb_name.str(), arb_type, _group_size);
+    _group_arbiters[i] = BSArbiter::NewArbiter(this, group_arb_name.str(), arb_type, _group_size);
   }
-  _global_arbiter = Arbiter::NewArbiter(this, "global_arb", arb_type, groups);
+  _global_arbiter = BSArbiter::NewArbiter(this, "global_arb", arb_type, groups);
 }
 
 TreeArbiter::~TreeArbiter() {
@@ -79,7 +79,7 @@ void TreeArbiter::UpdateState() {
 
 void TreeArbiter::AddRequest( int input, int id, int pri )
 {
-  Arbiter::AddRequest(input, id, pri);
+  BSArbiter::AddRequest(input, id, pri);
   int group_index = input / _group_size;
   _group_arbiters[group_index]->AddRequest( input % _group_size, id, pri );
   ++_group_reqs[group_index];
@@ -88,7 +88,7 @@ void TreeArbiter::AddRequest( int input, int id, int pri )
 int TreeArbiter::Arbitrate( int* id, int* pri ) {
   if(!_num_reqs) {
     return -1;
-  } 
+  }
   for(int i = 0; i < (int)_group_arbiters.size(); ++i) {
     if(_group_reqs[i]) {
       int group_id, group_pri;
@@ -102,7 +102,7 @@ int TreeArbiter::Arbitrate( int* id, int* pri ) {
   assert(group_sel >= 0 && group_sel < _group_size);
   _selected = group * _group_size + group_sel;
   assert(_selected >= 0 && _selected < _size);
-  return Arbiter::Arbitrate(id, pri);
+  return BSArbiter::Arbitrate(id, pri);
 }
 
 void TreeArbiter::Clear()
@@ -115,5 +115,5 @@ void TreeArbiter::Clear()
     _group_reqs[i] = 0;
   }
   _global_arbiter->Clear();
-  Arbiter::Clear();
+  BSArbiter::Clear();
 }

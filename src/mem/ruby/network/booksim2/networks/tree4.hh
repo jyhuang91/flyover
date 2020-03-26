@@ -55,7 +55,7 @@ class Tree4 : public BSNetwork {
   void _BuildNet( const Configuration& config );
 
 
-  Router*& _Router( int height, int pos );
+  BSRouter*& _Router( int height, int pos );
 
   int _WireLatency( int height1, int pos1, int height2, int pos2 );
 

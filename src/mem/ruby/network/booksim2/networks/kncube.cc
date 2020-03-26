@@ -97,7 +97,7 @@ void KNCube::_BuildNet( const Configuration &config )
       }
     }
 
-    _routers[node] = Router::NewRouter( config, this, router_name.str( ),
+    _routers[node] = BSRouter::NewRouter( config, this, router_name.str( ),
         node, 2*_n + 1, 2*_n + 1 );
     _timed_modules.push_back(_routers[node]);
 
@@ -109,7 +109,7 @@ void KNCube::_BuildNet( const Configuration &config )
     if (_router_states[node] == false) {
       _routers[node]->SetRouterState(false);
       if (is_rp) { // TODO: make all dynamic
-        _routers[node]->SetPowerState(Router::power_off);
+        _routers[node]->SetPowerState(BSRouter::power_off);
       }
     } else if (is_rp) {
       RouteTbl rt = RouteTbl(node, _size, _router_states);

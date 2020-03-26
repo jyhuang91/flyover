@@ -733,32 +733,32 @@ void NoRDRouter::_RouteUpdate( )
     // avoid rerouting by VCAlloc again and again
     f->rtime = GetSimTime();
 
-    if (f->dest_router != _id) {
-      OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
-      assert(route_set);
-      set<OutputSet::sSetElement> const setlist = route_set->GetSet();
-      if (setlist.size() == 1) {
-        set<OutputSet::sSetElement>::const_iterator iset = setlist.begin();
-        int const out_port = iset->output_port;
-        assert((out_port >= 0) && (out_port < _outputs));
-        const FlitChannel * channel = _output_channels[out_port];
-        Router * router = channel->GetSink();
-        assert(router);
-        /*if (f->dest_router == router->GetID()) {
-          if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
-            cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
-              << router->GetID() << " is "
-              << POWERSTATE[_neighbor_states[out_port]] << ", but actually is "
-              << POWERSTATE[router->GetPowerState()] << "(flit " << f->id
-              << " dest " << f->dest_router << ")" << endl;
-            assert(f->type == Flit::READ_REPLY || f->type == Flit::WRITE_REPLY);
-            assert(0); // means should not come here??
-          }
-          assert(_neighbor_states[out_port] == power_on ||
-              _neighbor_states[out_port] == draining);
-        }*/
-      }
-    }
+    //if (f->dest_router != _id) {
+    //  OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
+    //  assert(route_set);
+    //  set<OutputSet::sSetElement> const setlist = route_set->GetSet();
+    //  if (setlist.size() == 1) {
+    //    set<OutputSet::sSetElement>::const_iterator iset = setlist.begin();
+    //    int const out_port = iset->output_port;
+    //    assert((out_port >= 0) && (out_port < _outputs));
+    //    const FlitChannel * channel = _output_channels[out_port];
+    //    BSRouter * router = channel->GetSink();
+    //    assert(router);
+    //    /*if (f->dest_router == router->GetID()) {
+    //      if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
+    //        cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
+    //          << router->GetID() << " is "
+    //          << POWERSTATE[_neighbor_states[out_port]] << ", but actually is "
+    //          << POWERSTATE[router->GetPowerState()] << "(flit " << f->id
+    //          << " dest " << f->dest_router << ")" << endl;
+    //        assert(f->type == Flit::READ_REPLY || f->type == Flit::WRITE_REPLY);
+    //        assert(0); // means should not come here??
+    //      }
+    //      assert(_neighbor_states[out_port] == power_on ||
+    //          _neighbor_states[out_port] == draining);
+    //    }*/
+    //  }
+    //}
     /* ==== Power Gate - End ==== */
     if(_speculative) {
       _sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second, -1)));
@@ -827,7 +827,7 @@ void NoRDRouter::_VCAllocUpdate( )
       bool back_to_route = false;
 
       const FlitChannel * channel = _output_channels[match_output];
-      Router * router = channel->GetSink();
+      BSRouter * router = channel->GetSink();
 
       if (router) {
         const bool is_mc = (router->GetID() >= gNodes - gK);
@@ -928,7 +928,7 @@ void NoRDRouter::_VCAllocUpdate( )
         assert((out_port >= 0) && (out_port < _outputs));
 
         const FlitChannel * channel = _output_channels[out_port];
-        Router * router = channel->GetSink();
+        BSRouter * router = channel->GetSink();
         if (router) {
           const bool is_mc = (router->GetID() >= gNodes - gK);
           if (!is_mc && _neighbor_states[out_port] == draining) {
@@ -1086,7 +1086,7 @@ void NoRDRouter::_SWHoldUpdate( )
 
         if (neighbor_port >= 0) {
           const FlitChannel *channel = _output_channels[neighbor_port];
-          Router *neighbor = channel->GetSink();
+          BSRouter *neighbor = channel->GetSink();
           int prev_x = neighbor->GetID() / gK;
           int prev_y = neighbor->GetID() % gK;
           int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
@@ -1118,7 +1118,7 @@ void NoRDRouter::_SWHoldUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -1398,7 +1398,7 @@ void NoRDRouter::_SWAllocUpdate( )
         if (f->head) {
           bool back_to_route = false;
           const FlitChannel * channel = _output_channels[output];
-          Router * router = channel->GetSink();
+          BSRouter * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && _neighbor_states[output] == draining) {
@@ -1486,7 +1486,7 @@ void NoRDRouter::_SWAllocUpdate( )
 
         if (neighbor_port >= 0) {
           const FlitChannel *channel = _output_channels[neighbor_port];
-          Router *neighbor = channel->GetSink();
+          BSRouter *neighbor = channel->GetSink();
           int prev_x = neighbor->GetID() / gK;
           int prev_y = neighbor->GetID() % gK;
           int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
@@ -1518,7 +1518,7 @@ void NoRDRouter::_SWAllocUpdate( )
 
       if(!_routing_delay && f->head) {
         const FlitChannel * channel = _output_channels[output];
-        const Router * router = channel->GetSink();
+        const BSRouter * router = channel->GetSink();
         if(router) {
           if(_noq) {
             if(f->watch) {
@@ -1652,7 +1652,7 @@ void NoRDRouter::_SWAllocUpdate( )
             assert((out_port >= 0) && (out_port < _outputs));
 
             const FlitChannel * channel = _output_channels[out_port];
-            Router * router = channel->GetSink();
+            BSRouter * router = channel->GetSink();
             if (router) {
               const bool is_mc = (router->GetID() >= gNodes - gK);
               if (!is_mc && _neighbor_states[out_port] == draining) {
@@ -1687,7 +1687,7 @@ void NoRDRouter::_SWAllocUpdate( )
           assert(output >= 0 && output < _outputs);
           assert(match_vc >= 0 && match_vc < _vcs);
           const FlitChannel * channel = _output_channels[output];
-          Router * router = channel->GetSink();
+          BSRouter * router = channel->GetSink();
           if (router) {
             const bool is_mc = (router->GetID() >= gNodes - gK);
             if (!is_mc && _neighbor_states[output] == draining) {
@@ -1933,7 +1933,7 @@ void NoRDRouter::_NoRDStep()
         int shortest_hops = abs(src_x - dest_x) + abs(src_y - dest_y);
 
         const FlitChannel *channel = _output_channels[_ring_in_port];
-        Router *neighbor = channel->GetSink();
+        BSRouter *neighbor = channel->GetSink();
         int prev_x = neighbor->GetID() / gK;
         int prev_y = neighbor->GetID() % gK;
         int prev_hops = abs(prev_x - dest_x) + abs(prev_y - dest_y);
@@ -2165,8 +2165,7 @@ void NoRDRouter::_HandshakeResponse()
       if (drain_done)
         for (deque<pair<uint64_t, pair<Flit *, pair<int, int> > > >::iterator iter =
              _crossbar_flits.begin(); iter != _crossbar_flits.end(); ++iter) {
-          uint64_t const time = iter->first;
-          assert(time == -1 || time < GetSimTime());
+          assert(iter->first == -1 || iter->first < GetSimTime());
           int const expanded_output = iter->second.second.second;
           int const output = expanded_output / _output_speedup;
           assert((output >= 0) && (output < _outputs));

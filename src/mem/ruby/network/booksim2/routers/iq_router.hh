@@ -48,7 +48,7 @@ class Allocator;
 class SwitchMonitor;
 class BufferMonitor;
 
-class IQRouter : public Router {
+class IQRouter : public BSRouter {
 
 protected:
 
@@ -143,7 +143,7 @@ protected:
 
   // ----------------------------------------
   //
-  //   Router Power Modellingyes
+  //   BSRouter Power Modellingyes
   //
   // ----------------------------------------
 

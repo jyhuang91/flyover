@@ -58,7 +58,7 @@ protected:
   int _channels;
   int _classes;
 
-  vector<Router *> _routers;
+  vector<BSRouter *> _routers;
 
   vector<FlitChannel *> _inject;
   vector<CreditChannel *> _inject_cred;
@@ -137,8 +137,8 @@ public:
   /* ==== Power Gate - Begin ==== */
   const vector<HandshakeChannel *> & GetChannelHandshake(){return _chan_handshake;}
   /* ==== Power Gate - End ==== */
-  const vector<Router *> & GetRouters(){return _routers;}
-  Router * GetRouter(int index) {return _routers[index];}
+  const vector<BSRouter *> & GetRouters(){return _routers;}
+  BSRouter * GetRouter(int index) {return _routers[index];}
   int NumRouters() const {return _size;}
   /* ==== Power Gate - Begin ==== */
   vector<bool> & GetCoreStates(){return _core_states;}
