@@ -2672,14 +2672,13 @@ void rp_gem5net( const BSRouter *r, const Flit *f, int in_channel,
   int vcEnd = vcBegin + gNumVCperVnet - 1;
   assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
 
-  int cur_router = r->GetID();
   int dest_router = Gem5Net::NodeToRouter(f->dest);
   assert(dest_router == f->dest_router);
   int out_port;
 
   if (inject) {
     out_port = -1;
-  } else if (cur_router == dest_router) {
+  } else if (r->GetID() == dest_router) {
     out_port = Gem5Net::NodeToPort(f->dest);
   } else {
 
