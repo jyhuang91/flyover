@@ -739,7 +739,8 @@ void BufferState::ReturnBuffer( int vc)
     Error( err.str() );
   }
   _in_use_by[vc] = -1;
-  _tail_sent[vc] = true;
+  _tail_sent[vc] = false;
+  assert(_vc_occupancy[vc] == 0);
   _buffer_policy->ReturnBuffer(vc);
 }
 

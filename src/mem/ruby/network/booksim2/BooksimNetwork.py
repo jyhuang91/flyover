@@ -14,4 +14,4 @@ class BooksimNetwork(RubyNetwork):
     flit_size = Param.Int(16, "network flit size in bytes (ni and link)")
     vcs_per_vnet = Param.Int(4, "virtual channels per virtual network");
 
-    buffers_per_vc = Param.UInt32(4, "buffers per virtual channel");
+    buffers_per_vc = Param.UInt32(5, "buffers per virtual channel");
