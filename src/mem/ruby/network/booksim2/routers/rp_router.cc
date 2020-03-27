@@ -51,10 +51,6 @@ RPRouter::RPRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
 : IQRouter( config, parent, name, id, inputs, outputs )
 {
-    cout << FullName() << " | rp |"
-        << inputs << " inputs, "
-        << outputs << " outputs."
-        << endl;
 }
 
 RPRouter::~RPRouter( )

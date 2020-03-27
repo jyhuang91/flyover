@@ -264,7 +264,7 @@ void BSRouter::SynchronizeCycle(uint64_t cycles)
     if (_power_state == power_on) {
         _idle_timer += cycles;
     } else if (_power_state == power_off) {
-        assert((_off_timer + cycles) > _timer);
+        assert((_off_timer + cycles) > _off_timer);
         _off_timer += cycles;
         _power_off_cycles += cycles;
         _total_power_off_cycles += cycles;
