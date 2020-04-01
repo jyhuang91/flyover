@@ -78,6 +78,8 @@ def define_options(parser):
     parser.add_option("--noc-pg", action="store_true", default=False,
                       help="NoC power gating, create different core router \
                             map in topology")
+    parser.add_option("--buffers-per-vc", type="int", default=5,
+                      help="buffer depth per virtual channel")
 
     # ruby mapping options
     parser.add_option("--numa-high-bit", type="int", default=0,
@@ -153,6 +155,7 @@ def create_system(options, system, piobus = None, dma_ports = []):
     if options.booksim_network:
         network.booksim_config = options.booksim_config
         network.outdir = m5.options.outdir
+        network.buffers_per_vc = options.buffers_per_vc
     ruby.network = network
 
     protocol = buildEnv['PROTOCOL']
