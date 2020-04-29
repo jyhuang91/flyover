@@ -16,7 +16,6 @@
 #include "mem/ruby/network/MessageBuffer.hh"
 #include "mem/ruby/common/Global.hh"
 #include "sim/clocked_object.hh"
-#include "base/callback.hh"
 
 #define REPORT_INTERVAL 100000
 
@@ -48,12 +47,9 @@ Gem5TrafficManager::Gem5TrafficManager(const Configuration &config, const
     _next_report = REPORT_INTERVAL;
     _watch_all_pkts = (config.GetInt("watch_all_pkts") > 0);
     _outdir = config.GetStr("outdir");
+    _stats_dumped = 0;
 
     _sim_state = running;
-
-    Callback *cb = new MakeCallback<Gem5TrafficManager,
-             &Gem5TrafficManager::DumpStats>(this);
-    registerExitCallback(cb);
 }
 
 Gem5TrafficManager::~Gem5TrafficManager()
@@ -769,8 +765,21 @@ void Gem5TrafficManager::DisplayOverallStats(ostream& os) const
     }
 }
 
+void Gem5TrafficManager::ResetStats()
+{
+    _ClearStats();
+}
+
 void Gem5TrafficManager::DumpStats()
 {
+    string stat_file = string("/booksimstats");
+    if (_stats_dumped)
+        stat_file += to_string(_stats_dumped) + string(".json");
+    else
+        stat_file += string(".json");
+
+    _stats_dumped++;
+
     uint64_t cycles = _time - g_ruby_start;
     cout << "Total cycles: " << cycles
         << " (start: " << g_ruby_start << ", end: " << _time << ")" << endl;
@@ -780,7 +789,7 @@ void Gem5TrafficManager::DumpStats()
 
     const vector<BSRouter *> routers = _net[0]->GetRouters();
 
-    string outfile = _outdir + string("/booksimstats.json");
+    string outfile = _outdir + stat_file;
     ofstream statsout(outfile.c_str(), ofstream::out);
 
     statsout << "{" << endl;

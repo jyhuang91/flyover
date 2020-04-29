@@ -7,7 +7,7 @@
 #include <vector>
 #include <cassert>
 
-#include "mem/ruby/network/booksim2/BooksimNetwork.hh"
+#include "mem/ruby/network/booksim2/BookSimNetwork.hh"
 #include "mem/ruby/network/booksim2/trafficmanager.hh"
 #include "mem/ruby/network/booksim2/config_utils.hh"
 #include "mem/ruby/network/booksim2/networks/network.hh"
@@ -23,13 +23,14 @@ class MessageBuffer;
 class Gem5TrafficManager : public TrafficManager {
 
 protected:
-    BooksimNetwork *_net_ptr;
+    BookSimNetwork *_net_ptr;
     vector<vector<MessageBuffer *> > _input_buffer;
     vector<vector<MessageBuffer *> > _output_buffer;
 
     int _vnets;
     vector<int> _last_vnet; // no subnet used in gem5
     string _outdir;
+    int _stats_dumped;
 
 protected:
     virtual void _RetireFlit(Flit *f, int dest);
@@ -46,6 +47,7 @@ public:
     virtual ~Gem5TrafficManager();
 
     virtual void DisplayOverallStats(ostream& os) const;
+    virtual void ResetStats();
     virtual void DumpStats();
     virtual void Step();
     void RegisterMessageBuffers(vector<vector<MessageBuffer *> >& in,
@@ -54,7 +56,7 @@ public:
     bool functionalRead(Packet *pkt);
     uint32_t functionalWrite(Packet *pkt);
 
-    void init_net_ptr(BooksimNetwork* net_ptr) { _net_ptr = net_ptr; }
+    void init_net_ptr(BookSimNetwork* net_ptr) { _net_ptr = net_ptr; }
     bool EventsOutstanding();
     bool RouterPowerStateTransition();
     virtual int NextPowerEventCycle() {return 0;}

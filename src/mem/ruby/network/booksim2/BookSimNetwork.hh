@@ -4,22 +4,23 @@
 #include <iostream>
 #include <vector>
 
+#include "base/callback.hh"
 #include "mem/ruby/common/Consumer.hh"
 #include "mem/ruby/network/Network.hh"
-#include "params/BooksimNetwork.hh"
+#include "params/BookSimNetwork.hh"
 
 class Gem5TrafficManager;
 class InjectConsumer;
 class Configuration;
 class BSNetwork;
 
-class BooksimNetwork : public Network, public Consumer
+class BookSimNetwork : public Network, public Consumer
 {
 public:
-    typedef BooksimNetworkParams Params;
-    BooksimNetwork(const Params *p);
+    typedef BookSimNetworkParams Params;
+    BookSimNetwork(const Params *p);
 
-    ~BooksimNetwork();
+    ~BookSimNetwork();
     void init();
     void wakeup();
 
@@ -31,6 +32,8 @@ public:
     void regPerfStats();
     void regActivityStats();
     void regPowerStats();
+    void ResetStats();
+    void DumpStats();
     void print(std::ostream& out) const;
 
     // set the queue
@@ -102,19 +105,20 @@ public:
     void increment_flov_hops(int hops, int vnet) { _flov_hops[vnet] += hops; }
 
 private:
-    BooksimNetwork(const BooksimNetwork& obj);
-    BooksimNetwork& operator=(const BooksimNetwork& obj);
+    BookSimNetwork(const BookSimNetwork& obj);
+    BookSimNetwork& operator=(const BookSimNetwork& obj);
 
     void checkNetworkAllocation(NodeID id, bool ordered, int network_num,
                                 std::string vnet_type);
 
+    uint64_t _start_cycle;
     std::vector<std::string> _vnet_type_names;
     Gem5TrafficManager* _manager;
     Configuration* _booksim_config;
     std::vector<BSNetwork*> _net;
     int _next_report_time;
     int _vcs_per_vnet;
-    int _flit_size;	// in Byte
+    int _flit_size; // in Byte
     uint32_t _buffers_per_vc;
 
     // Statistical variables for performance
@@ -180,9 +184,21 @@ private:
 
 };
 
+class BookSimStatsCallback : public Callback
+{
+  private:
+    BookSimNetwork *m_booksim_network;
+
+  public:
+    virtual ~BookSimStatsCallback() {}
+    BookSimStatsCallback(BookSimNetwork *network) :
+        m_booksim_network(network) {}
+    void process() { m_booksim_network->ResetStats(); }
+};
+
 //extern inline
 inline std::ostream&
-operator<<(std::ostream& out, const BooksimNetwork& obj)
+operator<<(std::ostream& out, const BookSimNetwork& obj)
 {
     obj.print(out);
     out << std::flush;

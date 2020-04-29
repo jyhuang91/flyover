@@ -7,12 +7,12 @@ Import('*')
 if env['PROTOCOL'] == 'None':
     Return()
 
-SimObject('BooksimNetwork.py')
+SimObject('BookSimNetwork.py')
 
 Source('batchtrafficmanager.cc')
 Source('booksim_config.cc')
 Source('booksim_main.cc')
-Source('BooksimNetwork.cc')
+Source('BookSimNetwork.cc')
 Source('buffer.cc')
 Source('buffer_state.cc')
 Source('config_utils.cc')

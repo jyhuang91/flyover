@@ -658,8 +658,25 @@ void Gem5FLOVTrafficManager::DisplayOverallStats(ostream& os) const
     }
 }
 
+void Gem5FLOVTrafficManager::ResetStats()
+{
+    for ( int c = 0; c < _classes; ++c ) {
+        _flov_hop_stats[c]->Clear();
+    }
+
+    _ClearStats();
+}
+
 void Gem5FLOVTrafficManager::DumpStats()
 {
+    string stat_file = string("/booksimstats");
+    if (_stats_dumped)
+        stat_file += to_string(_stats_dumped) + string(".json");
+    else
+        stat_file += string(".json");
+
+    _stats_dumped++;
+
     uint64_t cycles = _time - g_ruby_start;
     cout << "Total cycles: " << cycles
         << " (start: " << g_ruby_start << ", end: " << _time << ")" << endl;
@@ -669,7 +686,7 @@ void Gem5FLOVTrafficManager::DumpStats()
 
     const vector<BSRouter *> routers = _net[0]->GetRouters();
 
-    string outfile = _outdir + string("/booksimstats.json");
+    string outfile = _outdir + stat_file;
     ofstream statsout(outfile.c_str(), ofstream::out);
 
     statsout << "{" << endl;

@@ -134,7 +134,7 @@ def create_system(options, system, piobus = None, dma_ports = []):
 
     # booksim2
     elif options.booksim_network:
-        NetworkClass = BooksimNetwork
+        NetworkClass = BookSimNetwork
         IntLinkClass = None
         ExtLinkClass = None
         RouterClass = None

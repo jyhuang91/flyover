@@ -3,7 +3,7 @@
 #include <fstream>
 
 #include "mem/ruby/system/System.hh"
-#include "mem/ruby/network/booksim2/BooksimNetwork.hh"
+#include "mem/ruby/network/booksim2/BookSimNetwork.hh"
 #include "mem/ruby/network/booksim2/routefunc.hh"
 #include "mem/ruby/network/booksim2/networks/network.hh"
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
@@ -15,9 +15,11 @@ extern TrafficManager * trafficManager;
 
 using namespace std;
 
-BooksimNetwork::BooksimNetwork(const Params *p)
+BookSimNetwork::BookSimNetwork(const Params *p)
     : Network(p), Consumer(this)
 {
+    _start_cycle = 0;
+
     _booksim_config =  new BookSimConfig();
     _booksim_config->ParseFile(p->booksim_config);
     _vcs_per_vnet = p->vcs_per_vnet;
@@ -82,16 +84,18 @@ BooksimNetwork::BooksimNetwork(const Params *p)
 
     _manager->init_net_ptr(this);
 
+    // Reset sstats callback
+    Stats::registerResetCallback(new BookSimStatsCallback(this));
 }
 
 void
-BooksimNetwork::init()
+BookSimNetwork::init()
 {
     Network::init();
     _manager->RegisterMessageBuffers(m_toNetQueues, m_fromNetQueues);
 }
 
-BooksimNetwork::~BooksimNetwork()
+BookSimNetwork::~BookSimNetwork()
 {
     // delete manager
     delete _net[0];
@@ -99,7 +103,7 @@ BooksimNetwork::~BooksimNetwork()
     delete _manager;
 }
 
-void BooksimNetwork::checkNetworkAllocation(NodeID id, bool ordered,
+void BookSimNetwork::checkNetworkAllocation(NodeID id, bool ordered,
                                             int network_num,
                                             string vnet_type)
 {
@@ -115,7 +119,7 @@ void BooksimNetwork::checkNetworkAllocation(NodeID id, bool ordered,
 }
 
 void
-BooksimNetwork::setToNetQueue(NodeID id, bool ordered, int network_num,
+BookSimNetwork::setToNetQueue(NodeID id, bool ordered, int network_num,
                                    string vnet_type, MessageBuffer *b)
 {
     checkNetworkAllocation(id, ordered, network_num, vnet_type);
@@ -128,7 +132,7 @@ BooksimNetwork::setToNetQueue(NodeID id, bool ordered, int network_num,
 }
 
 void
-BooksimNetwork::setFromNetQueue(NodeID id, bool ordered, int network_num,
+BookSimNetwork::setFromNetQueue(NodeID id, bool ordered, int network_num,
                                      string vnet_type, MessageBuffer *b)
 {
     checkNetworkAllocation(id, ordered, network_num, vnet_type);
@@ -140,7 +144,7 @@ BooksimNetwork::setFromNetQueue(NodeID id, bool ordered, int network_num,
 }
 
 void
-BooksimNetwork::wakeup()
+BookSimNetwork::wakeup()
 {
     _manager->Step();
     if (_manager->EventsOutstanding()) {
@@ -154,20 +158,34 @@ BooksimNetwork::wakeup()
 }
 
 bool
-BooksimNetwork::functionalRead(Packet *pkt)
+BookSimNetwork::functionalRead(Packet *pkt)
 {
     return _manager->functionalRead(pkt);
 }
 
 uint32_t
-BooksimNetwork::functionalWrite(Packet *pkt)
+BookSimNetwork::functionalWrite(Packet *pkt)
 {
     return _manager->functionalWrite(pkt);
 }
 
 void
-BooksimNetwork::regStats()
+BookSimNetwork::ResetStats()
 {
+    _manager->ResetStats();
+}
+
+void
+BookSimNetwork::DumpStats()
+{
+    _manager->DumpStats();
+}
+
+void
+BookSimNetwork::regStats()
+{
+    Network::regStats();
+
     regMsgStats();
     regPerfStats();
     regActivityStats();
@@ -175,7 +193,7 @@ BooksimNetwork::regStats()
 }
 
 void
-BooksimNetwork::regMsgStats()
+BookSimNetwork::regMsgStats()
 {
     _ctrl_flits_received
         .init(m_virtual_networks)
@@ -260,7 +278,7 @@ BooksimNetwork::regMsgStats()
 }
 
 void
-BooksimNetwork::regPerfStats()
+BookSimNetwork::regPerfStats()
 {
     _plat
         .init(m_virtual_networks)
@@ -372,7 +390,7 @@ BooksimNetwork::regPerfStats()
 }
 
 void
-BooksimNetwork::regActivityStats()
+BookSimNetwork::regActivityStats()
 {
     _router_buffer_reads
         .init(_net[0]->NumRouters())
@@ -420,7 +438,7 @@ BooksimNetwork::regActivityStats()
 }
 
 void
-BooksimNetwork::regPowerStats()
+BookSimNetwork::regPowerStats()
 {
     _dynamic_link_power.name(name() + ".link_dynamic_power");
     _static_link_power.name(name() + ".link_static_power");
@@ -439,7 +457,7 @@ BooksimNetwork::regPowerStats()
 }
 
 void
-BooksimNetwork::collateStats()
+BookSimNetwork::collateStats()
 {
     //RubySystem *rs = params()->ruby_system;
     //double time_delta = double(curCycle() - g_ruby_start);
@@ -473,22 +491,24 @@ BooksimNetwork::collateStats()
             _int_link_activity[i] += ac[j];
         }
     }
+
+    DumpStats();
 }
 
 void
-BooksimNetwork::print(ostream& out) const
+BookSimNetwork::print(ostream& out) const
 {
-    out << "[BooksimNetwork]";
+    out << "[BookSimNetwork]";
 }
 
-BooksimNetwork *
-BooksimNetworkParams::create()
+BookSimNetwork *
+BookSimNetworkParams::create()
 {
-    return new BooksimNetwork(this);
+    return new BookSimNetwork(this);
 }
 
 bool
-BooksimNetwork::isDataMsg(MessageSizeType size_type)
+BookSimNetwork::isDataMsg(MessageSizeType size_type)
 {
     switch(size_type) {
       case MessageSizeType_Control:
@@ -518,21 +538,21 @@ BooksimNetwork::isDataMsg(MessageSizeType size_type)
 
 // useless stuff
 void
-BooksimNetwork::makeInLink(NodeID src, SwitchID dest, BasicLink* link,
+BookSimNetwork::makeInLink(NodeID src, SwitchID dest, BasicLink* link,
                            LinkDirection direction,
                            const NetDest& routing_table_entry)
 {
 }
 
 void
-BooksimNetwork::makeOutLink(SwitchID src, NodeID dest, BasicLink* link,
+BookSimNetwork::makeOutLink(SwitchID src, NodeID dest, BasicLink* link,
                            LinkDirection direction,
                            const NetDest& routing_table_entry)
 {
 }
 
 void
-BooksimNetwork::makeInternalLink(SwitchID src, SwitchID dest, BasicLink* link,
+BookSimNetwork::makeInternalLink(SwitchID src, SwitchID dest, BasicLink* link,
                            LinkDirection direction,
                            const NetDest& routing_table_entry)
 {

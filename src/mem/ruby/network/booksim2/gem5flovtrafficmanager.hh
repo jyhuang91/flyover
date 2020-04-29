@@ -7,7 +7,6 @@
 #include <vector>
 #include <cassert>
 
-#include "mem/ruby/network/booksim2/BooksimNetwork.hh"
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
 #include "mem/ruby/network/booksim2/config_utils.hh"
 #include "mem/ruby/network/booksim2/networks/network.hh"
@@ -46,6 +45,7 @@ public:
 
     virtual void DisplayOverallStats(ostream& os) const;
     virtual void DumpStats();
+    virtual void ResetStats();
     virtual void Step();
     virtual int  NextPowerEventCycle();
 };
