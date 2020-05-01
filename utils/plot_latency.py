@@ -305,9 +305,10 @@ def main():
     pdf.plot_teardown(pdfpage, fig)
 
     # latency breakdown
-    colors = ['#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#253494']
-    colors = ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0']
-    colors = ['#0570b0', '#000000', '#ffffff', '#fee0d2', '#f7fcf5']
+    #colors = ['#0570b0', '#000000', '#ffffff', '#fee0d2', '#f7fcf5']
+    #colors = ['#2f5597', '#000000', '#ffffff', '#f4b183', '#e2f0d9']
+    #colors = ['#08519c','#3182bd','#6baed6','#bdd7e7','#eff3ff']
+    colors = ['#08519c','#bdd7e7','#6baed6','#3182bd','#eff3ff']
     figname = traffic + injection_rate_name[injection_rate] + 'lat_breakdown.pdf'
     pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
     ax = fig.gca()
