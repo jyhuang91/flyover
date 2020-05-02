@@ -251,6 +251,7 @@ def parseStats(stats_dir, config, router_config_file, link_config_file,
     router_dynamic_power = 0.0
     router_static_power = 0.0
     for (r, inj) in enumerate(inject_rate):
+        print('Router {}:'.format(r))
         if r == 0:
             inj = flov_hops / cycles + hops / cycles
         else:
@@ -258,8 +259,12 @@ def parseStats(stats_dir, config, router_config_file, link_config_file,
         rpower = computeRouterPowerAndArea(
             r, stats_file, config, number_of_virtual_networks, vcs_per_vnet,
             buffers_per_vc, attached_router_id, flit_size_bits, inj)
-        router_dynamic_power += rpower[2][1]
-        router_static_power += rpower[3][1] * booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
+        assert rpower[12][0] == 'Total dynamic power: '
+        assert rpower[13][0] == 'Total leakage power: '
+        router_dynamic_power += rpower[12][1]
+        off_percent = booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
+        router_static_power += rpower[13][1] * booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
+        print('')
 
     # Finalize DSENT
     dsent.finalize()
