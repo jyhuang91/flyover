@@ -23,6 +23,7 @@ public:
     ~BookSimNetwork();
     void init();
     void wakeup();
+    void startup();
 
     static bool isDataMsg(MessageSizeType size_type);
 

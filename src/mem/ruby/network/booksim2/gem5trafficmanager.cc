@@ -767,6 +767,11 @@ void Gem5TrafficManager::DisplayOverallStats(ostream& os) const
 
 void Gem5TrafficManager::ResetStats()
 {
+    vector<BSRouter *> routers = _net[0]->GetRouters();
+    for (int r = 0; r < routers.size(); r++) {
+        routers[r]->ResetStats();
+    }
+
     _ClearStats();
 }
 

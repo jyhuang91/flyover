@@ -2453,3 +2453,11 @@ uint64_t IQRouter::GetSwitchActivities()
 
   return total_activities;
 }
+
+void IQRouter::ResetStats()
+{
+  _bufferMonitor->reset();
+  _switchMonitor->reset();
+
+  BSRouter::ResetStats();
+}

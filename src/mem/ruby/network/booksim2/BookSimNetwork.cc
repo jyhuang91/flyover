@@ -95,6 +95,13 @@ BookSimNetwork::init()
     _manager->RegisterMessageBuffers(m_toNetQueues, m_fromNetQueues);
 }
 
+void
+BookSimNetwork::startup()
+{
+    _manager->setTime(g_ruby_start);
+    cout << "BookSim startup cycle: " << _manager->getTime() << endl;
+}
+
 BookSimNetwork::~BookSimNetwork()
 {
     // delete manager
@@ -172,6 +179,7 @@ BookSimNetwork::functionalWrite(Packet *pkt)
 void
 BookSimNetwork::ResetStats()
 {
+    _manager->setTime(g_ruby_start);
     _manager->ResetStats();
 }
 

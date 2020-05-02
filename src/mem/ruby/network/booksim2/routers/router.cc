@@ -270,6 +270,28 @@ void BSRouter::SynchronizeCycle(uint64_t cycles)
         _total_power_off_cycles += cycles;
     }
 }
+
+void BSRouter::ResetStats()
+{
+    _power_off_cycles = 0;
+    _total_power_off_cycles = 0;
+    _total_run_time = 0;
+    _idle_timer = 0;
+    _drain_timer = 0;
+    _off_timer = 0;
+    _wakeup_timer = 0;
+    _off_counter = 0;
+    _drain_counter = 0;
+    _drain_timeout_counter = 0;
+
+#ifdef TRACK_FLOWS
+    ResetFlowStats();
+#endif
+
+#ifdef TRACK_STALLS
+    ResetStallStats();
+#endif
+}
 /* ==== Power Gate - End ==== */
 
 

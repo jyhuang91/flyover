@@ -309,6 +309,7 @@ public:
   virtual void DisplayOverallStatsCSV( ostream & os = cout ) const ;
 
   inline uint64_t getTime() { return _time;}
+  inline void setTime(uint64_t time) { _time = time; }
   BooksimStats * getStats(const string & name) { return _stats[name]; }
 
 };
