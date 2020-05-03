@@ -2193,7 +2193,8 @@ void IQRouter::_SwitchUpdate( )
         << "." << (expanded_output % _output_speedup)
         << "." << endl;
     }
-    _switchMonitor->traversal(input, output, f) ;
+    if (_power_state == power_on || _power_state == draining)
+      _switchMonitor->traversal(input, output, f) ;
 
     if(f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "

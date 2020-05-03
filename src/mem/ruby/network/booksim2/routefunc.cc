@@ -3058,6 +3058,12 @@ void nord_gem5net( const BSRouter *r, const Flit *f, int in_channel,
         (r->GetNeighborPowerState(yx_out_port) == BSRouter::power_on ||
          yx_out_port == ring_out_port));
 
+    if (r->GetPowerState() == BSRouter::power_off ||
+        r->GetPowerState() == BSRouter::wakeup) { // bypass
+      xy_avaiable = false;
+      yx_avaiable = false;
+    }
+
     // Add escape channel with low priority
     if (in_escape) {
       if (f->ring_dest > r->GetRingID()) {
