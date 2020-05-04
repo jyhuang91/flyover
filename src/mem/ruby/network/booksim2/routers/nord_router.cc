@@ -455,6 +455,11 @@ void NoRDRouter::_InternalStep( )
 
   if(!_route_vcs.empty())
     _RouteEvaluate( );
+  if ((_power_state == power_off ||
+        _power_state == wakeup) &&
+      !_route_vcs.empty()) {
+    _RouteUpdate();
+  }
   if(_vc_allocator) {
     _vc_allocator->Clear();
     if(!_vc_alloc_vcs.empty())
