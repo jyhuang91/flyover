@@ -695,7 +695,7 @@ void Gem5FLOVTrafficManager::DumpStats()
     statsout << "    \"cycles\": " << cycles << "," << endl;
     statsout << "    \"routers\": {" << endl;
     for (int r = 0; r < routers.size(); r++) {
-        int power_off_cycles = routers[r]->GetPowerOffCycles();
+        uint64_t power_off_cycles = routers[r]->GetPowerOffCycles();
         double power_off_percentile = (double) power_off_cycles / (double) cycles;
         uint64_t reads = routers[r]->GetBufferReads();
         uint64_t writes = routers[r]->GetBufferWrites();
