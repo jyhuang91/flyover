@@ -660,6 +660,11 @@ void Gem5FLOVTrafficManager::DisplayOverallStats(ostream& os) const
 
 void Gem5FLOVTrafficManager::ResetStats()
 {
+    vector<BSRouter *> routers = _net[0]->GetRouters();
+    for (int r = 0; r < routers.size(); r++) {
+        routers[r]->ResetStats();
+    }
+
     for ( int c = 0; c < _classes; ++c ) {
         _flov_hop_stats[c]->Clear();
     }

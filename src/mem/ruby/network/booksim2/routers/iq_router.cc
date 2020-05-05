@@ -2193,7 +2193,8 @@ void IQRouter::_SwitchUpdate( )
         << "." << (expanded_output % _output_speedup)
         << "." << endl;
     }
-    _switchMonitor->traversal(input, output, f) ;
+    if (_power_state == power_on || _power_state == draining)
+      _switchMonitor->traversal(input, output, f) ;
 
     if(f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -2452,4 +2453,12 @@ uint64_t IQRouter::GetSwitchActivities()
   }
 
   return total_activities;
+}
+
+void IQRouter::ResetStats()
+{
+  _bufferMonitor->reset();
+  _switchMonitor->reset();
+
+  BSRouter::ResetStats();
 }

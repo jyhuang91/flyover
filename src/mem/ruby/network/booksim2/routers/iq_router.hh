@@ -190,6 +190,7 @@ public:
   virtual uint64_t GetBufferWrites();
   virtual uint64_t GetSwitchActivities();
 
+  virtual void ResetStats();
 };
 
 #endif

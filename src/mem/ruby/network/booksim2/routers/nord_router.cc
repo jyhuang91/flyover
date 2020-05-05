@@ -118,6 +118,16 @@ NoRDRouter::NoRDRouter( Configuration const & config, Module *parent,
   _drain_done_sent.resize(4, false);
   _drain_tags.resize(4, false);
   _outstanding_bypass_packets.clear();
+
+  if ((row == 1) || (gK > 4 && row % 2 == 1 && row < gK - 1) ||
+      (row == gK - 1 && col > 0 && col < gK - 1)) {
+    _nord_wakeup_threshold = config.GetInt("nord_performance_centric_wakeup_threshold");
+  } else {
+    _nord_wakeup_threshold = config.GetInt("nord_power_centric_wakeup_threshold");
+  }
+  _wakeup_monitor_epoch = config.GetInt("nord_wakeup_monitor_epoch");
+  _wakeup_monitor_vc_requests = 0;
+
   /* ==== Power Gate - End ==== */
 }
 
@@ -357,6 +367,14 @@ void NoRDRouter::PowerStateEvaluate()
           *gWatchOut << endl;
         }
       }
+      if (_nord_wakeup_threshold > 0) {
+        if (GetSimTime() % _wakeup_monitor_epoch) {
+          if (_wakeup_monitor_vc_requests >= _nord_wakeup_threshold) {
+            _wakeup_signal = true;
+          }
+          _wakeup_monitor_vc_requests = 0;
+        }
+      }
     }
     break;
 
@@ -412,7 +430,7 @@ int NoRDRouter::NextPowerEventCycle()
 void NoRDRouter::_InternalStep( )
 {
   /* ==== Power Gate - Begin ==== */
-  if (_power_state == power_off || _power_state == wakeup) {
+  /*if (_power_state == power_off || _power_state == wakeup) {
     _NoRDStep();
     _HandshakeResponse();
     _OutputQueuing();
@@ -420,7 +438,7 @@ void NoRDRouter::_InternalStep( )
     //_active = !_out_queue_handshakes.empty() || ...
     _active = !_proc_credits.empty() || !_in_queue_flits.empty();
     return;
-  }
+  }*/
   /* ==== Power Gate - End ==== */
 
   if(!_active) {
@@ -437,6 +455,11 @@ void NoRDRouter::_InternalStep( )
 
   if(!_route_vcs.empty())
     _RouteEvaluate( );
+  if ((_power_state == power_off ||
+        _power_state == wakeup) &&
+      !_route_vcs.empty()) {
+    _RouteUpdate();
+  }
   if(_vc_allocator) {
     _vc_allocator->Clear();
     if(!_vc_alloc_vcs.empty())
@@ -596,7 +619,8 @@ void NoRDRouter::_InputQueuing( )
     if(f->head) ++_active_packets[f->cl][input];
 #endif
 
-    _bufferMonitor->write(input, f) ;
+    if (_power_state == power_on || _power_state == draining)
+      _bufferMonitor->write(input, f) ;
 
     if(cur_buf->GetState(vc) == VC::idle) {
       assert(cur_buf->FrontFlit(vc) == f);
@@ -789,6 +813,10 @@ void NoRDRouter::_VCAllocUpdate( )
       break;
     }
     assert(GetSimTime() == time);
+
+    if (_power_state == power_off) {
+      _wakeup_monitor_vc_requests++;
+    }
 
     int const input = item.second.first.first;
     assert((input >= 0) && (input < _inputs));
@@ -1053,7 +1081,8 @@ void NoRDRouter::_SWHoldUpdate( )
       if(f->tail) --_active_packets[f->cl][input];
 #endif
 
-      _bufferMonitor->read(input, f) ;
+      if (_power_state == power_on || _power_state == draining)
+        _bufferMonitor->read(input, f) ;
 
       f->hops++;
       f->vc = match_vc;
@@ -1457,7 +1486,8 @@ void NoRDRouter::_SWAllocUpdate( )
       if(f->tail) --_active_packets[f->cl][input];
 #endif
 
-      _bufferMonitor->read(input, f) ;
+      if (_power_state == power_on || _power_state == draining)
+        _bufferMonitor->read(input, f) ;
 
       f->hops++;
       f->vc = match_vc;

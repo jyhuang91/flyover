@@ -789,6 +789,10 @@ int Gem5NoRDTrafficManager::NextPowerEventCycle()
         if (cycle > 0 && next_event_cycle > 0 && next_event_cycle < cycle)
             cycle = next_event_cycle;
     }
+    if (_time % _wakeup_monitor_epoch != 0 &&
+        cycle > (_wakeup_monitor_epoch - _time % _wakeup_monitor_epoch)) {
+        cycle = _wakeup_monitor_epoch - _time % _wakeup_monitor_epoch;
+    }
 
     return cycle;
 }

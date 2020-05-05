@@ -319,6 +319,8 @@ public:
   virtual void AggressPowerGatingPolicy() {};
   virtual void RegressPowerGatingPolicy() {};
 
+  virtual void ResetStats();
+
   virtual int NextPowerEventCycle() {return 0;}
   virtual void SynchronizeCycle(uint64_t cycles);
 
