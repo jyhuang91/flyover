@@ -80,9 +80,8 @@ def parseConfig(config_file):
         print("ERROR: Ruby network not found in '", config_file)
         sys.exit(1)
 
-    if config.get("system.ruby.network", "type") != "BooksimNetwork":
-        print("ERROR: Garnet network or Booksim network not used in '",
-              config_file)
+    if config.get("system.ruby.network", "type") != "BookSimNetwork":
+        print("ERROR: Booksim network not used in '", config_file)
         sys.exit(1)
 
     router_id = config.get("system.ruby.network", "attached_router_id").split()
@@ -262,8 +261,9 @@ def parseStats(stats_dir, config, router_config_file, link_config_file,
         assert rpower[12][0] == 'Total dynamic power: '
         assert rpower[13][0] == 'Total leakage power: '
         router_dynamic_power += rpower[12][1]
-        off_percent = booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
-        router_static_power += rpower[13][1] * booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
+        on_percent = booksim_stats["routers"]["router_{}".format(r)]["power-on-percentile"]
+        print(' on percent: {}'.format(on_percent))
+        router_static_power += rpower[13][1] * on_percent
         print('')
 
     # Finalize DSENT
