@@ -172,7 +172,7 @@ def main():
 
     # figure generation
     plt.rc('font', size=14)
-    plt.rc('font', weight='bold')
+    #plt.rc('font', weight='bold')
     plt.rc('legend', fontsize=14)
     #linestyles = ['-', '--', '--', '--', '-.', '-.']
     linestyles = ['-', '--', '-', '-', '--', '--']
@@ -236,6 +236,7 @@ def main():
     figname = traffic + injection_rate_name[injection_rate] + 'power_breakdown.pdf'
     pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
     ax = fig.gca()
+    ax2 = ax.twinx() # for normalized static power, must put it here for the look
     hdls = barchart.draw(
         ax,
         paper_power_breakdown,
@@ -270,7 +271,6 @@ def main():
             add_line(ax, pos * scale, ypos)
     add_line(ax, 1, ypos)
     # add static power at secondary axis
-    ax2 = ax.twinx()  # ax for allreduce speedup
     xs = []
     p = 0.0
     for g in range(len(off_percentile)):

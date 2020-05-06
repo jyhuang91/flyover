@@ -28,7 +28,7 @@ def main():
 
     # figure generation
     plt.rc('font', size=14)
-    plt.rc('font', weight='bold')
+    #plt.rc('font', weight='bold')
     plt.rc('legend', fontsize=14)
     colors = ['#f2a900', '#00a9e0']
     linestyles = ['-', '-']

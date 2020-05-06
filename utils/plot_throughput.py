@@ -5,6 +5,7 @@ import sys
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as plticker
 from easypyplot import pdf, barchart, color
 from easypyplot import format as fmt
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
@@ -16,7 +17,7 @@ def main():
     traffic = 'uniform'
     off = 50
 
-    dimensions = [6, 8]
+    dimensions = [4, 6, 8, 10]
     schemes = [
         'baseline', 'rp', 'nord', 'flov', 'opt_flov'
     ]
@@ -25,7 +26,7 @@ def main():
     ]
     rp_schemes = ['rpa', 'rpc', 'norp']
     injection_rates = []
-    for i in range(1, 91, 1):
+    for i in range(1, 101, 1):
         injection_rates.append("%.2f" % (float(i) / 100))
 
     saturations = np.zeros((int(len(dimensions)), int(len(schemes))), dtype=np.float)
@@ -112,9 +113,9 @@ def main():
             paper_inj_rates[d][s] = [float(rate) for i, rate in enumerate(paper_inj_rates[d][s])]
 
     # figure generation
-    plt.rc('font', size=14)
-    plt.rc('font', weight='bold')
-    plt.rc('legend', fontsize=14)
+    plt.rc('font', size=16)
+    #plt.rc('font', weight='bold')
+    plt.rc('legend', fontsize=16)
     #linestyles = ['-', '-', '-', '--', '--']
     #markers = ['o', '^', 'd', 'v', 'D']
     #colors = ['#27408b', '#000000', '#ee0000', '#cd3278', '#451900']
@@ -130,11 +131,11 @@ def main():
     colors = ['#b7312c', '#f2a900', '#48a23f', '#00a9e0', '#004b87', '#715091', '#636569',
             '#0076a8', '#d78825']
     markers = ['x', 'o', 'd', '^', 's', 'p', 'v', 'D', 'x']
-    linestyles = ['-', '-', '-', '-', '-']
+    linestyles = ['-', '-', '-', '-', '-', '-', '-']
 
     for d, dimension in enumerate(dimensions):
         figname = traffic + '_' + str(dimension) + 'dim_50off_throughput.pdf'
-        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
+        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=16)
         ax = fig.gca()
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
@@ -170,9 +171,12 @@ def main():
 
     for d, dimension in enumerate(dimensions):
         figname = traffic + '_' + str(dimension) + 'dim_50off_power.pdf'
-        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
+        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=16)
         ax = fig.gca()
-        axins = zoomed_inset_axes(ax, 2, loc=4) # zoom-factor: 2.5, location: lower-right
+        if dimension == 4:
+            axins = zoomed_inset_axes(ax, 1.8, loc=4) # zoom-factor: 1.8, location: lower-right
+        else:
+            axins = zoomed_inset_axes(ax, 2, loc=4) # zoom-factor: 2, location: lower-right
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
                 #injection_rates,
@@ -215,10 +219,22 @@ def main():
             frameon=False,
             handletextpad=0.5,
             columnspacing=1)
-        if dimension == 6:
+        if dimension == 4:
+            x1, x2, y1, y2 = 0.1, 0.3, 0.14, 0.35 # specify the limits
+            loc = plticker.MultipleLocator(base=0.05)
+            axins.yaxis.set_major_locator(loc)
+        elif dimension == 6:
             x1, x2, y1, y2 = 0, 0.15, 0.2, 0.8 # specify the limits
+            loc = plticker.MultipleLocator(base=0.15)
+            axins.yaxis.set_major_locator(loc)
         elif dimension == 8:
             x1, x2, y1, y2 = 0, 0.15, 0.3, 1.5 # specify the limits
+            loc = plticker.MultipleLocator(base=0.3)
+            axins.yaxis.set_major_locator(loc)
+        elif dimension == 10:
+            x1, x2, y1, y2 = 0, 0.15, 0.3, 2 # specify the limits
+            loc = plticker.MultipleLocator(base=0.5)
+            axins.yaxis.set_major_locator(loc)
         axins.set_xlim(x1, x2) # apply the x-limits
         axins.set_ylim(y1, y2) # apply the y-limits
         axins.yaxis.grid(True, linestyle='--', color='black')
