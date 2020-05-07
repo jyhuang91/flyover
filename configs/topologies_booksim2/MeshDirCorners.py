@@ -208,7 +208,7 @@ class MeshDirCorners(SimpleTopology):
 
         num_cpus = options.num_cpus
         num_rows = options.mesh_rows
-        num_columns = num_columns
+        num_columns = num_rows
         num_routers = num_rows * num_columns
 
         # First determine which nodes are cache cntrls vs. dirs vs. dma
@@ -249,7 +249,8 @@ class MeshDirCorners(SimpleTopology):
             remaining_cores.remove(r)
 
         # attached router id of extern nodes
-        attached_router_id = active_cores.sort()
+        active_cores.sort()
+        attached_router_id = active_cores
         attached_router_id = attached_router_id + attached_router_id
 
         # Connect each cache controller to the appropriate router

@@ -58,8 +58,7 @@ Gem5NoRDTrafficManager::Gem5NoRDTrafficManager(const Configuration &config, cons
     if (gK > 4)
       _power_centric_wakeup_threshold = 1;
     else
-      _power_centric_wakeup_threshold = 2;
-    //_power_centric_wakeup_threshold = config.GetInt("nord_power_centric_wakeup_threshold");
+      _power_centric_wakeup_threshold = config.GetInt("nord_power_centric_wakeup_threshold");
     _wakeup_monitor_epoch = config.GetInt("nord_wakeup_monitor_epoch");
     _last_monitor_epoch = 0;
     _wakeup_monitor_vc_requests.resize(_net[0]->NumRouters(), 0);
