@@ -358,7 +358,7 @@ BookSimConfig::BookSimConfig( )
   _int_map["bet_threshold"] = 10;
   _int_map["wakeup_threshold"] = 10;
   _int_map["nord_performance_centric_wakeup_threshold"] = 1; // number of VC requests at NI within monitor epoch
-  _int_map["nord_power_centric_wakeup_threshold"] = 3;
+  _int_map["nord_power_centric_wakeup_threshold"] = 2;
   _int_map["nord_wakeup_monitor_epoch"] = 10; // report every 10 cycles
   _int_map["misroute_threshold"] = -1;
   _float_map["zeroload_latency"] = 30;

@@ -158,20 +158,21 @@ void BSNetwork::_Alloc( )
   _core_states.resize(_size, true);
   _router_states.resize(_size, true);
   if (_powergate_auto_config) {
-    _off_cores.clear();
+    //_off_cores.clear();
+    assert(_off_cores.size() > 0);
     _off_routers.clear();
     // random off core id generation for core parking
-    unsigned num_off_cores = _nodes * _powergate_percentile / 100;
+    /*unsigned num_off_cores = _nodes * _powergate_percentile / 100;
     if (num_off_cores + gK > _nodes) {
       ostringstream err;
       err << "percentile of power-gating is too high, should keep one row active" << endl;
       Error(err.str());
-    }
+    }*/
     if (_fabric_manager < 0 || _fabric_manager >= _size) {
       _fabric_manager = gK*gK/2 - gK/2 - 1;
     }
     assert(_fabric_manager < _size);
-    RandomSeed(_powergate_seed);
+    /*RandomSeed(_powergate_seed);
     for (unsigned i = 0; i < num_off_cores; ++i) {
       int cid = RandomInt(_nodes - 1 - gK);
       while (find(_off_cores.begin(), _off_cores.end(), cid) != _off_cores.end() ||
@@ -181,8 +182,8 @@ void BSNetwork::_Alloc( )
       _off_cores.push_back(cid);
     }
     assert(_off_cores.size() == num_off_cores);
-    sort(_off_cores.begin(), _off_cores.end());
-    for (unsigned i = 0; i < num_off_cores; i++) {
+    sort(_off_cores.begin(), _off_cores.end());*/
+    for (unsigned i = 0; i < _off_cores.size(); i++) {
       int cid = _off_cores[i];
       _core_states[cid] = false;
     }

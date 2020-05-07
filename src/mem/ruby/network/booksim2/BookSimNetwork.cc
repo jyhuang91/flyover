@@ -29,7 +29,10 @@ BookSimNetwork::BookSimNetwork(const Params *p)
     _booksim_config->Assign("vcs_per_vnet", _vcs_per_vnet);
     _booksim_config->Assign("channel_width", _flit_size*8);
     _booksim_config->Assign("vc_buf_size", (int)_buffers_per_vc);
+    _booksim_config->Assign("k", p->kary);
     _booksim_config->AddStrField("outdir", p->outdir);
+    if (_booksim_config->GetStr("router") != "iq") // don't add for Baseline
+        _booksim_config->AddStrField("off_cores", p->off_cores);
 
     _booksim_config->Assign("nodes", (int) m_nodes);
     _booksim_config->Assign("num_vcs", (int) m_virtual_networks*_vcs_per_vnet);

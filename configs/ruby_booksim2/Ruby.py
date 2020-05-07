@@ -156,6 +156,7 @@ def create_system(options, system, piobus = None, dma_ports = []):
         network.booksim_config = options.booksim_config
         network.outdir = m5.options.outdir
         network.buffers_per_vc = options.buffers_per_vc
+        network.kary = options.mesh_row
     ruby.network = network
 
     protocol = buildEnv['PROTOCOL']

@@ -15,3 +15,6 @@ class BookSimNetwork(RubyNetwork):
     vcs_per_vnet = Param.Int(4, "virtual channels per virtual network");
 
     buffers_per_vc = Param.UInt32(5, "buffers per virtual channel");
+
+    kary = Param.Int(8, "k-ary network");
+    off_cores = Param.String("", "off router array string")
