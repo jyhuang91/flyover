@@ -51,6 +51,10 @@ protected:
   int _pending_credits;
   vector<int> _outstanding_bypass_packets;
 
+  int _nord_wakeup_threshold;
+  int _wakeup_monitor_epoch;
+  int _wakeup_monitor_vc_requests;
+
   bool _ReceiveFlits();
   void _ReceiveHandshakes( );
   /* ==== Power Gate - End ==== */

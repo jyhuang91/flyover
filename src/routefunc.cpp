@@ -2842,6 +2842,12 @@ void nord_mesh( const Router *r, const Flit *f, int in_channel,
         (r->GetNeighborPowerState(yx_out_port) == Router::power_on ||
          yx_out_port == ring_out_port));
 
+    if (r->GetPowerState() == Router::power_off ||
+        r->GetPowerState() == Router::wakeup) { // bypass
+      xy_avaiable = false;
+      yx_avaiable = false;
+    }
+
     // Add escape channel with low priority
     if (in_escape) {
       if (f->ring_dest > r->GetRingID()) {

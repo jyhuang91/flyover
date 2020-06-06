@@ -4,12 +4,17 @@ traffic=uniform
 powergate_auto_config=1
 off_percentile=50
 
-for dim in 8 10
+for dim in 4 #6 8 10
 do
-  for inj in `seq -w 0.01 0.01 0.90`
+  #for inj in `seq -w 0.01 0.01 0.90`
+  for inj in `seq -w 0.01 0.01 1.00`
   do
     condition=`echo "$inj > 0.75" | bc -l`
     if [ $dim -gt 6 ] && [ $condition -eq 1 ]; then
+      break
+    fi
+    condition=`echo "$inj > 0.90" | bc -l`
+    if [ $dim -gt 4 ] && [ $condition -eq 1 ]; then
       break
     fi
     for scheme in baseline rpa rpc norp nord flov opt_flov
@@ -29,8 +34,12 @@ do
       else
         wait_for_tail_credit=1
       fi
+      nord_power_centric_wakeup_threshold=1
+      if [ $scheme = "nord" ] && [ $dim -eq 4 ] ; then
+        nord_power_centric_wakeup_threshold=2
+      fi
       count=`ps aux | grep booksim | wc -l`
-      while [ $count -ge 26 ]; do
+      while [ $count -ge 8 ]; do
         count=`ps aux | grep booksim | wc -l`
       done
       logfile=../results/throughput/${scheme}/${dim}dim/${traffic}_${inj}inj_${dim}dim_${off_percentile}off.log
@@ -49,7 +58,7 @@ do
         routing_deadlock_timeout_threshold=512 \
         idle_threshold=20 \
         drain_threshold=${drain_threshold} \
-        nord_power_centric_wakeup_threshold=1 \
+        nord_power_centric_wakeup_threshold=${nord_power_centric_wakeup_threshold} \
         wait_for_tail_credit=${wait_for_tail_credit} \
         flov_monitor_epoch=1000 > ${logfile} 2>&1 &
     done
