@@ -1,5 +1,5 @@
 # FLOV
-Fly-Over: A Light-Weight Distributed Power-Gating Mechanism for Energy-Efficient Networks-on-Chip
+A Voting Approach for Adaptive Network-on-Chip Power-Gating
 
 The simulation infrastructure used in FLOV is based on BookSim simulator.
 
