@@ -12,7 +12,7 @@ meshrows=8;
 logfile=log/opt_flov/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_${datasize}.log
 mkdir -p log/opt_flov
 
-./build/${system}/gem5.opt \
+./build/${system}/gem5.fast \
   -d m5out/restore_opt_flov/${benchmark}${numthread}_${meshrows}x${meshrows}mesh_sim${datasize} \
   configs/example/fs_booksim2.py \
   --checkpoint-dir=m5out/checkpoints/${benchmark}${numthread}_${numcpu}cpu_sim${datasize}/ \
