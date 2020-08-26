@@ -133,8 +133,8 @@ def main():
     average_norm_static_power = np.zeros(
         int(len(paper_schemes)), dtype=np.float)
 
-    if os.path.exists('results.npz'):
-        results = np.load('results.npz')
+    if os.path.exists('results_8c.npz'):
+        results = np.load('results_8c.npz')
 
         # Raw resutls
         runtimes = results['runtimes']
@@ -196,7 +196,7 @@ def main():
             for b, benchmark in enumerate(benchmarks):
 
                 # runtime
-                filename = 'm5out/restore_' + scheme + '/' + benchmark + '32_8x8mesh_simsmall/stats.txt'
+                filename = 'm5out-8c-4x4mesh/restore_' + scheme + '/' + benchmark + '8_4x4mesh_simsmall/stats.txt'
 
                 statsfile = open(filename)
                 for l, line in enumerate(statsfile):
@@ -209,7 +209,7 @@ def main():
                 norm_runtimes[s][b] = runtimes[s][b] / runtimes[0][b]
 
                 # energy
-                sim_directory = "m5out/restore_" + scheme + "/" + benchmark + "32_8x8mesh_simsmall"
+                sim_directory = "m5out-8c-4x4mesh/restore_" + scheme + "/" + benchmark + "8_4x4mesh_simsmall"
 
                 dynamic_power, static_power, dynamic_energy, static_energy = power_model.getPowerAndEnergy(
                     sim_directory, router_config_file, link_config_file)
@@ -243,7 +243,7 @@ def main():
                     b * len(schemes) + s] = dynamic_power / baseline_total_power
 
                 # latency and hop count
-                booksim_stats_file = 'm5out/restore_{}/{}32_8x8mesh_simsmall/booksimstats.json'.format(scheme, benchmark)
+                booksim_stats_file = 'm5out-8c-4x4mesh/restore_{}/{}8_4x4mesh_simsmall/booksimstats.json'.format(scheme, benchmark)
                 with open(booksim_stats_file) as jsonfile:
                     booksim_stats = json.load(jsonfile)
                     latency[s][b] = booksim_stats['packet-latency']['average']
@@ -394,7 +394,7 @@ def main():
         average_norm_dynamic_power_over_nord = average_norm_dynamic_power[
             2:] / average_norm_dynamic_power[2]
 
-        np.savez('results.npz',
+        np.savez('results_8c.npz',
                 # raw data
                 runtimes=runtimes, norm_runtimes=norm_runtimes,
                 energy=energy, energy_breakdown=energy_breakdown,
@@ -485,7 +485,7 @@ def main():
           average_norm_static_power_over_nord)
 
     # write to a file
-    with open('results.csv', mode='w') as result_file:
+    with open('results_8c.csv', mode='w') as result_file:
         # write runtime
         result_file.write('Raw runtime\n')
         for s, scheme in enumerate(schemes):
