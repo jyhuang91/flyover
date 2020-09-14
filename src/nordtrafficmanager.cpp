@@ -783,11 +783,16 @@ void NoRDTrafficManager::_Step( )
 
           if (_lookahead_routing) {
             assert(!_noq);
-            if(f->watch) {
-              *gWatchOut << GetSimTime() << " | "
-                << "node" << n << " | "
-                << "Already generated lookahead routing info for flit " << f->id
-                << " (NOQ)." << endl;
+            const FlitChannel * inject = _net[subnet]->GetInject(n);
+            const Router * router = inject->GetSink();
+            assert(router);
+            int in_channel = inject->GetSinkPort();
+            _rf(router, f, in_channel, &f->la_route_set, false);
+            if (f->watch) {
+                *gWatchOut << GetSimTime() << " | "
+                    << "node" << n << " | "
+                    << "Generating lookahead routing info for flit " << f->id
+                    << "." << endl;
             }
           } else {
             f->la_route_set.Clear();
