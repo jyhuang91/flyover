@@ -17,7 +17,7 @@ def main():
     traffic = 'uniform'
     off = 50
 
-    dimensions = [4, 6, 8, 10]
+    dimensions = [4, 6, 8, 10, 20]
     schemes = [
         'baseline', 'rp', 'nord', 'flov', 'opt_flov'
     ]
@@ -86,7 +86,7 @@ def main():
                         if 'Packet latency average' in line and 'samples' in line:
                             line = line.split()
                             latencies[d][s][i] = float(line[4])
-                            if float(line[4]) > 300 and saturations[d][s] == 0:
+                            if float(line[4]) > 500 and saturations[d][s] == 0:
                                 saturations[d][s] = float(injection_rate)
                         if 'Total Power:' in line:
                             line = line.split()
@@ -104,7 +104,10 @@ def main():
             saturation = int(math.ceil(saturations[d][s] * 100))
             paper_inj_rates[d].append([])
             paper_inj_rates[d][s].append("0.01")
-            for i in range(5, saturation - 3, 5):
+            gap = 5
+            if dimension == 20:
+                gap = 2
+            for i in range(gap, saturation - 3, gap):
                 paper_inj_rates[d][s].append("%.2f" % (float(i) / 100))
             for i in range(saturation - 3, saturation + 1, 1):
                 paper_inj_rates[d][s].append("%.2f" % (float(i) / 100))
@@ -113,9 +116,9 @@ def main():
             paper_inj_rates[d][s] = [float(rate) for i, rate in enumerate(paper_inj_rates[d][s])]
 
     # figure generation
-    plt.rc('font', size=16)
+    plt.rc('font', size=26)
     #plt.rc('font', weight='bold')
-    plt.rc('legend', fontsize=16)
+    plt.rc('legend', fontsize=20)
     #linestyles = ['-', '-', '-', '--', '--']
     #markers = ['o', '^', 'd', 'v', 'D']
     #colors = ['#27408b', '#000000', '#ee0000', '#cd3278', '#451900']
@@ -135,7 +138,7 @@ def main():
 
     for d, dimension in enumerate(dimensions):
         figname = traffic + '_' + str(dimension) + 'dim_50off_throughput.pdf'
-        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=16)
+        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 8), fontsize=28)
         ax = fig.gca()
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
@@ -156,33 +159,49 @@ def main():
         ax.set_xlabel('injection rate (flits/cycle/core)')
         ax.yaxis.grid(True, linestyle='--', color='black')
         hdls, lab = ax.get_legend_handles_labels()
-        ax.legend(
-            hdls,
-            lab,
-            loc='upper center',
-            bbox_to_anchor=(0.5, 1.2),
-            ncol=5,
-            frameon=False,
-            handletextpad=0.5,
-            columnspacing=1)
-        ax.set_ylim(0, 300)
-        fig.subplots_adjust(top=0.85, bottom=0.2)
+        if dimension != 20:
+            legend = ax.legend(
+                hdls,
+                lab,
+                loc='upper left',
+                #bbox_to_anchor=(0, 1.2),
+                ncol=1,
+                frameon=True,
+                fontsize=22,
+                handletextpad=0.5,
+                columnspacing=1)
+        else:
+            legend = ax.legend(
+                hdls,
+                lab,
+                loc='upper left',
+                bbox_to_anchor=(0.16, 1),
+                ncol=1,
+                frameon=True,
+                fontsize=22,
+                handletextpad=0.5,
+                columnspacing=1)
+        legend.get_frame().set_edgecolor('white')
+        ax.set_ylim(0, 500)
+        fig.subplots_adjust(top=0.85, bottom=0.2, left=0.15)
         pdf.plot_teardown(pdfpage, fig)
 
     for d, dimension in enumerate(dimensions):
         figname = traffic + '_' + str(dimension) + 'dim_50off_power.pdf'
-        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=16)
+        pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 8), fontsize=28)
         ax = fig.gca()
         if dimension == 4:
             axins = zoomed_inset_axes(ax, 1.8, loc=4) # zoom-factor: 1.8, location: lower-right
+        elif dimension == 20:
+            axins = zoomed_inset_axes(ax, 1.5, loc=4) # zoom-factor: 2, location: lower-right
         else:
             axins = zoomed_inset_axes(ax, 2, loc=4) # zoom-factor: 2, location: lower-right
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
                 #injection_rates,
                 #powers[d][s, :],
-                paper_inj_rates[d][s],
-                powers[d][s, paper_indices[d][s]],
+                paper_inj_rates[d][s][0:-1],
+                powers[d][s, paper_indices[d][s][0:-1]],
                 marker=markers[s],
                 markersize=9,
                 markeredgewidth=2,
@@ -195,8 +214,8 @@ def main():
             axins.plot(
                 #injection_rates,
                 #powers[d][s, :],
-                paper_inj_rates[d][s],
-                powers[d][s, paper_indices[d][s]],
+                paper_inj_rates[d][s][0:-1],
+                powers[d][s, paper_indices[d][s][0:-1]],
                 marker=markers[s],
                 markersize=9,
                 markeredgewidth=2,
@@ -209,16 +228,22 @@ def main():
         ax.set_ylabel('NoC Power (Watts)')
         ax.set_xlabel('injection rate (flits/cycle/core)')
         ax.yaxis.grid(True, linestyle='--', color='black')
+        if dimension == 10:
+            ax.yaxis.set_major_formatter(plticker.FormatStrFormatter('%.1f'))
         hdls, lab = ax.get_legend_handles_labels()
-        ax.legend(
+        legend = ax.legend(
             hdls,
             lab,
-            loc='upper center',
-            bbox_to_anchor=(0.5, 1.2),
-            ncol=5,
-            frameon=False,
+            #loc='upper center',
+            #bbox_to_anchor=(0.5, 1.2),
+            #ncol=5,
+            loc='upper left',
+            ncol=1,
+            frameon=True,
+            fontsize=20,
             handletextpad=0.5,
             columnspacing=1)
+        legend.get_frame().set_edgecolor('white')
         if dimension == 4:
             x1, x2, y1, y2 = 0.1, 0.3, 0.14, 0.35 # specify the limits
             loc = plticker.MultipleLocator(base=0.05)
@@ -235,6 +260,10 @@ def main():
             x1, x2, y1, y2 = 0, 0.15, 0.3, 2 # specify the limits
             loc = plticker.MultipleLocator(base=0.5)
             axins.yaxis.set_major_locator(loc)
+        elif dimension == 20:
+            x1, x2, y1, y2 = 0, 0.10, 2.5, 10 # specify the limits
+            loc = plticker.MultipleLocator(base=2)
+            axins.yaxis.set_major_locator(loc)
         axins.set_xlim(x1, x2) # apply the x-limits
         axins.set_ylim(y1, y2) # apply the y-limits
         axins.yaxis.grid(True, linestyle='--', color='black')
@@ -243,7 +272,7 @@ def main():
         axins.xaxis.set_ticks_position('none')
         axins.yaxis.set_ticks_position('none')
         mark_inset(ax, axins, loc1=2, loc2=3, fc="none", lw=1)
-        fig.subplots_adjust(top=0.85, bottom=0.2)
+        fig.subplots_adjust(top=0.85, bottom=0.2, left=0.15)
         pdf.plot_teardown(pdfpage, fig)
 
     #plt.show()
