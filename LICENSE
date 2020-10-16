@@ -1,6 +1,10 @@
+Unless otherwise noted, this software is distributed under the MIT license,
+which is discribed below. Some files in this distribution are distributed
+under different licenses (see booksim2/LICENSE.md and gem5/LICENSE).
+
 MIT License
 
-Copyright (c) 2020 jyhuang91
+Copyright (c) 2020 High Performance Computing Lab, Texas A&M University
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
