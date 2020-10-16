@@ -1,0 +1,20 @@
+# -*- mode:python -*-
+
+# Authors: Jiayi Huang
+
+Import('*')
+
+if env['PROTOCOL'] == 'None':
+    Return()
+
+Source('anynet.cc')
+Source('cmesh.cc')
+Source('dragonfly.cc')
+Source('fattree.cc')
+Source('flatfly_onchip.cc')
+Source('fly.cc')
+Source('kncube.cc')
+Source('network.cc')
+Source('qtree.cc')
+Source('tree4.cc')
+Source('gem5net.cc')

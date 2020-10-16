@@ -1,0 +1,47 @@
+# -*- mode:python -*-
+
+# Authors: Jiayi Huang
+
+Import('*')
+
+if env['PROTOCOL'] == 'None':
+    Return()
+
+SimObject('BookSimNetwork.py')
+
+Source('batchtrafficmanager.cc')
+Source('booksim_config.cc')
+Source('booksim_main.cc')
+Source('BookSimNetwork.cc')
+Source('buffer.cc')
+Source('buffer_state.cc')
+Source('config_utils.cc')
+Source('credit.cc')
+Source('flit.cc')
+Source('flitchannel.cc')
+Source('flovtrafficmanager.cc')
+Source('handshake.cc')
+Source('gem5trafficmanager.cc')
+Source('gem5flovtrafficmanager.cc')
+Source('gem5nordtrafficmanager.cc')
+Source('injection.cc')
+Source('misc_utils.cc')
+Source('module.cc')
+Source('outputset.cc')
+Source('packet_reply_info.cc')
+Source('random_utils.cc')
+#Source('rng.c')
+#Source('rng-double.c')
+Source('rng_wrapper.cc')
+Source('rng_double_wrapper.cc')
+Source('routefunc.cc')
+Source('routetbl.cc')
+Source('rptrafficmanager.cc')
+Source('stats.cc')
+Source('traffic.cc')
+Source('trafficmanager.cc')
+Source('vc.cc')
+env.CFile(target = ['y.tab.c', 'y.tab.h'], source = 'config.y')
+env.CFile(target = 'lex.yy.c', source = 'config.l')
+Source('y.tab.c')
+Source('lex.yy.c')
