@@ -1,7 +1,26 @@
-# FLOV
+# FLOV-BookSim
 A Voting Approach for Adaptive Network-on-Chip Power-Gating
 
 The simulation infrastructure used in FLOV is based on BookSim simulator.
+
+## Compilatioin
+
+You can simply change directory to the `src/` folder and `make` to compile the
+code.
+
+```bash
+$ cd src
+$ make
+```
+
+## Run Simulations
+
+To run the simulation, you can execute the compiled binary `./src/booksim
+<simulation.cfg>` and give a input configuration file (pick one from `runfiles/`
+or write your own).
+
+We also provide some script files to help reproduce the results and plot the
+figures. Check out `utils/`.
 
 BookSim Interconnection Network Simulator
 =========================================
