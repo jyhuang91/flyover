@@ -1,3 +1,7 @@
+# PyObject for BookSim network wrapper
+#
+# Author: Jiayi Huang
+
 from m5.params import *
 from m5.proxy import *
 from Network import RubyNetwork

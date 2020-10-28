@@ -1,3 +1,10 @@
+/*
+ * gem5trafficmanager.hh
+ * - A traffic manager for gem5 simulation
+ *
+ * Author: Jiayi Huang
+ */
+
 #ifndef _GEM5_TRAFFICMANAGER_HH_
 #define _GEM5_TRAFFICMANAGER_HH_
 

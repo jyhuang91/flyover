@@ -1,3 +1,10 @@
+/*
+ * gem5nordtrafficmanager.cc
+ * - A traffic manager for NoRD gem5 simulation
+ *
+ * Author: Jiayi Huang
+ */
+
 #include <sstream>
 #include <cmath>
 #include <fstream>
@@ -148,7 +155,6 @@ void Gem5NoRDTrafficManager::_GeneratePacket(int source, int stype, int vnet, ui
             f->cl = cl;
             f->src_router = Gem5Net::NodeToRouter(source);
             f->gem5_vnet = vnet;
-            //f->vc = vnet; // why assign it?
             f->msg_ptr = new_msg_ptr;
 
             _total_in_flight_flits[f->cl].insert(make_pair(f->id, f));
@@ -303,8 +309,6 @@ void Gem5NoRDTrafficManager::Step()
 
             Credit * const c = _net[subnet]->ReadCredit(n);
             if (c) {
-#ifdef TRACK_FLOWS
-#endif
                 _buf_states[n][subnet]->ProcessCredit(c);
                 c->Free();
             }
@@ -621,9 +625,6 @@ void Gem5NoRDTrafficManager::Step()
                     _partial_packets[n][c].pop_front();
                 }
 
-#ifdef TRACK_FLOWS
-#endif
-
                 dest_buf->SendingFlit(f);
 
                 if (_pri_type == network_age_based) {
@@ -700,8 +701,6 @@ void Gem5NoRDTrafficManager::Step()
                     }
                 }
 
-#ifdef TRACK_FLOW
-#endif
                 _net[subnet]->WriteFlit(f, n);
             }
         }
@@ -725,8 +724,6 @@ void Gem5NoRDTrafficManager::Step()
                     Credit * const c = Credit::New();
                     c->vc.insert(f->vc);
                     _net[subnet]->WriteCredit(c, n);
-#ifdef TRACK_FLOWS
-#endif
                     _RetireFlit(f, n);
                 } else {
 

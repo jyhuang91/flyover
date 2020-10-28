@@ -1,3 +1,10 @@
+/*
+ * routetbl.cpp
+ * - routing table support for Router Parking
+ *
+ * Author: Jiayi Huang
+ */
+
 #include <deque>
 #include <limits>
 
@@ -128,7 +135,7 @@ void RouteTbl::_CalDist()
 void RouteTbl::_CalUpDownDist()
 {
   _Init();
-  
+
   int closest;
   int count = 0;
 
@@ -160,7 +167,7 @@ void RouteTbl::BuildRoute()
     if (i == _src) {
       _rt_tbl[i] = ARRIVED;
     } else {
-      
+
       int j = i;
       while (_pred[j] != _src) {
         j = _pred[j];
@@ -177,7 +184,7 @@ void RouteTbl::BuildRoute()
       } else {
         dir = NORTH;
       }
-      
+
       _rt_tbl[i] = dir;
     }
   }
@@ -207,7 +214,7 @@ void RouteTbl::BuildEscRoute(int root)
   for (int i = 0; i < _num_nodes; i++) {
     if (_router_states[i] == false)
       continue;
-    
+
     if (i == _src) {
       _esc_rt_tbl[i] = ARRIVED;
     } else {
@@ -261,7 +268,7 @@ void RouteTbl::_BFS(int current)
 }
 
 void RouteTbl::_PrintPath(int node) {
-  
+
   if (node == _src) {
     cout << node << "->";
   } else if (_pred[node] == -1) {

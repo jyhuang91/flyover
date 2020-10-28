@@ -1,3 +1,10 @@
+/*
+ * gem5flovtrafficmanager.hh
+ * - A traffic manager for FLOV gem5 simulation
+ *
+ * Author: Jiayi Huang
+ */
+
 #ifndef _GEM5_FLOV_TRAFFICMANAGER_HH_
 #define _GEM5_FLOV_TRAFFICMANAGER_HH_
 

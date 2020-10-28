@@ -1,9 +1,14 @@
+/*
+ * gem5trafficmanager.cc
+ * - A traffic manager for gem5 simulation
+ *
+ * Author: Jiayi Huang
+ */
+
 #include <sstream>
 #include <cmath>
 #include <fstream>
 #include <limits>
-//#include <cstdlib>
-//#include <ctime>
 
 #include "mem/ruby/network/booksim2/booksim.hh"
 #include "mem/ruby/network/booksim2/gem5trafficmanager.hh"
@@ -167,7 +172,6 @@ void Gem5TrafficManager::_GeneratePacket(int source, int stype, int vnet, uint64
             f->cl = cl;
             f->src_router = Gem5Net::NodeToRouter(source);
             f->gem5_vnet = vnet;
-            //f->vc = vnet; // why assign it?
             f->msg_ptr = new_msg_ptr;
 
             _total_in_flight_flits[f->cl].insert(make_pair(f->id, f));
@@ -333,8 +337,6 @@ void Gem5TrafficManager::Step()
 
             Credit * const c = _net[subnet]->ReadCredit(n);
             if (c) {
-#ifdef TRACK_FLOWS
-#endif
                 _buf_states[n][subnet]->ProcessCredit(c);
                 c->Free();
             }
@@ -521,9 +523,6 @@ void Gem5TrafficManager::Step()
 
                  _partial_packets[n][c].pop_front();
 
-#ifdef TRACK_FLOWS
-#endif
-
                  dest_buf->SendingFlit(f);
 
                  if (_pri_type == network_age_based) {
@@ -567,8 +566,6 @@ void Gem5TrafficManager::Step()
                      _sent_packets[c][n]++;
                  }
 
-#ifdef TRACK_FLOW
-#endif
                  _net[subnet]->WriteFlit(f, n);
             }
         }
@@ -591,8 +588,6 @@ void Gem5TrafficManager::Step()
                 Credit * const c = Credit::New();
                 c->vc.insert(f->vc);
                 _net[subnet]->WriteCredit(c, n);
-#ifdef TRACK_FLOWS
-#endif
                 _RetireFlit(f, n);
             }
         }

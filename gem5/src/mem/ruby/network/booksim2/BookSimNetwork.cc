@@ -1,3 +1,9 @@
+/*
+ * BookSim network wrapper
+ *
+ * Author: Jiayi Huang
+ */
+
 #include <string>
 #include <sstream>
 #include <fstream>

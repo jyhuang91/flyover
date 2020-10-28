@@ -4,9 +4,8 @@ traffic=uniform
 powergate_auto_config=1
 off_percentile=50
 
-for dim in 20 #4 6 8 10
+for dim in 4 6 8 10 20
 do
-  #for inj in `seq -w 0.01 0.01 0.90`
   for inj in `seq -w 0.01 0.01 1.00`
   do
     condition=`echo "$inj > 0.35" | bc -l`

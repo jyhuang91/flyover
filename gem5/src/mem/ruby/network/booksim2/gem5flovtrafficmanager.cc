@@ -1,9 +1,14 @@
+/*
+ * gem5flovtrafficmanager.cc
+ * - A traffic manager for FLOV gem5 simulation
+ *
+ * Author: Jiayi Huang
+ */
+
 #include <sstream>
 #include <cmath>
 #include <fstream>
 #include <limits>
-//#include <cstdlib>
-//#include <ctime>
 
 #include "mem/ruby/network/booksim2/booksim.hh"
 #include "mem/ruby/network/booksim2/gem5flovtrafficmanager.hh"
@@ -246,8 +251,6 @@ void Gem5FLOVTrafficManager::Step()
 
             Credit * const c = _net[subnet]->ReadCredit(n);
             if (c) {
-#ifdef TRACK_FLOWS
-#endif
                 _buf_states[n][subnet]->ProcessCredit(c);
                 c->Free();
             }
@@ -434,9 +437,6 @@ void Gem5FLOVTrafficManager::Step()
 
                  _partial_packets[n][c].pop_front();
 
-#ifdef TRACK_FLOWS
-#endif
-
                  dest_buf->SendingFlit(f);
 
                  if (_pri_type == network_age_based) {
@@ -480,8 +480,6 @@ void Gem5FLOVTrafficManager::Step()
                      _sent_packets[c][n]++;
                  }
 
-#ifdef TRACK_FLOW
-#endif
                  _net[subnet]->WriteFlit(f, n);
             }
         }
@@ -504,8 +502,6 @@ void Gem5FLOVTrafficManager::Step()
                 Credit * const c = Credit::New();
                 c->vc.insert(f->vc);
                 _net[subnet]->WriteCredit(c, n);
-#ifdef TRACK_FLOWS
-#endif
                 _RetireFlit(f, n);
             }
         }
@@ -520,14 +516,14 @@ void Gem5FLOVTrafficManager::Step()
     ++_monitor_counter;
     _network_time++;
 
-    //if (_time > _next_report) {
-    //    while (_time > _next_report) {
-    //        cout << "Booksim report System time " << _time
-    //            << "\tnetwork time " << _network_time << endl;
-    //        _next_report += REPORT_INTERVAL;
-    //    }
-    //    DisplayStats(cout);
-    //}
+    /*if (_time > _next_report) {
+        while (_time > _next_report) {
+            cout << "Booksim report System time " << _time
+                << "\tnetwork time " << _network_time << endl;
+            _next_report += REPORT_INTERVAL;
+        }
+        DisplayStats(cout);
+    }*/
 
     assert(_network_time);
     assert(_time);

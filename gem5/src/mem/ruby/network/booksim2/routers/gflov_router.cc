@@ -1,29 +1,9 @@
-// $Id$
-
 /*
- Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- Redistributions of source code must retain the above copyright notice, this
- list of conditions and the following disclaimer.
- Redistributions in binary form must reproduce the above copyright notice, this
- list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * gflov_router.cc
+ * - A class for G-FLOV router microarchitecture
+ *
+ * Author: Jiayi Huang
+ */
 
 #include "mem/ruby/network/booksim2/routers/gflov_router.hh"
 
@@ -237,7 +217,7 @@ void GFLOVRouter::PowerStateEvaluate()
       for (int out = 0; out < 4; ++out) {
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0)
             || (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-          continue;	// for edge routers
+          continue; // for edge routers
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
         _out_queue_handshakes[out]->src_state = _power_state;
@@ -449,7 +429,6 @@ void GFLOVRouter::_InternalStep( )
   /* ==== Power Gate - Begin ==== */
   _HandshakeResponse();
 
-  //_active = activity;
   //flits are set back to RC in VC update
   _active = activity | !_route_vcs.empty();
   /* ==== Power Gate - End ==== */
@@ -1702,7 +1681,7 @@ void GFLOVRouter::_FlovStep() {
 
     BufferState * const dest_buf = _next_buf[output];
     if (f->head)
-      dest_buf->TakeBuffer(vc, _vcs * _inputs);	// indicate its taken by flov
+      dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by flov
     dest_buf->SendingFlit(f);
 
     if (f->watch) {
@@ -1749,10 +1728,10 @@ void GFLOVRouter::_FlovStep() {
     // relay the credit to the upstream router
     // FLOV channel input output mapping
     // input --> output
-    //	 0	 -->   1
-    //	 1	 -->   0
-    //	 2	 -->   3
-    //	 3	 -->   2
+    //   0   -->   1
+    //   1   -->   0
+    //   2   -->   3
+    //   3   -->   2
     if (output < 4) {
       int input = output;
       if (output % 2)
@@ -1955,11 +1934,6 @@ void GFLOVRouter::_HandshakeEvaluate() {
             for (int vc = 0; vc < _vcs; ++vc)
               _credit_counter[input][vc] = 0;
             _next_buf[input]->FullCredits();
-            //if (!h->drain_done) {
-            //	// it could be, if the just power_on don't receive my wakeup state change
-            //	// before it sent the handshake, previous the line are all off
-            //	//assert(_drain_tags[input]);
-            //}
           }
         } else if (src_state == draining) {
           assert(!h->drain_done);

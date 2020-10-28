@@ -170,13 +170,7 @@ def main():
 
     # figure generation
     plt.rc('font', size=14)
-    #plt.rc('font', weight='bold')
     plt.rc('legend', fontsize=14)
-    #linestyles = ['-', '--', '--', '--', '-.', '-.']
-    linestyles = ['-', '--', '-', '-', '--', '--']
-    markers = ['o', 's', '^', 'd', 'v', 'D']
-    #colors = ['r', 'g', 'b', 'y', 'm', 'k']
-    colors = ['#27408b', '#8b5742', '#000000', '#ee0000', '#cd3278', '#451900']
     # matlab colors
     colors = ['#b7312c', '#f2a900', '#00a9e0', '#004b87', '#715091', '#636569',
             '#0076a8', '#d78825']
@@ -212,14 +206,8 @@ def main():
         bbox_to_anchor=(0.5, 1.2),
         ncol=len(paper_schemes),
         frameon=False)
-    #ax.legend(loc='upper center', ncol=4, frameon=False)
-    #if traffic == 'uniform':
-    #    ax.set_ylim(25, 45)
-    #else:
-    #    ax.set_ylim(15, 35)
     ax.set_xlim(0, 90)
     fig.subplots_adjust(top=0.85, bottom=0.2)
-    #plt.tight_layout()
     pdf.plot_teardown(pdfpage, fig)
 
     group_names = []
@@ -303,9 +291,6 @@ def main():
     pdf.plot_teardown(pdfpage, fig)
 
     # latency breakdown
-    #colors = ['#0570b0', '#000000', '#ffffff', '#fee0d2', '#f7fcf5']
-    #colors = ['#2f5597', '#000000', '#ffffff', '#f4b183', '#e2f0d9']
-    #colors = ['#08519c','#3182bd','#6baed6','#bdd7e7','#eff3ff']
     colors = ['#08519c','#bdd7e7','#6baed6','#3182bd','#eff3ff']
     figname = traffic + injection_rate_name[injection_rate] + 'lat_breakdown.pdf'
     pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
@@ -355,118 +340,7 @@ def main():
     fig.subplots_adjust(bottom=0.38)
     pdf.plot_teardown(pdfpage, fig)
 
-    '''
-    figname = traffic + injection_rate_name[injection_rate] + 'dynamic_power.pdf'
-    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    ax = fig.gca()
-    for s, scheme in enumerate(paper_schemes):
-        ax.plot(
-            off_percentile,
-            paper_dynamic_power[s, :],
-            #router_dynamic_power[s, :],
-            marker=markers[s],
-            markersize=9,
-            markeredgewidth=2,
-            fillstyle='none',
-            markeredgecolor=colors[s],
-            color=colors[s],
-            linestyle=linestyles[s],
-            linewidth=2,
-            label=scheme)
-    ax.set_ylabel('Dynamic Power (W)')
-    #ax.set_xlabel('Fraction of Power-Gated Cores (%)')
-    ax.set_xlabel(xlab)
-    ax.yaxis.grid(True, linestyle='--', color='black')
-    hdls, lab = ax.get_legend_handles_labels()
-    ax.legend(
-        hdls,
-        lab,
-        loc='upper center',
-        bbox_to_anchor=(0.5, 1.3),
-        ncol=3,
-        frameon=False)
-    #ax.legend(loc='upper center', ncol=4)
-    ax.set_xlim(0, 90)
-    if injection_rate == '0.02':
-        ax.set_ylim(0, 0.3)
-    elif injection_rate == '0.08':
-        ax.set_ylim(0, 0.8)
-    fig.subplots_adjust(top=0.8, bottom=0.2)
-    pdf.plot_teardown(pdfpage, fig)
-
-    figname = traffic + injection_rate_name[injection_rate] + 'total_power.pdf'
-    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    ax = fig.gca()
-    for s, scheme in enumerate(paper_schemes):
-        ax.plot(
-            off_percentile,
-            paper_total_power[s, :],
-            #router_total_power[s, :],
-            marker=markers[s],
-            markersize=9,
-            markeredgewidth=2,
-            fillstyle='none',
-            markeredgecolor=colors[s],
-            color=colors[s],
-            linestyle=linestyles[s],
-            linewidth=2,
-            label=scheme)
-    ax.set_ylabel('Total Power (W)')
-    #ax.set_xlabel('Fraction of Power-Gated Cores (%)')
-    ax.set_xlabel(xlab)
-    ax.yaxis.grid(True, linestyle='--', color='black')
-    hdls, lab = ax.get_legend_handles_labels()
-    ax.legend(
-        hdls,
-        lab,
-        loc='upper center',
-        bbox_to_anchor=(0.5, 1.3),
-        ncol=3,
-        frameon=False)
-    #ax.legend(loc='upper center', ncol=4)
-    ax.set_xlim(0, 90)
-    if injection_rate == '0.02':
-        ax.set_ylim(0, 1)
-    elif injection_rate == '0.08':
-        ax.set_ylim(0, 1.4)
-    fig.subplots_adjust(top=0.8, bottom=0.2)
-    pdf.plot_teardown(pdfpage, fig)
-
-    figname = traffic + injection_rate_name[injection_rate] + 'static_power.pdf'
-    #figname = injection_rate + 'static_power.pdf'
-    pdfpage, fig = pdf.plot_setup(figname, figsize=(8, 4), fontsize=14)
-    ax = fig.gca()
-    for s, scheme in enumerate(paper_schemes):
-        ax.plot(
-            off_percentile,
-            paper_static_power[s, :],
-            marker=markers[s],
-            markersize=9,
-            markeredgewidth=2,
-            fillstyle='none',
-            markeredgecolor=colors[s],
-            color=colors[s],
-            linestyle=linestyles[s],
-            linewidth=2,
-            label=scheme)
-    ax.set_ylabel('Static Power (W)')
-    ax.set_xlabel('Fraction of Power-Gated Cores (%), ' + injection_rate +
-                  ' flits/cycle/core')
-    ax.yaxis.grid(True, linestyle='--', color='black')
-    hdls, lab = ax.get_legend_handles_labels()
-    ax.legend(
-        hdls,
-        lab,
-        loc='upper center',
-        bbox_to_anchor=(0.5, 1.3),
-        ncol=3,
-        frameon=False)
-    ax.set_xlim(0, 90)
-    fig.subplots_adjust(top=0.8, bottom=0.2)
-    pdf.plot_teardown(pdfpage, fig)
-    '''
-
-    #plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':

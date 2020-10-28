@@ -1,3 +1,10 @@
+/*
+ * dsent_power_module.cpp
+ * - Parameterized power model for DSENT numbers
+ *
+ * Author: Jiayi Huang
+ */
+
 #include "dsent_power_module.hpp"
 #include "booksim_config.hpp"
 #include "iq_router.hpp"

@@ -2145,9 +2145,6 @@ void opt_rflov_mesh( const Router *r, const Flit *f, int in_channel,
 
     out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
 
-    //if(r->GetNeighborPowerState(out_port) != Router::power_on)
-    //  out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
-
     if ((cur % gK != dest % gK) && (cur / gK != dest / gK)
         && r->GetNeighborPowerState(out_port) != Router::power_on) {// not in same row/col
       if (dest % gK > cur % gK + 1) {
@@ -2250,9 +2247,6 @@ void opt_flov_mesh( const Router *r, const Flit *f, int in_channel,
     }
 
     out_port = dor_next_mesh(r->GetID(), f->dest); // XY
-
-    //if(r->GetNeighborPowerState(out_port) != Router::power_on)
-    //  out_port = dor_next_mesh(r->GetID(), f->dest, true); // YX
 
     if ((cur % gK != dest % gK) && (cur / gK != dest / gK)
         && r->GetNeighborPowerState(out_port) != Router::power_on) {// not in same row/col
@@ -2586,134 +2580,6 @@ void ring_dateline_mesh( const Router *r, const Flit *f, int in_channel,
   outputs->AddRange(out_port, vcBegin, vcEnd);
 }
 
-void nord_old_mesh( const Router *r, const Flit *f, int in_channel,
-    OutputSet *outputs, bool inject )
-{
-  int vcBegin = 0, vcEnd = gNumVCs-1;
-  if ( f->type == Flit::READ_REQUEST ) {
-    vcBegin = gReadReqBeginVC;
-    vcEnd = gReadReqEndVC;
-  } else if ( f->type == Flit::WRITE_REQUEST ) {
-    vcBegin = gWriteReqBeginVC;
-    vcEnd = gWriteReqEndVC;
-  } else if ( f->type ==  Flit::READ_REPLY ) {
-    vcBegin = gReadReplyBeginVC;
-    vcEnd = gReadReplyEndVC;
-  } else if ( f->type ==  Flit::WRITE_REPLY ) {
-    vcBegin = gWriteReplyBeginVC;
-    vcEnd = gWriteReplyEndVC;
-  }
-  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || ((inject || r == nullptr) && (f->vc < 0)));
-  assert(vcEnd - vcBegin + 1 > 2 && "2 VCs should use ring_dateline_mesh routing instead");
-
-  // dateline algorithm
-  // first VC as dateline class 0, last VC as dateline class 1
-
-  outputs->Clear( );
-
-  int out_port = -1;
-  bool timeout = (GetSimTime() - f->rtime > gRoutingDeadlockTimeoutThreshold);
-  if(inject) {
-    // injection can use all VCs ?
-    vcBegin++;
-    vcEnd--;
-    out_port = -1;
-  } else if (r == nullptr && !inject) { // bypass
-    if (f->bypass_vc == vcBegin || f->bypass_vc == vcEnd) { // escape
-      vcBegin = f->bypass_vc;
-      vcEnd = f->bypass_vc;
-    } else if (timeout) {
-      vcEnd = vcBegin;
-    } else {
-      vcBegin++;
-      vcEnd--;
-    }
-    out_port = -1;
-  } else if(r->GetID() == f->dest) {
-    // ejection can also use all VCs
-    out_port = 2*gN;
-  } else {
-    assert(r);
-    int in_vc = f->vc;
-
-    bool in_escape = (in_vc == vcBegin || in_vc == vcEnd);
-
-
-    int xy_out_port = dor_next_mesh(r->GetID(), f->dest);  // XY
-    int yx_out_port = dor_next_mesh(r->GetID(), f->dest, true);  // YX
-
-    out_port = xy_out_port;
-    if(r->GetNeighborPowerState(xy_out_port) != Router::power_on) {
-      out_port = yx_out_port;
-      if (r->GetNeighborPowerState(yx_out_port) != Router::power_on)
-        out_port = r->GetRingOutput();
-    }
-
-    bool go_to_escape = false;
-    if (in_escape == false) {
-      go_to_escape = (f->misroute_hops > gMissRouteThreshold);
-    }
-
-    bool uturn = (in_channel == out_port);
-
-    if (in_escape == true) {
-      out_port = r->GetRingOutput();
-      if (r->GetID() == gNodes - 1) { // dateline
-        vcBegin = vcEnd;
-      } else {
-        vcBegin = in_vc;
-        vcEnd = in_vc;
-      }
-    //} else if (go_to_escape || uturn) {
-    } else if (go_to_escape) {
-      out_port = r->GetRingOutput();
-      if (r->GetID() == gNodes - 1) { // dateline
-        vcBegin = vcEnd;
-      } else {
-        vcEnd = vcBegin;
-      }
-    } else if (timeout) {
-      out_port = r->GetRingOutput();
-      if (r->GetID() == gNodes - 1) { // dateline
-        vcBegin = vcEnd;
-      } else {
-        vcEnd = vcBegin;
-      }
-    } else if (uturn) {
-      out_port = r->GetRingOutput();
-      ++vcBegin;
-      --vcEnd;
-    } else {
-      ++vcBegin;
-      --vcEnd;
-    }
-  }
-
-  if (f->watch) {
-    if (r != nullptr) {
-      *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
-        << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-        << " at output port " << out_port << " for flit " << f->id
-        << " (input port " << in_channel << ", destination " << f->dest << ")"
-        << "." << endl;
-    } else if (inject) {
-      *gWatchOut << GetSimTime() << " | node " << f->src << " | "
-        << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-        << " at injection port for flit " << f->id
-        << " (destination " << f->dest << ")." << endl;
-    } else {
-      *gWatchOut << GetSimTime() << " | "
-        << "Adding VC range [" << vcBegin << "," << vcEnd << "]"
-        << " at bypassing port for flit " << f->id
-        << " (destination " << f->dest << ")." << endl;
-    }
-  }
-
-  outputs->Clear();
-
-  outputs->AddRange(out_port, vcBegin, vcEnd);
-}
-
 void nord_mesh( const Router *r, const Flit *f, int in_channel,
     OutputSet *outputs, bool inject )
 {
@@ -3021,7 +2887,6 @@ void InitializeRoutingMap( const Configuration & config )
   gRoutingFunctionMap["opt_flov_mesh"] = &opt_flov_mesh; // optimized flov routing
   gRoutingFunctionMap["adaptive_flov_mesh"] = &adaptive_flov_mesh;
   gRoutingFunctionMap["rp_mesh"] = &rp_mesh;
-  gRoutingFunctionMap["nord_old_mesh"] = &nord_old_mesh;
   gRoutingFunctionMap["nord_mesh"] = &nord_mesh;
   gRoutingFunctionMap["ring_dateline_mesh"] = &ring_dateline_mesh;
   /* ==== Power Gate - End ==== */

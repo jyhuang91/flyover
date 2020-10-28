@@ -1,29 +1,9 @@
-// $Id$
-
 /*
- Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- Redistributions of source code must retain the above copyright notice, this
- list of conditions and the following disclaimer.
- Redistributions in binary form must reproduce the above copyright notice, this
- list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * nord_router.cc
+ * - A class for NoRD router microarchitecture
+ *
+ * Author: Jiayi Huang
+ */
 
 #include "mem/ruby/network/booksim2/routers/nord_router.hh"
 
@@ -753,37 +733,12 @@ void NoRDRouter::_RouteUpdate( )
 
     cur_buf->Route(vc, _rf, this, f, input);
     cur_buf->SetState(vc, VC::vc_alloc);
+
     /* ==== Power Gate - Begin ==== */
     // avoid rerouting by VCAlloc again and again
     f->rtime = GetSimTime();
-
-    //if (f->dest_router != _id) {
-    //  OutputSet const * const route_set = cur_buf->GetRouteSet(vc);
-    //  assert(route_set);
-    //  set<OutputSet::sSetElement> const setlist = route_set->GetSet();
-    //  if (setlist.size() == 1) {
-    //    set<OutputSet::sSetElement>::const_iterator iset = setlist.begin();
-    //    int const out_port = iset->output_port;
-    //    assert((out_port >= 0) && (out_port < _outputs));
-    //    const FlitChannel * channel = _output_channels[out_port];
-    //    BSRouter * router = channel->GetSink();
-    //    assert(router);
-    //    /*if (f->dest_router == router->GetID()) {
-    //      if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
-    //        cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
-    //          << router->GetID() << " is "
-    //          << POWERSTATE[_neighbor_states[out_port]] << ", but actually is "
-    //          << POWERSTATE[router->GetPowerState()] << "(flit " << f->id
-    //          << " dest " << f->dest_router << ")" << endl;
-    //        assert(f->type == Flit::READ_REPLY || f->type == Flit::WRITE_REPLY);
-    //        assert(0); // means should not come here??
-    //      }
-    //      assert(_neighbor_states[out_port] == power_on ||
-    //          _neighbor_states[out_port] == draining);
-    //    }*/
-    //  }
-    //}
     /* ==== Power Gate - End ==== */
+
     if(_speculative) {
       _sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second, -1)));
     }

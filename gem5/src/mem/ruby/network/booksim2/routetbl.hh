@@ -1,3 +1,10 @@
+/*
+ * routetbl.hh
+ * - routing table support for Router Parking
+ *
+ * Author: Jiayi Huang
+ */
+
 #ifndef _ROUTE_TBL_HPP_
 #define _ROUTE_TBL_HPP_
 
@@ -8,14 +15,14 @@
 
 //#define INFINITY (__builtin_inff())
 
-enum { INVALID = -1, EAST, WEST, 
+enum { INVALID = -1, EAST, WEST,
   SOUTH, NORTH, ARRIVED
 };
 
 class RouteTbl {
 
 private:
-  
+
   vector<int> _pred;
   vector<int> _dist;
   vector<bool> _visited;
@@ -45,7 +52,7 @@ private:
 
   void _Init();
   int _ClosestUnvisited();
-  void _CalDist(); 
+  void _CalDist();
   void _CalUpDownDist();
   void _BFS(int current);
 
@@ -53,7 +60,7 @@ private:
   void _PrintAllPath();
 
 public:
- 
+
   void BuildRoute();
   void BuildEscRoute(int root);
 

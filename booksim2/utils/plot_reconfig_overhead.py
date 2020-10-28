@@ -23,12 +23,10 @@ def main():
             latencies.append([float(latency) for latency in line[1:-1]])
         elif 'gFLOV' in line:
             line = line.split()
-            #latencies[1] = [float(latency) for latency in line[1:-1]]
             latencies.append([float(latency) for latency in line[1:-1]])
 
     # figure generation
     plt.rc('font', size=14)
-    #plt.rc('font', weight='bold')
     plt.rc('legend', fontsize=14)
     colors = ['#f2a900', '#00a9e0']
     linestyles = ['-', '-']

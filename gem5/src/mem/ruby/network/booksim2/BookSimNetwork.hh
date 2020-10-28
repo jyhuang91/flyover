@@ -1,3 +1,9 @@
+/*
+ * BookSim network wrapper
+ *
+ * Author: Jiayi Huang
+ */
+
 #ifndef __MEM_RUBY_NETWORK_BOOKSIM_NETWORK_HH__
 #define __MEM_RUBY_NETWORK_BOOKSIM_NETWORK_HH__
 

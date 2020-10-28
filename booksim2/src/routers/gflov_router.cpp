@@ -1,29 +1,9 @@
-// $Id$
-
 /*
- Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- Redistributions of source code must retain the above copyright notice, this
- list of conditions and the following disclaimer.
- Redistributions in binary form must reproduce the above copyright notice, this
- list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * gflov_router.cpp
+ * - A class for G-FLOV router microarchitecture
+ *
+ * Author: Jiayi Huang
+ */
 
 #include "gflov_router.hpp"
 
@@ -451,7 +431,6 @@ void GFLOVRouter::_InternalStep( )
   /* ==== Power Gate - Begin ==== */
   _HandshakeResponse();
 
-  //_active = activity;
   //flits are set back to RC in VC update
   _active = activity | !_route_vcs.empty();
   /* ==== Power Gate - End ==== */
@@ -1706,7 +1685,7 @@ void GFLOVRouter::_FlovStep() {
 
     BufferState * const dest_buf = _next_buf[output];
     if (f->head)
-      dest_buf->TakeBuffer(vc, _vcs * _inputs);	// indicate its taken by flov
+      dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by flov
     dest_buf->SendingFlit(f);
 
     if (f->watch) {
@@ -1753,10 +1732,10 @@ void GFLOVRouter::_FlovStep() {
     // relay the credit to the upstream router
     // GFLOV channel input output mapping
     // input --> output
-    //	 0	 -->   1
-    //	 1	 -->   0
-    //	 2	 -->   3
-    //	 3	 -->   2
+    //   0   -->   1
+    //   1   -->   0
+    //   2   -->   3
+    //   3   -->   2
     if (output < 4) {
       int input = output;
       if (output % 2)
@@ -1861,12 +1840,6 @@ void GFLOVRouter::_HandshakeEvaluate() {
           _next_buf[input]->ClearCredits();
         }
       }
-      //if (h->drain_done)
-        // I was draining previously
-        // Or due to draining of my leftside and it back to on,
-        // but I wakeup later, and use the first tag to on.
-        //assert(0);
-        //; // do nothing
       if (!h->drain_done && src_state >= 0) {
         _resp_hids[input] = h->hid;
       }

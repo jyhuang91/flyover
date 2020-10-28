@@ -1,29 +1,9 @@
-// $Id$
-
 /*
- Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- Redistributions of source code must retain the above copyright notice, this
- list of conditions and the following disclaimer.
- Redistributions in binary form must reproduce the above copyright notice, this
- list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * nord_router.cpp
+ * - A class for NoRD router microarchitecture
+ *
+ * Author: Jiayi Huang
+ */
 
 #include "nord_router.hpp"
 
@@ -414,18 +394,6 @@ void NoRDRouter::PowerStateEvaluate()
 
 void NoRDRouter::_InternalStep( )
 {
-  /* ==== Power Gate - Begin ==== */
-  /*if (_power_state == power_off || _power_state == wakeup) {
-    _NoRDStep();
-    _HandshakeResponse();
-    _OutputQueuing();
-    assert(_out_queue_handshakes.empty());
-    //_active = !_out_queue_handshakes.empty() || ...
-    _active = !_proc_credits.empty() || !_in_queue_flits.empty();
-    return;
-  }*/
-  /* ==== Power Gate - End ==== */
-
   if(!_active) {
     /* ==== Power Gate - Begin ==== */
     _HandshakeResponse();
@@ -752,19 +720,6 @@ void NoRDRouter::_RouteUpdate( )
         const FlitChannel * channel = _output_channels[out_port];
         Router * router = channel->GetSink();
         assert(router);
-        /*if (f->dest == router->GetID()) {
-          if (_neighbor_states[out_port] != power_on) { // what about draining, see the assertion below
-            cout << GetSimTime() << " | router#" << _id << "'s neighbor router#"
-              << router->GetID() << " is "
-              << POWERSTATE[_neighbor_states[out_port]] << ", but actually is "
-              << POWERSTATE[router->GetPowerState()] << "(flit " << f->id
-              << " dest " << f->dest << ")" << endl;
-            assert(f->type == Flit::READ_REPLY || f->type == Flit::WRITE_REPLY);
-            assert(0); // means should not come here??
-          }
-          assert(_neighbor_states[out_port] == power_on ||
-              _neighbor_states[out_port] == draining);
-        }*/
       }
     }
     /* ==== Power Gate - End ==== */

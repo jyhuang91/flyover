@@ -1,3 +1,10 @@
+/*
+ * gem5nordtrafficmanager.hh
+ * - A traffic manager for NoRD gem5 simulation
+ *
+ * Author: Jiayi Huang
+ */
+
 #ifndef _GEM5_NORD_TRAFFICMANAGER_HH_
 #define _GEM5_NORD_TRAFFICMANAGER_HH_
 

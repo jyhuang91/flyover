@@ -1,3 +1,10 @@
+/*
+ * dsent_power_module.hpp
+ * - Parameterized power model for DSENT numbers
+ *
+ * Author: Jiayi Huang
+ */
+
 #ifndef _DSENT_POWER_MODULE_HPP_
 #define _DSENT_POWER_MODULE_HPP_
 

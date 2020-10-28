@@ -64,21 +64,9 @@ def main():
                                         rp_idx = j
                                         latency = float(line[4])
                                     break
-                                #if 'Total Power:' in line:
-                                #    line = line.split()
-                                #    if power == None:
-                                #        rp_idx = j
-                                #        power = line[3]
-                                #    elif line[3] < power:
-                                #        rp_idx = j
-                                #        power = line[3]
-                                #    break
                     scheme = rp_schemes[rp_idx]
 
-                filename = scheme + '/' + str(
-                    dimension
-                ) + 'dim/' + traffic + '_' + injection_rate + 'inj_' + str(
-                    dimension) + 'dim_' + str(off) + 'off.log'
+                filename = scheme + '/' + str(dimension) + 'dim/' + traffic + '_' + injection_rate + 'inj_' + str(dimension) + 'dim_' + str(off) + 'off.log'
 
                 if os.path.exists(filename):
                     infile = open(filename)
@@ -117,20 +105,8 @@ def main():
 
     # figure generation
     plt.rc('font', size=26)
-    #plt.rc('font', weight='bold')
     plt.rc('legend', fontsize=20)
-    #linestyles = ['-', '-', '-', '--', '--']
-    #markers = ['o', '^', 'd', 'v', 'D']
-    #colors = ['#27408b', '#000000', '#ee0000', '#cd3278', '#451900']
-    linestyles = ['-', '-.', '--', '-', '-', '--', '--', '-']
-    markers = ['o', 's', 'p', '^', 'd', 'v', 'D', 'x']
-    colors = [
-        '#27408b', '#c39d00', '#8b5742', '#000000', '#ee0000', '#cd3278',
-        '#451900', '#66c2a4'
-    ]
     # matlab colors
-    colors = ['#b7312c', '#f2a900', '#48a23f', '#00a9e0', '#715091', '#636569',
-            '#0076a8', '#d78825', '#004b87']
     colors = ['#b7312c', '#f2a900', '#48a23f', '#00a9e0', '#004b87', '#715091', '#636569',
             '#0076a8', '#d78825']
     markers = ['x', 'o', 'd', '^', 's', 'p', 'v', 'D', 'x']
@@ -142,8 +118,6 @@ def main():
         ax = fig.gca()
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
-                #injection_rates,
-                #latencies[d][s, :],
                 paper_inj_rates[d][s],
                 latencies[d][s, paper_indices[d][s]],
                 marker=markers[s],
@@ -198,8 +172,6 @@ def main():
             axins = zoomed_inset_axes(ax, 2, loc=4) # zoom-factor: 2, location: lower-right
         for s, scheme in enumerate(paper_schemes):
             ax.plot(
-                #injection_rates,
-                #powers[d][s, :],
                 paper_inj_rates[d][s][0:-1],
                 powers[d][s, paper_indices[d][s][0:-1]],
                 marker=markers[s],
@@ -212,8 +184,6 @@ def main():
                 linewidth=2,
                 label=scheme)
             axins.plot(
-                #injection_rates,
-                #powers[d][s, :],
                 paper_inj_rates[d][s][0:-1],
                 powers[d][s, paper_indices[d][s][0:-1]],
                 marker=markers[s],
@@ -234,9 +204,6 @@ def main():
         legend = ax.legend(
             hdls,
             lab,
-            #loc='upper center',
-            #bbox_to_anchor=(0.5, 1.2),
-            #ncol=5,
             loc='upper left',
             ncol=1,
             frameon=True,
@@ -275,7 +242,7 @@ def main():
         fig.subplots_adjust(top=0.85, bottom=0.2, left=0.15)
         pdf.plot_teardown(pdfpage, fig)
 
-    #plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':

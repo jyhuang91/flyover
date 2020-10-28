@@ -115,7 +115,7 @@ TimedModule( parent, name ), _id( id ), _inputs( inputs ), _outputs( outputs ),
   _drain_timeout_counter = 0;
   _max_drain_time = 0;
   _min_drain_time = -1;
-  // FIXME: only support mesh now
+  // XXX: only support mesh now
   _neighbor_states.resize(4, power_on);
   _downstream_states.resize(4, power_on);
   _logical_neighbors.resize(4, -1);

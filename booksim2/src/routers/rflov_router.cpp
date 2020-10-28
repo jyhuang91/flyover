@@ -1,29 +1,10 @@
-// $Id$
-
 /*
- Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- Redistributions of source code must retain the above copyright notice, this 
- list of conditions and the following disclaimer.
- Redistributions in binary form must reproduce the above copyright notice, this
- list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * rflov_router.cpp
+ * - A class for R-FLOV router microarchitecture (different in handshaking
+ *   from G-FLOV)
+ *
+ * Author: Jiayi Huang
+ */
 
 #include "rflov_router.hpp"
 
@@ -47,7 +28,7 @@
 #include "switch_monitor.hpp"
 #include "buffer_monitor.hpp"
 
-RFLOVRouter::RFLOVRouter( Configuration const & config, Module *parent, 
+RFLOVRouter::RFLOVRouter( Configuration const & config, Module *parent,
     string const & name, int id, int inputs, int outputs )
   : IQRouter( config, parent, name, id, inputs, outputs )
 {
@@ -135,7 +116,6 @@ void RFLOVRouter::PowerStateEvaluate()
           }
           _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
           _out_queue_handshakes[out]->new_state = draining;
-          //_out_queue_handshakes[out]->src_state = _power_state;
           _out_queue_handshakes[out]->id = _id;
           _out_queue_handshakes[out]->hid = ++_req_hids[out];
         }
@@ -193,7 +173,6 @@ void RFLOVRouter::PowerStateEvaluate()
           continue;
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
-        //_out_queue_handshakes[out]->src_state = _power_state;
         _out_queue_handshakes[out]->id = _id;
         _out_queue_handshakes[out]->hid = ++_req_hids[out];
       }
@@ -231,11 +210,6 @@ void RFLOVRouter::PowerStateEvaluate()
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0) ||
             (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
           continue;
-        //        int in = out;
-        //        if (out % 2)
-        //          --in;
-        //        else
-        //          ++in;
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_off;
         _out_queue_handshakes[out]->id = _id;
@@ -256,7 +230,7 @@ void RFLOVRouter::PowerStateEvaluate()
       for (int out = 0; out < 4; ++out) {
         if ((out == 0 && _id % gK == gK-1) || (out == 1 && _id % gK == 0)
             || (out == 2 && _id / gK == gK-1) || (out == 3 && _id / gK == 0))
-          continue;	// for edge routers
+          continue; // for edge routers
         _out_queue_handshakes.insert(make_pair(out, Handshake::New()));
         _out_queue_handshakes[out]->new_state = power_on;
         _out_queue_handshakes[out]->id = _id;
@@ -322,7 +296,7 @@ void RFLOVRouter::PowerStateEvaluate()
       _drain_tags[2] && _drain_tags[3];
     drain_done &= _in_queue_flits.empty();
     ++_wakeup_timer;
-    if (drain_done && _wakeup_timer >= _wakeup_threshold) { 
+    if (drain_done && _wakeup_timer >= _wakeup_threshold) {
       _wakeup_signal = false;
       _wakeup_timer = 0;
       _idle_timer = 0;
@@ -417,7 +391,6 @@ void RFLOVRouter::_InternalStep( )
   /* ==== Power Gate - Begin ==== */
   _HandshakeResponse();
 
-  //_active = activity;
   //flits are set back to RC in VC update
   _active = activity | !_route_vcs.empty();
   /* ==== Power Gate - End ==== */
@@ -528,7 +501,7 @@ void RFLOVRouter::_InputQueuing( )
                   -1)));
         }
         if(_vc_allocator) {
-          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+          _vc_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                   -1)));
         }
         if(_noq) {
@@ -541,7 +514,7 @@ void RFLOVRouter::_InputQueuing( )
         _sw_hold_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       } else {
-        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc), 
+        _sw_alloc_vcs.push_back(make_pair(-1, make_pair(make_pair(input, vc),
                 -1)));
       }
     }
@@ -1198,19 +1171,19 @@ void RFLOVRouter::_SWAllocUpdate( )
                 vc_prio += numeric_limits<int>::min();
               }
 
-              // FIXME: This check should probably be performed in Evaluate(), 
-              // not Update(), as the latter can cause the outcome to depend on 
+              // FIXME: This check should probably be performed in Evaluate(),
+              // not Update(), as the latter can cause the outcome to depend on
               // the order of evaluation!
-              if(dest_buf->IsAvailableFor(out_vc) && 
+              if(dest_buf->IsAvailableFor(out_vc) &&
                   !dest_buf->IsFullFor(out_vc) &&
-                  ((match_vc < 0) || 
-                   RoundRobinArbiter::Supersedes(out_vc, vc_prio, 
-                     match_vc, match_prio, 
+                  ((match_vc < 0) ||
+                   RoundRobinArbiter::Supersedes(out_vc, vc_prio,
+                     match_vc, match_prio,
                      vc_offset, _vcs))) {
                 match_vc = out_vc;
                 match_prio = vc_prio;
               }
-            }	
+            }
           }
         }
         assert(match_vc >= 0);
@@ -1665,7 +1638,7 @@ void RFLOVRouter::_RFlovStep() {
 
     BufferState * const dest_buf = _next_buf[output];
     if (f->head)
-      dest_buf->TakeBuffer(vc, _vcs * _inputs);	// indicate its taken by flov
+      dest_buf->TakeBuffer(vc, _vcs * _inputs); // indicate its taken by flov
     dest_buf->SendingFlit(f);
 
     if (f->watch) {
@@ -1712,10 +1685,10 @@ void RFLOVRouter::_RFlovStep() {
     // relay the credit to the upstream router
     // RFLOV channel input output mapping
     // input --> output
-    //	 0	 -->   1
-    //	 1	 -->   0
-    //	 2	 -->   3
-    //	 3	 -->   2
+    //   0   -->   1
+    //   1   -->   0
+    //   2   -->   3
+    //   3   -->   2
     bool boundary = ((output == 1 && _id % gK == gK-1) || (output == 0 && _id % gK == 0) ||
         (output == 3 && _id / gK == gK-1) || (output == 2 && _id / gK == 0));
     if (output < 4 && !boundary) {
@@ -1803,9 +1776,6 @@ void RFLOVRouter::_HandshakeEvaluate() {
       if (h->hid == _req_hids[input] && (_power_state == draining || _power_state == wakeup)) {
         _drain_tags[input] = true;
       }
-      /*if (_power_state == draining || _power_state == wakeup) {
-        _drain_tags[input] = true;
-      }*/
     } else {
       _resp_hids[output] = h->hid;
     }
