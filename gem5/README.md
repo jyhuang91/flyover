@@ -27,7 +27,8 @@ untar it. put it under `gem5/m5out/checkpoints`.
 ## Run Simulations
 
 bash scripts under `runscripts/` subderectory is provided for simulation runs,
-take a look and use the one you want to run.
+take a look and use the one you want to run (`opt_flov` is for `FLOV+` in the
+[TC paper](https://jyhuang91.github.io/papers/tc2020-flyover.pdf)).
 
 
 
