@@ -8,7 +8,7 @@ details can be found in our and IEEE TC 2020 paper and IPDPS'17 paper:
 Jiayi Huang, Shilpa Bhosekar, Rahul Boyapati, Ningyuan Wang, Byul Hur, Ki Hwan
 Yum, and Eun Jung Kim, "[A Voting Approach for Adaptive Network-on-Chip
 Power-Gating](https://doi.org/10.1109/TC.2020.3033163)", in *IEEE Transactions
-on Computers*, vol. ?, no. ?, pp. ?-?, 2020.
+on Computers*, vol. 70, no. 11, pp. 1962-1975, 2021.
 
 Rahul Boyapati\*, Jiayi Huang\*, Ningyuan Wang, Kyung Hoon Kim, Ki Hwan Yum, and
 Eun Jung Kim, "[Fly-Over: A Light-Weight Distributed Power-Gating Mechanism for
@@ -62,10 +62,10 @@ If you find this useful in your research, please consider citing our work:
      author = {Huang, Jiayi and Bhosekar, Shilpa and Boyapati, Rahul and Wang, Ningyuan and Hur, Byul and Yum, Ki Hwan and Kim, Eun Jung},
      title = {{A Voting Approach for Adaptive Network-on-Chip Power-Gating}},
      jornal = {IEEE Transactions on Computers},
-     year = {2020},
-     volume = {},
-     number = {},
-     pages = {1--1},
+     year = {2021},
+     volume = {70},
+     number = {11},
+     pages = {1962--1975},
      doi = {10.1109/TC.2020.3033163}
     }
 
