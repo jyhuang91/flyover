@@ -258,6 +258,56 @@ void FLOVTrafficManager::_GeneratePacket( int source, int stype,
     assert(core_states[source] == true);
     /* ==== Power Gate - End ==== */
 
+    Flit::FlitType packet_type = Flit::ANY_TYPE;
+    int size = _GetNextPacketSize(cl); //input size
+    int pid = _cur_pid++;
+    assert(_cur_pid);
+    int packet_destination = _traffic_pattern[cl]->dest(source);
+    /* ==== Power Gate - Begin ==== */
+    if (_traffic[cl] == "tornado" && core_states[packet_destination] == false) {
+        packet_destination = source;
+    } else {
+        while (core_states[packet_destination] != true)
+            packet_destination = _traffic_pattern[cl]->dest(source);
+    }
+    assert(core_states[packet_destination] == true);
+    /* ==== Power Gate - End ==== */
+    bool record = false;
+    bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0);
+    watch |= _watch_all_packets;
+    if (_use_read_write[cl]){
+        if (stype > 0) {
+            if (stype == 1) {
+                packet_type = Flit::READ_REQUEST;
+                size = _read_request_size[cl];
+            } else if (stype == 2) {
+                packet_type = Flit::WRITE_REQUEST;
+                size = _write_request_size[cl];
+            } else {
+                ostringstream err;
+                err << "Invalid packet type: " << packet_type;
+                Error( err.str( ) );
+            }
+        } else {
+            PacketReplyInfo* rinfo = _repliesPending[source].front();
+            if (rinfo->type == Flit::READ_REQUEST) {//read reply
+                size = _read_reply_size[cl];
+                packet_type = Flit::READ_REPLY;
+            } else if (rinfo->type == Flit::WRITE_REQUEST) {  //write reply
+                size = _write_reply_size[cl];
+                packet_type = Flit::WRITE_REPLY;
+            } else {
+                ostringstream err;
+                err << "Invalid packet type: " << rinfo->type;
+                Error( err.str( ) );
+            }
+            packet_destination = rinfo->source;
+            time = rinfo->time;
+            record = rinfo->record;
+            _repliesPending[source].pop_front();
+            rinfo->Free();
+        }
+    }
 
     if ((packet_destination < 0) || (packet_destination >= _nodes)) {
         ostringstream err;
